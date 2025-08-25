@@ -1,0 +1,52 @@
+plugins {
+    id 'application'
+}
+
+// Set the Java version for the project to Java 11
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+// Define your main classes for easier execution
+application {
+    mainClass = 'csx55.overlay.node.Registry'
+}
+
+// Custom task to run the Registry server
+// The error occurs if this section is missing
+task runRegistry(type: JavaExec) {
+    group = "Execution"
+    description = "Starts the Registry server"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.overlay.node.Registry'
+    if (project.hasProperty('args')) {
+        args project.property('args').split()
+    }
+}
+
+// Custom task to run the MessagingNode client
+// The error occurs if this section is missing
+task runMessagingNode(type: JavaExec) {
+    group = "Execution"
+    description = "Starts a Messaging Node client"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.overlay.node.MessagingNode'
+    if (project.hasProperty('args')) {
+        args project.property('args').split()
+    }
+}
+
+// Custom task to create the final .tar submission file
+task createTar(type: Tar) {
+    // IMPORTANT: Change this to your first and last name!
+    archiveBaseName.set('FirstName_LastName_HW1')
+    archiveExtension.set('tar')
+    
+    // Include all required files for submission
+    from('.') {
+        include 'build.gradle'
+        include 'README.txt'
+        include 'src/main/java/**/*.java'
+    }
+}
