@@ -219,8 +219,8 @@ public class CorrectnessVerificationTest {
                 // Verify decimal format
                 String sentSum = m.group(4);
                 String recvSum = m.group(5);
-                assertThat(sentSum).matches(".*\\.\\d{2}$", "Sent sum must have .00 format");
-                assertThat(recvSum).matches(".*\\.\\d{2}$", "Received sum must have .00 format");
+                assertThat(sentSum).as("Sent sum must have .00 format").matches(".*\\.\\d{2}$");
+                assertThat(recvSum).as("Received sum must have .00 format").matches(".*\\.\\d{2}$");
             }
         }
         
@@ -433,8 +433,8 @@ public class CorrectnessVerificationTest {
                 if (sentSum.startsWith("-") || recvSum.startsWith("-")) {
                     foundNegative = true;
                     // Verify format even for negative numbers
-                    assertThat(sentSum).matches("-?\\d+\\.\\d{2}", "Negative sum must have .00 format");
-                    assertThat(recvSum).matches("-?\\d+\\.\\d{2}", "Negative sum must have .00 format");
+                    assertThat(sentSum).as("Negative sum must have .00 format").matches("-?\\d+\\.\\d{2}");
+                    assertThat(recvSum).as("Negative sum must have .00 format").matches("-?\\d+\\.\\d{2}");
                 }
             }
         }
