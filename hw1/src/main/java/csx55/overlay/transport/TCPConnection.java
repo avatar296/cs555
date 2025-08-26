@@ -1,5 +1,6 @@
 package csx55.overlay.transport;
 
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.Event;
 import csx55.overlay.wireformats.EventFactory;
 
@@ -26,8 +27,14 @@ public class TCPConnection {
     public TCPConnection(Socket socket, TCPConnectionListener listener) throws IOException {
         this.socket = socket;
         this.listener = listener;
-        this.dout = new DataOutputStream(socket.getOutputStream());
-        this.din = new DataInputStream(socket.getInputStream());
+        try {
+            this.dout = new DataOutputStream(socket.getOutputStream());
+            this.din = new DataInputStream(socket.getInputStream());
+        } catch (IOException e) {
+            LoggerUtil.error("TCPConnection", "Failed to create streams for connection", e);
+            closeQuietly();
+            throw e;
+        }
         
         // Don't set remoteNodeId here - it will be set properly when we know the actual node ID
         this.remoteNodeId = null;
@@ -56,24 +63,34 @@ public class TCPConnection {
                     }
                 }
             } catch (SocketException e) {
-                // Connection closed
+                // Connection closed - this is expected when socket is closed
+                LoggerUtil.debug("TCPConnection", "Socket closed for " + remoteNodeId);
             } catch (IOException e) {
-                e.printStackTrace();
+                LoggerUtil.error("TCPConnection", "Error reading from " + remoteNodeId, e);
             } finally {
                 if (listener != null) {
                     listener.onConnectionLost(this);
                 }
-                close();
+                closeQuietly();
             }
         });
         receiverThread.start();
     }
     
     public synchronized void sendEvent(Event event) throws IOException {
-        byte[] marshalledBytes = event.getBytes();
-        dout.writeInt(marshalledBytes.length);
-        dout.write(marshalledBytes);
-        dout.flush();
+        if (!isConnected()) {
+            throw new IOException("Connection is not active");
+        }
+        try {
+            byte[] marshalledBytes = event.getBytes();
+            dout.writeInt(marshalledBytes.length);
+            dout.write(marshalledBytes);
+            dout.flush();
+        } catch (IOException e) {
+            LoggerUtil.error("TCPConnection", "Failed to send event to " + remoteNodeId, e);
+            closeQuietly();
+            throw e;
+        }
     }
     
     public String getRemoteNodeId() {
@@ -85,12 +102,32 @@ public class TCPConnection {
     }
     
     public synchronized void close() {
+        closeQuietly();
+    }
+    
+    private synchronized void closeQuietly() {
+        try {
+            if (din != null) {
+                din.close();
+            }
+        } catch (IOException e) {
+            LoggerUtil.debug("TCPConnection", "Error closing input stream: " + e.getMessage());
+        }
+        
+        try {
+            if (dout != null) {
+                dout.close();
+            }
+        } catch (IOException e) {
+            LoggerUtil.debug("TCPConnection", "Error closing output stream: " + e.getMessage());
+        }
+        
         try {
             if (socket != null && !socket.isClosed()) {
                 socket.close();
             }
         } catch (IOException e) {
-            // Ignore
+            LoggerUtil.debug("TCPConnection", "Error closing socket: " + e.getMessage());
         }
     }
     

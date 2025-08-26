@@ -1,6 +1,7 @@
 package csx55.overlay.node.registry;
 
 import csx55.overlay.transport.TCPConnection;
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.util.StatisticsCollector;
 import csx55.overlay.wireformats.TrafficSummary;
 
@@ -16,7 +17,7 @@ public class StatisticsCollectionService {
     
     public synchronized void handleTrafficSummary(TrafficSummary summary, TCPConnection connection) {
         if (statsCollector == null) {
-            System.err.println("Statistics collector not initialized");
+            LoggerUtil.error("StatisticsCollection", "Statistics collector not initialized - cannot handle traffic summary");
             return;
         }
         

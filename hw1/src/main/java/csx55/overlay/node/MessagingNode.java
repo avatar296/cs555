@@ -4,6 +4,7 @@ import csx55.overlay.node.messaging.*;
 import csx55.overlay.routing.RoutingTable;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.*;
 
 import java.io.IOException;
@@ -73,7 +74,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                         // Don't add to cache yet - wait for peer identification
                     } catch (IOException e) {
                         if (running) {
-                            System.err.println("Error accepting peer: " + e.getMessage());
+                            LoggerUtil.error("MessagingNode", "Error accepting peer connection", e);
                         }
                     }
                 }
@@ -86,7 +87,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
             Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
 
         } catch (IOException e) {
-            System.err.println("Failed to start messaging node: " + e.getMessage());
+            LoggerUtil.error("MessagingNode", "Failed to start messaging node", e);
             cleanup();
         }
     }
@@ -100,7 +101,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
             executorService.shutdownNow();
             try {
                 if (!executorService.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
-                    System.err.println("ExecutorService did not terminate in time");
+                    LoggerUtil.warn("MessagingNode", "ExecutorService did not terminate in time");
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -110,7 +111,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                 registryConnection.close();
             }
         } catch (IOException e) {
-            System.err.println("Error during cleanup: " + e.getMessage());
+            LoggerUtil.warn("MessagingNode", "Error during cleanup", e);
         }
     }
 
@@ -148,7 +149,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                     break;
             }
         } catch (IOException e) {
-            System.err.println("Error handling event: " + e.getMessage());
+            LoggerUtil.error("MessagingNode", "Error handling event type " + event.getType(), e);
         }
     }
 
@@ -156,7 +157,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     public void onConnectionLost(TCPConnection connection) {
         // Check if this is the registry connection
         if (connection == registryConnection) {
-            System.err.println("Lost connection to Registry. Shutting down...");
+            LoggerUtil.error("MessagingNode", "Lost connection to Registry. Shutting down...");
             cleanup();
             System.exit(1);
         }
@@ -166,7 +167,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
             for (String nodeId : peerConnections.getAllConnections().keySet()) {
                 if (peerConnections.getConnection(nodeId) == connection) {
                     peerConnections.removeConnection(nodeId);
-                    System.out.println("Lost connection to peer: " + nodeId);
+                    LoggerUtil.info("MessagingNode", "Lost connection to peer: " + nodeId);
                     break;
                 }
             }
@@ -179,7 +180,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
             DeregisterRequest request = new DeregisterRequest(ipAddress, portNumber);
             registryConnection.sendEvent(request);
         } catch (IOException e) {
-            System.err.println("Failed to deregister: " + e.getMessage());
+            LoggerUtil.error("MessagingNode", "Failed to deregister", e);
         }
     }
 

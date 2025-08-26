@@ -2,6 +2,8 @@ package csx55.overlay.node.registry;
 
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
+import csx55.overlay.util.LoggerUtil;
+import csx55.overlay.util.ValidationUtil;
 import csx55.overlay.wireformats.DeregisterRequest;
 import csx55.overlay.wireformats.DeregisterResponse;
 import csx55.overlay.wireformats.RegisterRequest;
@@ -29,14 +31,34 @@ public class NodeRegistrationService {
     }
     
     public void handleRegisterRequest(RegisterRequest request, TCPConnection connection) throws IOException {
+        // Validate input parameters
+        if (!ValidationUtil.isValidIpAddress(request.getIpAddress())) {
+            LoggerUtil.warn("NodeRegistration", "Invalid IP address in registration: " + request.getIpAddress());
+            connection.sendEvent(new RegisterResponse(
+                (byte) 0,
+                "Registration failed: Invalid IP address format"
+            ));
+            return;
+        }
+        
+        if (!ValidationUtil.isValidPort(request.getPortNumber())) {
+            LoggerUtil.warn("NodeRegistration", "Invalid port in registration: " + request.getPortNumber());
+            connection.sendEvent(new RegisterResponse(
+                (byte) 0,
+                "Registration failed: Invalid port number (must be " + ValidationUtil.MIN_PORT + "-" + ValidationUtil.MAX_PORT + ")"
+            ));
+            return;
+        }
+        
         String nodeId = request.getIpAddress() + ":" + request.getPortNumber();
         Socket socket = connection.getSocket();
         String actualAddress = socket.getInetAddress().getHostAddress();
         
         if (!request.getIpAddress().equals(actualAddress)) {
+            LoggerUtil.warn("NodeRegistration", "IP mismatch - claimed: " + request.getIpAddress() + ", actual: " + actualAddress);
             connection.sendEvent(new RegisterResponse(
                 (byte) 0, 
-                "Registration failed: IP mismatch"
+                "Registration failed: IP mismatch (claimed: " + request.getIpAddress() + ", actual: " + actualAddress + ")"
             ));
             return;
         }
@@ -58,7 +80,7 @@ public class NodeRegistrationService {
                 registeredNodes.size()
             );
             connection.sendEvent(new RegisterResponse((byte) 1, successMsg));
-            System.out.println("Registered node: " + nodeId);
+            LoggerUtil.info("NodeRegistration", "Registered node: " + nodeId + " (total: " + registeredNodes.size() + ")");
         }
     }
     
@@ -101,7 +123,7 @@ public class NodeRegistrationService {
                 registeredNodes.size()
             );
             connection.sendEvent(new DeregisterResponse((byte) 1, successMsg));
-            System.out.println("Deregistered node: " + nodeId);
+            LoggerUtil.info("NodeRegistration", "Deregistered node: " + nodeId + " (remaining: " + registeredNodes.size() + ")");
         }
     }
     

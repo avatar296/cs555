@@ -1,6 +1,7 @@
 package csx55.overlay.node.registry;
 
 import csx55.overlay.transport.TCPConnection;
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.util.OverlayCreator;
 import csx55.overlay.wireformats.LinkWeights;
 import csx55.overlay.wireformats.MessagingNodesList;
@@ -24,7 +25,7 @@ public class OverlayManagementService {
     
     public void setupOverlay(int cr) {
         if (cr <= 0) {
-            System.out.println("Error: Connection requirement must be greater than 0");
+            LoggerUtil.error("OverlayManagement", "Connection requirement must be greater than 0, received: " + cr);
             return;
         }
         
@@ -32,12 +33,7 @@ public class OverlayManagementService {
         
         synchronized (registeredNodes) {
             if (registeredNodes.size() <= cr) {
-                System.out.println("Error: Not enough nodes. Need more than " + cr + " nodes, have " + registeredNodes.size());
-                return;
-            }
-            
-            if (cr >= registeredNodes.size()) {
-                System.out.println("Error: Connection requirement must be less than the number of nodes");
+                LoggerUtil.error("OverlayManagement", "Not enough nodes for CR=" + cr + ". Need more than " + cr + " nodes, have " + registeredNodes.size());
                 return;
             }
             
@@ -60,17 +56,17 @@ public class OverlayManagementService {
                     }
                 }
                 
-                System.out.println("setup completed with " + connectionRequirement + " connections");
+                LoggerUtil.info("OverlayManagement", "Overlay setup completed with CR=" + connectionRequirement + " connections per node");
                 
             } catch (IOException e) {
-                System.err.println("Failed to setup overlay: " + e.getMessage());
+                LoggerUtil.error("OverlayManagement", "Failed to setup overlay with CR=" + cr, e);
             }
         }
     }
     
     public void sendOverlayLinkWeights() {
         if (currentOverlay == null || currentOverlay.getAllLinks().isEmpty()) {
-            System.out.println("Overlay has not been set up. Cannot send weights.");
+            LoggerUtil.error("OverlayManagement", "Overlay has not been set up. Cannot send weights.");
             return;
         }
         
@@ -93,15 +89,15 @@ public class OverlayManagementService {
             for (TCPConnection connection : registeredNodes.values()) {
                 connection.sendEvent(message);
             }
-            System.out.println("link weights assigned");
+            LoggerUtil.info("OverlayManagement", "Link weights successfully assigned to all nodes");
         } catch (IOException e) {
-            System.err.println("Failed to send link weights: " + e.getMessage());
+            LoggerUtil.error("OverlayManagement", "Failed to send link weights to nodes", e);
         }
     }
     
     public void listWeights() {
         if (currentOverlay == null || currentOverlay.getAllLinks().isEmpty()) {
-            System.out.println("No overlay has been configured.");
+            LoggerUtil.warn("OverlayManagement", "No overlay has been configured to list weights");
             return;
         }
         

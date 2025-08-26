@@ -3,6 +3,7 @@ package csx55.overlay.node.messaging;
 import csx55.overlay.routing.RoutingTable;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.*;
 
 import java.io.IOException;
@@ -30,12 +31,12 @@ public class ProtocolHandlerService {
     }
     
     public void handleRegisterResponse(RegisterResponse response) {
-        System.out.println(response.getAdditionalInfo());
+        LoggerUtil.info("ProtocolHandler", "Registration response: " + response.getAdditionalInfo());
     }
     
     public boolean handleDeregisterResponse(DeregisterResponse response) {
         if (response.getStatusCode() == 1) {
-            System.out.println("exited overlay");
+            LoggerUtil.info("ProtocolHandler", "Successfully exited overlay");
             return true; // Signal to exit
         }
         return false;
@@ -54,7 +55,7 @@ public class ProtocolHandlerService {
             PeerIdentification identification = new PeerIdentification(nodeId);
             connection.sendEvent(identification);
         }
-        System.out.println("All connections are established. Number of connections: " + peerConnections.size());
+        LoggerUtil.info("ProtocolHandler", "All connections established. Number of connections: " + peerConnections.size());
     }
     
     public void handleLinkWeights(LinkWeights linkWeights) {
@@ -70,7 +71,7 @@ public class ProtocolHandlerService {
         routingTable.updateLinkWeights(linkWeights);
         routingService.updateRoutingTable(routingTable);
         
-        System.out.println("Link weights received and processed. Ready to send messages.");
+        LoggerUtil.info("ProtocolHandler", "Link weights received and processed. Ready to send messages.");
     }
     
     public synchronized void handlePeerIdentification(PeerIdentification identification, TCPConnection connection) {

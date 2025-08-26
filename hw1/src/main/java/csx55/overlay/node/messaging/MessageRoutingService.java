@@ -3,6 +3,7 @@ package csx55.overlay.node.messaging;
 import csx55.overlay.routing.RoutingTable;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.DataMessage;
 
 import java.io.IOException;
@@ -36,13 +37,13 @@ public class MessageRoutingService {
         String nextHop = routingTable.findNextHop(sinkId);
         
         if (nextHop == null) {
-            System.err.println("No route to " + sinkId);
+            LoggerUtil.warn("MessageRouting", "No route found to destination: " + sinkId);
             return;
         }
         
         TCPConnection connection = peerConnections.getConnection(nextHop);
         if (connection == null) {
-            System.err.println("No connection to next hop " + nextHop);
+            LoggerUtil.warn("MessageRouting", "No connection to next hop: " + nextHop + " for destination: " + sinkId);
             return;
         }
         
@@ -50,7 +51,7 @@ public class MessageRoutingService {
             DataMessage message = new DataMessage(nodeId, sinkId, payload);
             connection.sendEvent(message);
         } catch (IOException e) {
-            System.err.println("Failed to send message: " + e.getMessage());
+            LoggerUtil.error("MessageRouting", "Failed to send message to " + sinkId + " via " + nextHop, e);
         }
     }
     
@@ -60,13 +61,13 @@ public class MessageRoutingService {
         String nextHop = routingTable.findNextHop(sinkId);
         
         if (nextHop == null) {
-            System.err.println("No route to " + sinkId + " for relay");
+            LoggerUtil.warn("MessageRouting", "No route for relay to destination: " + sinkId);
             return;
         }
         
         TCPConnection connection = peerConnections.getConnection(nextHop);
         if (connection == null) {
-            System.err.println("No connection to next hop " + nextHop + " for relay");
+            LoggerUtil.warn("MessageRouting", "No connection for relay to next hop: " + nextHop);
             return;
         }
         
@@ -74,7 +75,7 @@ public class MessageRoutingService {
             DataMessage message = new DataMessage(sourceId, sinkId, payload);
             connection.sendEvent(message);
         } catch (IOException e) {
-            System.err.println("Failed to relay message: " + e.getMessage());
+            LoggerUtil.error("MessageRouting", "Failed to relay message from " + sourceId + " to " + sinkId, e);
         }
     }
     

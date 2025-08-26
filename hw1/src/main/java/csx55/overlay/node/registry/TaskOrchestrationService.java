@@ -1,6 +1,7 @@
 package csx55.overlay.node.registry;
 
 import csx55.overlay.transport.TCPConnection;
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.PullTrafficSummary;
 import csx55.overlay.wireformats.TaskComplete;
 import csx55.overlay.wireformats.TaskInitiate;
@@ -30,12 +31,12 @@ public class TaskOrchestrationService {
     
     public synchronized void startMessaging(int numberOfRounds) {
         if (taskInProgress) {
-            System.out.println("Task already in progress. Please wait for completion.");
+            LoggerUtil.warn("TaskOrchestration", "Task already in progress. Please wait for completion.");
             return;
         }
         
         if (numberOfRounds <= 0) {
-            System.out.println("Error: Number of rounds must be greater than 0");
+            LoggerUtil.error("TaskOrchestration", "Number of rounds must be greater than 0, received: " + numberOfRounds);
             return;
         }
         
@@ -46,7 +47,7 @@ public class TaskOrchestrationService {
         Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
         
         if (registeredNodes.isEmpty()) {
-            System.out.println("No nodes registered. Cannot start messaging.");
+            LoggerUtil.error("TaskOrchestration", "No nodes registered. Cannot start messaging task.");
             taskInProgress = false;
             return;
         }
@@ -59,7 +60,7 @@ public class TaskOrchestrationService {
                 connection.sendEvent(message);
             }
         } catch (IOException e) {
-            System.err.println("Failed to initiate messaging task: " + e.getMessage());
+            LoggerUtil.error("TaskOrchestration", "Failed to initiate messaging task with " + numberOfRounds + " rounds", e);
             taskInProgress = false;
         }
     }
@@ -68,7 +69,7 @@ public class TaskOrchestrationService {
         completedNodes++;
         
         if (completedNodes == registrationService.getNodeCount()) {
-            System.out.println(rounds + " rounds completed");
+            LoggerUtil.info("TaskOrchestration", rounds + " rounds completed successfully");
             scheduler.schedule(this::requestTrafficSummaries, 15, TimeUnit.SECONDS);
             taskInProgress = false;
         }
@@ -87,7 +88,7 @@ public class TaskOrchestrationService {
                 connection.sendEvent(message);
             }
         } catch (IOException e) {
-            System.err.println("Failed to request traffic summaries: " + e.getMessage());
+            LoggerUtil.error("TaskOrchestration", "Failed to request traffic summaries from nodes", e);
         }
     }
     

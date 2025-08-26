@@ -1,6 +1,7 @@
 package csx55.overlay.node.messaging;
 
 import csx55.overlay.transport.TCPConnection;
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.TrafficSummary;
 
 import java.io.IOException;
@@ -41,7 +42,7 @@ public class NodeStatisticsService {
         );
         
         registryConnection.sendEvent(summary);
-        System.out.println("Sent traffic summary to registry");
+        LoggerUtil.debug("NodeStatistics", "Sent traffic summary to registry");
         // Don't reset counters here - they should be reset only when a new task starts
     }
     

@@ -3,6 +3,7 @@ package csx55.overlay.node;
 import csx55.overlay.node.registry.*;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.*;
 
 import java.io.IOException;
@@ -31,7 +32,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
     public void start(int port) {
         try {
             serverSocket = new ServerSocket(port);
-            System.out.println("Registry listening on port: " + port);
+            LoggerUtil.info("Registry", "Registry listening on port: " + port);
 
             // Start command handler
             new Thread(commandHandler::startCommandLoop).start();
@@ -46,12 +47,12 @@ public class Registry implements TCPConnection.TCPConnectionListener {
                     new TCPConnection(clientSocket, this);
                 } catch (IOException e) {
                     if (running) {
-                        System.err.println("Failed to create connection: " + e.getMessage());
+                        LoggerUtil.error("Registry", "Failed to create connection: " + e.getMessage());
                     }
                 }
             }
         } catch (IOException e) {
-            System.err.println("Failed to start registry: " + e.getMessage());
+            LoggerUtil.error("Registry", "Failed to start registry on port " + port, e);
             cleanup();
         }
     }
@@ -63,7 +64,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
                 serverSocket.close();
             }
         } catch (IOException e) {
-            System.err.println("Error during cleanup: " + e.getMessage());
+            LoggerUtil.warn("Registry", "Error during cleanup: " + e.getMessage());
         }
     }
 
@@ -84,16 +85,16 @@ public class Registry implements TCPConnection.TCPConnectionListener {
                     statisticsService.handleTrafficSummary((TrafficSummary) event, connection);
                     break;
                 default:
-                    System.out.println("Unknown event type: " + event.getType());
+                    LoggerUtil.warn("Registry", "Unknown event type received: " + event.getType());
             }
         } catch (IOException e) {
-            System.err.println("Error handling event: " + e.getMessage());
+            LoggerUtil.error("Registry", "Error handling event type " + event.getType(), e);
         }
     }
 
     @Override
     public void onConnectionLost(TCPConnection connection) {
-        System.out.println("Connection lost with: " + connection.getSocket().getInetAddress());
+        LoggerUtil.info("Registry", "Connection lost with: " + connection.getSocket().getInetAddress());
     }
 
     // Command handler delegates

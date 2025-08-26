@@ -1,6 +1,7 @@
 package csx55.overlay.node.messaging;
 
 import csx55.overlay.transport.TCPConnection;
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.TaskComplete;
 import csx55.overlay.wireformats.TaskInitiate;
 
@@ -58,7 +59,7 @@ public class TaskExecutionService {
             TaskComplete complete = new TaskComplete(ipAddress, portNumber);
             registryConnection.sendEvent(complete);
         } catch (IOException e) {
-            System.err.println("Failed to send task complete: " + e.getMessage());
+            LoggerUtil.error("TaskExecutionService", "Failed to send task complete message", e);
         }
     }
 }

@@ -1,6 +1,7 @@
 package csx55.overlay.routing;
 
 import csx55.overlay.node.Edge;
+import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.LinkWeights;
 
 import java.util.*;
@@ -41,7 +42,7 @@ public class RoutingTable {
      */
     private void calculateMST() {
         if (!graph.containsKey(localNodeId)) {
-            System.err.println("Warning: Local node " + localNodeId + " not found in graph");
+            LoggerUtil.warn("RoutingTable", "Local node " + localNodeId + " not found in graph - cannot calculate MST");
             return;
         }
         
