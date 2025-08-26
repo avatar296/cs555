@@ -147,4 +147,24 @@ public class NodeRegistrationService {
     public int getNodeCount() {
         return registeredNodes.size();
     }
+    
+    public void handleConnectionLost(TCPConnection lostConnection) {
+        synchronized (registeredNodes) {
+            // Find the node ID associated with this connection
+            String nodeToRemove = null;
+            for (Map.Entry<String, TCPConnection> entry : registeredNodes.entrySet()) {
+                if (entry.getValue() == lostConnection) {
+                    nodeToRemove = entry.getKey();
+                    break;
+                }
+            }
+            
+            if (nodeToRemove != null) {
+                registeredNodes.remove(nodeToRemove);
+                connectionsCache.removeConnection(nodeToRemove);
+                LoggerUtil.info("NodeRegistration", 
+                    "Removed disconnected node: " + nodeToRemove + " (remaining: " + registeredNodes.size() + ")");
+            }
+        }
+    }
 }

@@ -235,6 +235,7 @@ public class MessagingNodeComponentTest {
         
         // Other nodes should detect the disconnection
         // Registry should update its state
+        orchestrator.clearOutputs();  // Clear previous outputs before getting new list
         orchestrator.sendRegistryCommand("list-messaging-nodes");
         Thread.sleep(1000);
         
@@ -432,6 +433,7 @@ public class MessagingNodeComponentTest {
         Thread.sleep(2000);
         
         // Verify node was deregistered
+        orchestrator.clearOutputs();  // Clear previous outputs before getting new list
         orchestrator.sendRegistryCommand("list-messaging-nodes");
         Thread.sleep(1000);
         List<String> afterExit = TestValidator.parseNodeList(orchestrator.getRegistryOutput());

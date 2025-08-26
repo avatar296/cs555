@@ -95,6 +95,8 @@ public class Registry implements TCPConnection.TCPConnectionListener {
     @Override
     public void onConnectionLost(TCPConnection connection) {
         LoggerUtil.info("Registry", "Connection lost with: " + connection.getSocket().getInetAddress());
+        // Remove the disconnected node from registered nodes
+        registrationService.handleConnectionLost(connection);
     }
 
     // Command handler delegates

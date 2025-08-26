@@ -252,6 +252,7 @@ public class RegistryComponentTest {
         Thread.sleep(3000);
         
         // Registry should detect disconnection and update its state
+        orchestrator.clearOutputs();  // Clear previous outputs before getting new list
         orchestrator.sendRegistryCommand("list-messaging-nodes");
         Thread.sleep(1000);
         List<String> afterNodes = TestValidator.parseNodeList(orchestrator.getRegistryOutput());

@@ -1,5 +1,6 @@
 package csx55.overlay.util;
 
+import csx55.overlay.util.LoggerUtil;
 import java.util.*;
 
 public class OverlayCreator {
@@ -102,7 +103,11 @@ public class OverlayCreator {
                 }
                 
                 if (candidates.isEmpty()) {
-                    // This shouldn't happen with proper parameters, but handle it gracefully
+                    // This can happen if we can't satisfy the connection requirement
+                    // Log this for debugging
+                    LoggerUtil.warn("OverlayCreator", 
+                        "Cannot find more candidates for node " + nodeId + 
+                        " (current connections: " + plan.nodeConnections.get(nodeId).size() + ")");
                     break;
                 }
                 
@@ -116,9 +121,16 @@ public class OverlayCreator {
             }
         }
         
-        // Assign random weights to all links
+        // Assign unique weights to all links
+        Set<Integer> usedWeights = new HashSet<>();
         for (Link link : plan.allLinks) {
-            link.weight = random.nextInt(10) + 1;
+            int weight;
+            do {
+                // Use a wider range to ensure uniqueness
+                weight = random.nextInt(1000) + 1;
+            } while (usedWeights.contains(weight));
+            usedWeights.add(weight);
+            link.weight = weight;
         }
         
         return plan;
