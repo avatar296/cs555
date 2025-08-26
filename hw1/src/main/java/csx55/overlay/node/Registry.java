@@ -16,6 +16,8 @@ public class Registry implements TCPConnection.TCPConnectionListener {
     private final TaskOrchestrationService taskService;
     private final StatisticsCollectionService statisticsService;
     private final RegistryCommandHandler commandHandler;
+    private volatile boolean running = true;
+    private ServerSocket serverSocket;
 
     public Registry() {
         this.registrationService = new NodeRegistrationService(connectionsCache);
@@ -27,24 +29,40 @@ public class Registry implements TCPConnection.TCPConnectionListener {
 
     public void start(int port) {
         try {
-            @SuppressWarnings("resource")
-            ServerSocket serverSocket = new ServerSocket(port);
+            serverSocket = new ServerSocket(port);
             System.out.println("Registry listening on port: " + port);
 
             // Start command handler
             new Thread(commandHandler::startCommandLoop).start();
+            
+            // Add shutdown hook for cleanup
+            Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
 
             // Accept incoming connections
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
+            while (running) {
                 try {
+                    Socket clientSocket = serverSocket.accept();
                     new TCPConnection(clientSocket, this);
                 } catch (IOException e) {
-                    System.err.println("Failed to create connection: " + e.getMessage());
+                    if (running) {
+                        System.err.println("Failed to create connection: " + e.getMessage());
+                    }
                 }
             }
         } catch (IOException e) {
             System.err.println("Failed to start registry: " + e.getMessage());
+            cleanup();
+        }
+    }
+    
+    private void cleanup() {
+        running = false;
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+        } catch (IOException e) {
+            System.err.println("Error during cleanup: " + e.getMessage());
         }
     }
 

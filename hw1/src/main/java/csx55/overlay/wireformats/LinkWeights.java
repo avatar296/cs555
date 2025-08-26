@@ -52,6 +52,7 @@ public class LinkWeights implements Event {
         
         for (int i = 0; i < numberOfLinks; i++) {
             String linkData = din.readUTF();
+            // Split by space since we serialize with spaces
             String[] parts = linkData.split(" ");
             if (parts.length == 3) {
                 links.add(new LinkInfo(parts[0], parts[1], Integer.parseInt(parts[2])));

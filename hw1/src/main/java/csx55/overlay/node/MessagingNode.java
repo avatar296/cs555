@@ -22,6 +22,8 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     private TCPConnection registryConnection;
     private final TCPConnectionsCache peerConnections = new TCPConnectionsCache();
     private final ExecutorService executorService = Executors.newCachedThreadPool();
+    private volatile boolean running = true;
+    private ServerSocket serverSocket;
 
     // Services
     private final NodeStatisticsService statisticsService;
@@ -42,8 +44,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
 
     private void start(String registryHost, int registryPort) {
         try {
-            @SuppressWarnings("resource")
-            ServerSocket serverSocket = new ServerSocket(0);
+            serverSocket = new ServerSocket(0);
             this.portNumber = serverSocket.getLocalPort();
             this.ipAddress = InetAddress.getLocalHost().getHostAddress();
             this.nodeId = ipAddress + ":" + portNumber;
@@ -63,23 +64,41 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
 
             // Listen for peer connections
             executorService.execute(() -> {
-                while (true) {
+                while (running) {
                     try {
                         Socket peerSocket = serverSocket.accept();
-                        String peerId = peerSocket.getInetAddress().getHostAddress() + ":" + peerSocket.getPort();
-                        TCPConnection peerConnection = new TCPConnection(peerSocket, this);
-                        peerConnections.addConnection(peerId, peerConnection);
+                        // Just create the connection - it will be properly identified
+                        // when we receive messages from it or when we initiate connections
+                        new TCPConnection(peerSocket, this);
                     } catch (IOException e) {
-                        System.err.println("Error accepting peer: " + e.getMessage());
+                        if (running) {
+                            System.err.println("Error accepting peer: " + e.getMessage());
+                        }
                     }
                 }
             });
 
             // Start command handler
             new Thread(commandHandler::startCommandLoop).start();
+            
+            // Add shutdown hook for cleanup
+            Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
 
         } catch (IOException e) {
             System.err.println("Failed to start messaging node: " + e.getMessage());
+            cleanup();
+        }
+    }
+    
+    private void cleanup() {
+        running = false;
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+            executorService.shutdownNow();
+        } catch (IOException e) {
+            System.err.println("Error during cleanup: " + e.getMessage());
         }
     }
 
@@ -92,6 +111,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                     break;
                 case Protocol.DEREGISTER_RESPONSE:
                     if (protocolHandler.handleDeregisterResponse((DeregisterResponse) event)) {
+                        cleanup();
                         System.exit(0);
                     }
                     break;
