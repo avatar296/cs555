@@ -52,7 +52,7 @@ public class TaskOrchestrationService {
     }
     
     public synchronized void handleTaskComplete(TaskComplete taskComplete, TCPConnection connection) {
-        String nodeId = taskComplete.getNodeIp() + ":" + taskComplete.getNodePort();
+        String nodeId = taskComplete.getNodeIpAddress() + ":" + taskComplete.getNodePortNumber();
         System.out.println("Task completed by node: " + nodeId);
         
         completedNodes++;

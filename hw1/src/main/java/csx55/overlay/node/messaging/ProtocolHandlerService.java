@@ -54,18 +54,14 @@ public class ProtocolHandlerService {
     public void handleLinkWeights(LinkWeights linkWeights) {
         allNodes.clear();
         for (LinkWeights.LinkInfo link : linkWeights.getLinks()) {
-            String node1 = link.getNode1();
-            String node2 = link.getNode2();
+            String node1 = link.nodeA;
+            String node2 = link.nodeB;
             if (!allNodes.contains(node1)) allNodes.add(node1);
             if (!allNodes.contains(node2)) allNodes.add(node2);
         }
         
         RoutingTable routingTable = new RoutingTable(nodeId);
-        // Build routing table from link weights
-        for (LinkWeights.LinkInfo link : linkWeights.getLinks()) {
-            routingTable.addLink(link.getNode1(), link.getNode2(), link.getWeight());
-        }
-        routingTable.computeShortestPaths();
+        routingTable.updateLinkWeights(linkWeights);
         routingService.updateRoutingTable(routingTable);
         
         System.out.println("Link weights received and processed. Ready to send messages.");

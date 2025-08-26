@@ -27,6 +27,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
 
     public void start(int port) {
         try {
+            @SuppressWarnings("resource")
             ServerSocket serverSocket = new ServerSocket(port);
             System.out.println("Registry listening on port: " + port);
 

@@ -46,7 +46,7 @@ public class NodeRegistrationService {
             }
             
             registeredNodes.put(nodeId, connection);
-            connectionsCache.addConnection(connection);
+            connectionsCache.addConnection(nodeId, connection);
             
             String successMsg = String.format(
                 "Registration request successful. The number of messaging nodes currently constituting the overlay is (%d)",
@@ -80,7 +80,7 @@ public class NodeRegistrationService {
             }
             
             registeredNodes.remove(nodeId);
-            connectionsCache.removeConnection(connection);
+            connectionsCache.removeConnection(nodeId);
             
             String successMsg = String.format(
                 "Deregistration successful. Remaining nodes: %d",

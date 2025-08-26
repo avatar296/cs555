@@ -38,7 +38,6 @@ public class StatisticsCollector {
         
         long totalSent = 0;
         long totalReceived = 0;
-        long totalRelayed = 0;
         long totalSumSent = 0;
         long totalSumReceived = 0;
         
@@ -57,7 +56,6 @@ public class StatisticsCollector {
             
             totalSent += summary.getMessagesSent();
             totalReceived += summary.getMessagesReceived();
-            totalRelayed += summary.getMessagesRelayed();
             totalSumSent += summary.getSumSentMessages();
             totalSumReceived += summary.getSumReceivedMessages();
         }

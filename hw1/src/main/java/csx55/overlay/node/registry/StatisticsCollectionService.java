@@ -20,8 +20,7 @@ public class StatisticsCollectionService {
             return;
         }
         
-        String nodeId = summary.getNodeIp() + ":" + summary.getNodePort();
-        summary.setNodeId(nodeId);
+        String nodeId = summary.getNodeId();
         
         statsCollector.addSummary(summary);
         System.out.println("Received traffic summary from: " + nodeId);

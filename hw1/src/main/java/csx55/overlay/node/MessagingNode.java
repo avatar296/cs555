@@ -42,6 +42,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
 
     private void start(String registryHost, int registryPort) {
         try {
+            @SuppressWarnings("resource")
             ServerSocket serverSocket = new ServerSocket(0);
             this.portNumber = serverSocket.getLocalPort();
             this.ipAddress = InetAddress.getLocalHost().getHostAddress();
@@ -119,7 +120,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     @Override
     public void onConnectionLost(TCPConnection connection) {
         // Remove from cache by finding matching connection
-        for (String nodeId : peerConnections.getAllNodeIds()) {
+        for (String nodeId : peerConnections.getAllConnections().keySet()) {
             if (peerConnections.getConnection(nodeId) == connection) {
                 peerConnections.removeConnection(nodeId);
                 break;

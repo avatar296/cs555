@@ -33,7 +33,7 @@ public class MessageRoutingService {
     public synchronized void sendMessage(String sinkId, int payload) {
         statisticsService.incrementSendStats(payload);
         
-        String nextHop = routingTable.getNextHop(sinkId);
+        String nextHop = routingTable.findNextHop(sinkId);
         
         if (nextHop == null) {
             System.err.println("No route to " + sinkId);
@@ -57,7 +57,7 @@ public class MessageRoutingService {
     public synchronized void relayMessage(String sourceId, String sinkId, int payload) {
         statisticsService.incrementRelayStats();
         
-        String nextHop = routingTable.getNextHop(sinkId);
+        String nextHop = routingTable.findNextHop(sinkId);
         
         if (nextHop == null) {
             System.err.println("No route to " + sinkId + " for relay");
@@ -79,8 +79,8 @@ public class MessageRoutingService {
     }
     
     public void handleDataMessage(DataMessage message) {
-        String sourceId = message.getSourceId();
-        String sinkId = message.getSinkId();
+        String sourceId = message.getSourceNodeId();
+        String sinkId = message.getSinkNodeId();
         int payload = message.getPayload();
         
         if (sinkId.equals(nodeId)) {

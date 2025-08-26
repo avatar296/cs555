@@ -1,6 +1,5 @@
 package csx55.overlay.node.registry;
 
-import csx55.overlay.node.Edge;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.util.OverlayCreator;
 import csx55.overlay.wireformats.LinkWeights;
@@ -75,7 +74,7 @@ public class OverlayManagementService {
         for (OverlayCreator.Link link : currentOverlay.getAllLinks()) {
             int weight = rand.nextInt(10) + 1;
             LinkWeights.LinkInfo linkInfo = new LinkWeights.LinkInfo(
-                link.node1, link.node2, weight
+                link.nodeA, link.nodeB, weight
             );
             linkInfos.add(linkInfo);
         }
