@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 public class TaskOrchestrationService {
     private int completedNodes = 0;
     private int rounds = 0;
+    private boolean taskInProgress = false;
     private final NodeRegistrationService registrationService;
     private final StatisticsCollectionService statisticsService;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -27,18 +28,25 @@ public class TaskOrchestrationService {
         this.statisticsService = statisticsService;
     }
     
-    public void startMessaging(int numberOfRounds) {
+    public synchronized void startMessaging(int numberOfRounds) {
+        if (taskInProgress) {
+            System.out.println("Task already in progress. Please wait for completion.");
+            return;
+        }
+        
         this.rounds = numberOfRounds;
         this.completedNodes = 0;
+        this.taskInProgress = true;
         
         Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
         
         if (registeredNodes.isEmpty()) {
             System.out.println("No nodes registered. Cannot start messaging.");
+            taskInProgress = false;
             return;
         }
         
-        statisticsService.reset(registeredNodes.size());
+        // Don't reset statistics here - they should be reset after printing the results
         
         TaskInitiate message = new TaskInitiate(numberOfRounds);
         try {
@@ -48,6 +56,7 @@ public class TaskOrchestrationService {
             System.out.println("Initiated messaging task for " + numberOfRounds + " rounds");
         } catch (IOException e) {
             System.err.println("Failed to initiate messaging task: " + e.getMessage());
+            taskInProgress = false;
         }
     }
     
@@ -60,11 +69,16 @@ public class TaskOrchestrationService {
         if (completedNodes == registrationService.getNodeCount()) {
             System.out.println(rounds + " rounds completed");
             scheduler.schedule(this::requestTrafficSummaries, 15, TimeUnit.SECONDS);
+            taskInProgress = false;
         }
     }
     
     private void requestTrafficSummaries() {
         Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
+        
+        // Reset statistics collector to prepare for new summaries
+        statisticsService.reset(registeredNodes.size());
+        
         PullTrafficSummary message = new PullTrafficSummary();
         
         try {
@@ -75,6 +89,10 @@ public class TaskOrchestrationService {
         } catch (IOException e) {
             System.err.println("Failed to request traffic summaries: " + e.getMessage());
         }
+    }
+    
+    public synchronized boolean isTaskInProgress() {
+        return taskInProgress;
     }
     
     public void shutdown() {

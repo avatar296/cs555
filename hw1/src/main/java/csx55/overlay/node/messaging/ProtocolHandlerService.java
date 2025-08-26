@@ -46,6 +46,8 @@ public class ProtocolHandlerService {
             String[] parts = peer.split(":");
             Socket socket = new Socket(parts[0], Integer.parseInt(parts[1]));
             TCPConnection connection = new TCPConnection(socket, listener);
+            // Set the proper remote node ID
+            connection.setRemoteNodeId(peer);
             peerConnections.addConnection(peer, connection);
         }
         System.out.println("All connections are established. Number of connections: " + peerConnections.size());

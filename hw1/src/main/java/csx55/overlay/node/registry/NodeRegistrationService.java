@@ -18,9 +18,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NodeRegistrationService {
     private final Map<String, TCPConnection> registeredNodes = new ConcurrentHashMap<>();
     private final TCPConnectionsCache connectionsCache;
+    private TaskOrchestrationService taskService;
     
     public NodeRegistrationService(TCPConnectionsCache connectionsCache) {
         this.connectionsCache = connectionsCache;
+    }
+    
+    public void setTaskService(TaskOrchestrationService taskService) {
+        this.taskService = taskService;
     }
     
     public void handleRegisterRequest(RegisterRequest request, TCPConnection connection) throws IOException {
@@ -66,6 +71,15 @@ public class NodeRegistrationService {
             connection.sendEvent(new DeregisterResponse(
                 (byte) 0,
                 "Deregistration failed: IP mismatch"
+            ));
+            return;
+        }
+        
+        // Check if a task is in progress
+        if (taskService != null && taskService.isTaskInProgress()) {
+            connection.sendEvent(new DeregisterResponse(
+                (byte) 0,
+                "Deregistration failed: Task is in progress. Please wait for completion."
             ));
             return;
         }

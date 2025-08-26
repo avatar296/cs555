@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 /**
  * Service for managing overlay topology and link weights
@@ -67,14 +66,13 @@ public class OverlayManagementService {
         
         Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
         
-        // Assign random weights to links
-        Random rand = new Random();
+        // Use existing weights from links (they were set during overlay creation)
         List<LinkWeights.LinkInfo> linkInfos = new ArrayList<>();
         
         for (OverlayCreator.Link link : currentOverlay.getAllLinks()) {
-            int weight = rand.nextInt(10) + 1;
+            // Use the weight that was already assigned during overlay creation
             LinkWeights.LinkInfo linkInfo = new LinkWeights.LinkInfo(
-                link.nodeA, link.nodeB, weight
+                link.nodeA, link.nodeB, link.weight
             );
             linkInfos.add(linkInfo);
         }

@@ -67,9 +67,12 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                 while (running) {
                     try {
                         Socket peerSocket = serverSocket.accept();
-                        // Just create the connection - it will be properly identified
-                        // when we receive messages from it or when we initiate connections
-                        new TCPConnection(peerSocket, this);
+                        // Create connection for incoming peer
+                        // The peer's actual node ID will be identified through messages
+                        TCPConnection peerConnection = new TCPConnection(peerSocket, this);
+                        // Store temporarily with socket info - will be updated when we know the real node ID
+                        String tempId = peerSocket.getInetAddress().getHostAddress() + ":" + peerSocket.getPort();
+                        peerConnections.addConnection(tempId, peerConnection);
                     } catch (IOException e) {
                         if (running) {
                             System.err.println("Error accepting peer: " + e.getMessage());

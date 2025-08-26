@@ -24,6 +24,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
         this.overlayService = new OverlayManagementService(registrationService);
         this.statisticsService = new StatisticsCollectionService();
         this.taskService = new TaskOrchestrationService(registrationService, statisticsService);
+        this.registrationService.setTaskService(taskService);
         this.commandHandler = new RegistryCommandHandler(this);
     }
 

@@ -29,9 +29,8 @@ public class TCPConnection {
         this.dout = new DataOutputStream(socket.getOutputStream());
         this.din = new DataInputStream(socket.getInputStream());
         
-        String ip = socket.getInetAddress().getHostAddress();
-        int port = socket.getPort();
-        this.remoteNodeId = ip + ":" + port;
+        // Don't set remoteNodeId here - it will be set properly when we know the actual node ID
+        this.remoteNodeId = null;
         
         startReceiver();
     }
