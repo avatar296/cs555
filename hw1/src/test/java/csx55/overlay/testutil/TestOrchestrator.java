@@ -25,8 +25,12 @@ public class TestOrchestrator {
      * Start the Registry process
      */
     public void startRegistry(int port) throws IOException, InterruptedException {
+        // Kill any process using this port first
+        killProcessOnPort(port);
+        
+        String classpath = getClasspath();
         ProcessBuilder pb = new ProcessBuilder(
-                "java", "-cp", getClasspath(),
+                "java", "-cp", classpath,
                 "csx55.overlay.node.Registry",
                 String.valueOf(port));
 
@@ -37,6 +41,9 @@ public class TestOrchestrator {
         
         registryProcess = pb.start();
         setupProcessIO(registryProcess, registryOutput);
+        
+        // Small delay to let process start and output be captured
+        Thread.sleep(100);
         
         // Wait for registry to actually start listening
         long startTime = System.currentTimeMillis();
@@ -56,6 +63,11 @@ public class TestOrchestrator {
             if (!registryProcess.isAlive()) {
                 // Try to get exit code for debugging
                 int exitCode = registryProcess.exitValue();
+                System.err.println("Registry process died with exit code: " + exitCode);
+                System.err.println("Registry output:");
+                for (String line : registryOutput) {
+                    System.err.println("  " + line);
+                }
                 throw new IOException("Registry process died with exit code: " + exitCode);
             }
             
@@ -209,11 +221,35 @@ public class TestOrchestrator {
 
     // Private helper methods
 
+    private void killProcessOnPort(int port) {
+        try {
+            // Use lsof to find the process using the port
+            ProcessBuilder pb = new ProcessBuilder("lsof", "-t", "-i:" + port);
+            Process process = pb.start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String pid = reader.readLine();
+            
+            if (pid != null && !pid.isEmpty()) {
+                System.out.println("Found process " + pid + " using port " + port + ", killing it...");
+                ProcessBuilder killPb = new ProcessBuilder("kill", "-9", pid.trim());
+                Process killProcess = killPb.start();
+                killProcess.waitFor(1, TimeUnit.SECONDS);
+                Thread.sleep(500); // Give it time to release the port
+                System.out.println("Killed process " + pid + " that was using port " + port);
+            }
+        } catch (Exception e) {
+            // Ignore errors - port might not be in use
+            System.out.println("No process found using port " + port + " or unable to kill: " + e.getMessage());
+        }
+    }
+
     private String getClasspath() {
         String cp = System.getProperty("java.class.path");
         // Add build output directories if not present
-        if (!cp.contains("build/classes")) {
-            cp = "build/classes/java/main:" + cp;
+        if (!cp.contains("build/classes/java/main")) {
+            // Use absolute path
+            String projectDir = System.getProperty("user.dir");
+            cp = projectDir + "/build/classes/java/main:" + cp;
         }
         return cp;
     }
