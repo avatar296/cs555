@@ -57,6 +57,7 @@ public class OverlayManagementService {
                 }
                 
                 LoggerUtil.info("OverlayManagement", "Overlay setup completed with CR=" + connectionRequirement + " connections per node");
+                System.out.println("setup completed with " + connectionRequirement + " connections");
                 
             } catch (IOException e) {
                 LoggerUtil.error("OverlayManagement", "Failed to setup overlay with CR=" + cr, e);
@@ -90,6 +91,7 @@ public class OverlayManagementService {
                 connection.sendEvent(message);
             }
             LoggerUtil.info("OverlayManagement", "Link weights successfully assigned to all nodes");
+            System.out.println("link weights assigned");
         } catch (IOException e) {
             LoggerUtil.error("OverlayManagement", "Failed to send link weights to nodes", e);
         }

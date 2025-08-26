@@ -1,0 +1,50 @@
+services:
+  registry:
+    # Enable stdin and tty for interactive commands
+    stdin_open: true
+    tty: true
+    # Mount source code for hot-reload during development
+    volumes:
+      - ./src:/app/src:ro
+      - ./build.gradle:/app/build.gradle:ro
+      - ./logs/registry:/app/logs
+    environment:
+      - JAVA_OPTS=-Xms128m -Xmx256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+      - LOG_LEVEL=DEBUG
+    ports:
+      - "8080:8080"
+      - "5005:5005"  # Debug port for registry
+
+  # For development, you might want fewer nodes initially
+  messaging-node-1:
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./src:/app/src:ro
+      - ./build.gradle:/app/build.gradle:ro
+      - ./logs/node1:/app/logs
+    environment:
+      - JAVA_OPTS=-Xms64m -Xmx128m
+      - LOG_LEVEL=DEBUG
+
+  messaging-node-2:
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./src:/app/src:ro
+      - ./build.gradle:/app/build.gradle:ro
+      - ./logs/node2:/app/logs
+    environment:
+      - JAVA_OPTS=-Xms64m -Xmx128m
+      - LOG_LEVEL=DEBUG
+
+  messaging-node-3:
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./src:/app/src:ro
+      - ./build.gradle:/app/build.gradle:ro
+      - ./logs/node3:/app/logs
+    environment:
+      - JAVA_OPTS=-Xms64m -Xmx128m
+      - LOG_LEVEL=DEBUG

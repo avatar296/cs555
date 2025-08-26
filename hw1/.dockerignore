@@ -1,0 +1,48 @@
+# Ignore build artifacts
+build/
+.gradle/
+*.class
+*.jar
+!gradle-wrapper.jar
+
+# Ignore IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+
+# Ignore logs
+logs/
+*.log
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore Git files
+.git/
+.gitignore
+
+# Ignore documentation
+*.md
+*.pdf
+README.txt
+
+# Ignore test files
+**/test/
+**/tests/
+
+# Ignore temporary files
+*.tmp
+*.temp
+*.swp
+*~
+
+# Ignore docker files during build context
+docker-compose*.yml
+Dockerfile*
+.dockerignore

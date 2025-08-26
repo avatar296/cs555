@@ -45,12 +45,12 @@ public class StatisticsCollector {
         for (String nodeId : sortedNodeIds) {
             TrafficSummary summary = summaries.get(nodeId);
             
-            System.out.printf("%s %d %d %d %d %d%n",
+            System.out.printf("%s %d %d %.2f %.2f %d%n",
                 nodeId,
                 summary.getMessagesSent(),
                 summary.getMessagesReceived(),
-                summary.getSumSentMessages(),
-                summary.getSumReceivedMessages(),
+                (double) summary.getSumSentMessages(),
+                (double) summary.getSumReceivedMessages(),
                 summary.getMessagesRelayed()
             );
             
@@ -61,11 +61,11 @@ public class StatisticsCollector {
         }
         
         // Print totals
-        System.out.printf("sum %d %d %d %d%n",
+        System.out.printf("sum %d %d %.2f %.2f%n",
             totalSent,
             totalReceived,
-            totalSumSent,
-            totalSumReceived
+            (double) totalSumSent,
+            (double) totalSumReceived
         );
     }
     

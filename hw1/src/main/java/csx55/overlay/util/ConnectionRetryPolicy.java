@@ -36,29 +36,29 @@ public class ConnectionRetryPolicy {
     public Socket connectWithRetry(String host, int port) throws IOException {
         IOException lastException = null;
         
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        for (int e = 1; e <= maxAttempts; e++) {
             try {
                 LoggerUtil.info("ConnectionRetry", 
                     String.format("Attempting connection to %s:%d (attempt %d/%d)", 
-                    host, port, attempt, maxAttempts));
+                    host, port, e, maxAttempts));
                     
                 Socket socket = new Socket(host, port);
                 
-                if (attempt > 1) {
+                if (e > 1) {
                     LoggerUtil.info("ConnectionRetry", 
                         String.format("Successfully connected to %s:%d after %d attempts", 
-                        host, port, attempt));
+                        host, port, e));
                 }
                 
                 return socket;
                 
-            } catch (IOException e) {
-                lastException = e;
+            } catch (IOException ex) {
+                lastException = ex;
                 LoggerUtil.warn("ConnectionRetry", 
-                    String.format("Connection attempt %d failed: %s", attempt, e.getMessage()));
+                    String.format("Connection attempt %d failed: %s", e, ex.getMessage()));
                 
-                if (attempt < maxAttempts) {
-                    long delay = calculateBackoffDelay(attempt);
+                if (e < maxAttempts) {
+                    long delay = calculateBackoffDelay(e);
                     LoggerUtil.debug("ConnectionRetry", 
                         String.format("Waiting %dms before retry", delay));
                     
@@ -87,30 +87,30 @@ public class ConnectionRetryPolicy {
     public <T> T executeWithRetry(RetryableOperation<T> operation, String operationName) throws Exception {
         Exception lastException = null;
         
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        for (int e = 1; e <= maxAttempts; e++) {
             try {
                 LoggerUtil.debug("ConnectionRetry", 
                     String.format("Executing %s (attempt %d/%d)", 
-                    operationName, attempt, maxAttempts));
+                    operationName, e, maxAttempts));
                     
                 T result = operation.execute();
                 
-                if (attempt > 1) {
+                if (e > 1) {
                     LoggerUtil.info("ConnectionRetry", 
                         String.format("%s succeeded after %d attempts", 
-                        operationName, attempt));
+                        operationName, e));
                 }
                 
                 return result;
                 
-            } catch (Exception e) {
-                lastException = e;
+            } catch (Exception ex) {
+                lastException = ex;
                 LoggerUtil.warn("ConnectionRetry", 
                     String.format("%s attempt %d failed: %s", 
-                    operationName, attempt, e.getMessage()));
+                    operationName, e, ex.getMessage()));
                 
-                if (attempt < maxAttempts && isRetryable(e)) {
-                    long delay = calculateBackoffDelay(attempt);
+                if (e < maxAttempts && isRetryable(ex)) {
+                    long delay = calculateBackoffDelay(e);
                     
                     try {
                         Thread.sleep(delay);

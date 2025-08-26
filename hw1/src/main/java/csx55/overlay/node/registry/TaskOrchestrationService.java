@@ -70,6 +70,7 @@ public class TaskOrchestrationService {
         
         if (completedNodes == registrationService.getNodeCount()) {
             LoggerUtil.info("TaskOrchestration", rounds + " rounds completed successfully");
+            System.out.println(rounds + " rounds completed");
             scheduler.schedule(this::requestTrafficSummaries, 15, TimeUnit.SECONDS);
             taskInProgress = false;
         }

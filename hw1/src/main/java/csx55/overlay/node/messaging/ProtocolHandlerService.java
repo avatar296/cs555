@@ -37,6 +37,7 @@ public class ProtocolHandlerService {
     public boolean handleDeregisterResponse(DeregisterResponse response) {
         if (response.getStatusCode() == 1) {
             LoggerUtil.info("ProtocolHandler", "Successfully exited overlay");
+            System.out.println("exited overlay");
             return true; // Signal to exit
         }
         return false;
@@ -56,6 +57,7 @@ public class ProtocolHandlerService {
             connection.sendEvent(identification);
         }
         LoggerUtil.info("ProtocolHandler", "All connections established. Number of connections: " + peerConnections.size());
+        System.out.println("All connections are established. Number of connections: " + peerConnections.size());
     }
     
     public void handleLinkWeights(LinkWeights linkWeights) {
@@ -72,6 +74,7 @@ public class ProtocolHandlerService {
         routingService.updateRoutingTable(routingTable);
         
         LoggerUtil.info("ProtocolHandler", "Link weights received and processed. Ready to send messages.");
+        System.out.println("Link weights received and processed. Ready to send messages.");
     }
     
     public synchronized void handlePeerIdentification(PeerIdentification identification, TCPConnection connection) {
