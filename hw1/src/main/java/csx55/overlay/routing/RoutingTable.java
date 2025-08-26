@@ -46,46 +46,50 @@ public class RoutingTable {
         }
         
         mst.clear();
-        Map<String, Edge> cheapestEdgeToNode = new HashMap<>();
+        Map<String, String> parent = new HashMap<>();
+        Map<String, Integer> minWeight = new HashMap<>();
         PriorityQueue<Edge> pq = new PriorityQueue<>(Comparator.comparingInt(e -> e.weight));
         Set<String> inTree = new HashSet<>();
         
-        // Start with local node as root
-        inTree.add(localNodeId);
-        
-        // Add all edges from root to priority queue
-        List<Edge> rootEdges = graph.get(localNodeId);
-        if (rootEdges != null) {
-            for (Edge edge : rootEdges) {
-                pq.add(edge);
-                cheapestEdgeToNode.put(edge.destination, new Edge(localNodeId, edge.weight));
-            }
+        // Initialize all nodes with infinite weight
+        for (String node : graph.keySet()) {
+            minWeight.put(node, Integer.MAX_VALUE);
         }
         
+        // Start with local node as root
+        minWeight.put(localNodeId, 0);
+        pq.add(new Edge(localNodeId, 0));
+        
         // Build MST
-        while (!pq.isEmpty() && inTree.size() < graph.size()) {
-            Edge currentEdge = pq.poll();
-            String nextNode = currentEdge.destination;
+        while (!pq.isEmpty()) {
+            Edge current = pq.poll();
+            String currentNode = current.destination;
             
-            if (inTree.contains(nextNode)) {
+            if (inTree.contains(currentNode)) {
                 continue;
             }
             
             // Add node to tree
-            inTree.add(nextNode);
-            mst.put(nextNode, cheapestEdgeToNode.get(nextNode));
+            inTree.add(currentNode);
             
-            // Update priority queue with edges from new node
-            List<Edge> neighborEdges = graph.get(nextNode);
-            if (neighborEdges != null) {
-                for (Edge neighborEdge : neighborEdges) {
-                    if (!inTree.contains(neighborEdge.destination)) {
-                        Edge currentCheapest = cheapestEdgeToNode.get(neighborEdge.destination);
-                        if (currentCheapest == null || currentCheapest.weight > neighborEdge.weight) {
-                            pq.add(neighborEdge);
-                            cheapestEdgeToNode.put(neighborEdge.destination, 
-                                new Edge(nextNode, neighborEdge.weight));
-                        }
+            // If not root, add to MST
+            if (!currentNode.equals(localNodeId) && parent.containsKey(currentNode)) {
+                String parentNode = parent.get(currentNode);
+                int weight = minWeight.get(currentNode);
+                mst.put(currentNode, new Edge(parentNode, weight));
+            }
+            
+            // Update neighbors
+            List<Edge> neighbors = graph.get(currentNode);
+            if (neighbors != null) {
+                for (Edge neighborEdge : neighbors) {
+                    String neighbor = neighborEdge.destination;
+                    int weight = neighborEdge.weight;
+                    
+                    if (!inTree.contains(neighbor) && weight < minWeight.get(neighbor)) {
+                        minWeight.put(neighbor, weight);
+                        parent.put(neighbor, currentNode);
+                        pq.add(new Edge(neighbor, weight));
                     }
                 }
             }
@@ -106,27 +110,34 @@ public class RoutingTable {
             return cachedNextHop;
         }
         
-        // Trace path from destination back to root (local node)
+        // Build path from destination to root
+        List<String> path = new ArrayList<>();
         String current = destination;
-        String previousNode = null;
         
         while (current != null && !current.equals(localNodeId)) {
+            path.add(current);
             Edge parentEdge = mst.get(current);
             if (parentEdge == null) {
                 // No path found
                 return null;
             }
-            
-            previousNode = current;
             current = parentEdge.destination;
         }
         
-        // Cache the result
-        if (previousNode != null) {
-            nextHopCache.put(destination, previousNode);
+        // Path should end at local node
+        if (current == null || !current.equals(localNodeId)) {
+            return null;
         }
         
-        return previousNode;
+        // The next hop is the last node in the reversed path (closest to root)
+        String nextHop = null;
+        if (!path.isEmpty()) {
+            nextHop = path.get(path.size() - 1);
+            // Cache the result
+            nextHopCache.put(destination, nextHop);
+        }
+        
+        return nextHop;
     }
     
     /**

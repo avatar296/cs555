@@ -50,7 +50,7 @@ public class LinkWeights implements Event {
         this.numberOfLinks = din.readInt();
         this.links = new ArrayList<>();
         
-        for (int i = 0; i < numberOfLinks; i++) {
+        for (int e = 0; e < numberOfLinks; e++) {
             String linkData = din.readUTF();
             // Split by space since we serialize with spaces
             String[] parts = linkData.split(" ");

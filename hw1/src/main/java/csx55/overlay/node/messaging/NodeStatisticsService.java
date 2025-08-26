@@ -42,7 +42,7 @@ public class NodeStatisticsService {
         
         registryConnection.sendEvent(summary);
         System.out.println("Sent traffic summary to registry");
-        resetCounters();
+        // Don't reset counters here - they should be reset only when a new task starts
     }
     
     public synchronized void resetCounters() {

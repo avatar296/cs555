@@ -49,6 +49,10 @@ public class ProtocolHandlerService {
             // Set the proper remote node ID
             connection.setRemoteNodeId(peer);
             peerConnections.addConnection(peer, connection);
+            
+            // Send peer identification to the connected node
+            PeerIdentification identification = new PeerIdentification(nodeId);
+            connection.sendEvent(identification);
         }
         System.out.println("All connections are established. Number of connections: " + peerConnections.size());
     }
@@ -67,6 +71,32 @@ public class ProtocolHandlerService {
         routingService.updateRoutingTable(routingTable);
         
         System.out.println("Link weights received and processed. Ready to send messages.");
+    }
+    
+    public void handlePeerIdentification(PeerIdentification identification, TCPConnection connection) {
+        String peerId = identification.getNodeId();
+        
+        // Update the connection's remote node ID
+        connection.setRemoteNodeId(peerId);
+        
+        // Check if this connection is already in the cache
+        boolean found = false;
+        for (String key : peerConnections.getAllConnections().keySet()) {
+            if (peerConnections.getConnection(key) == connection) {
+                found = true;
+                if (!key.equals(peerId)) {
+                    // Remove the old entry and add with correct ID
+                    peerConnections.removeConnection(key);
+                    peerConnections.addConnection(peerId, connection);
+                }
+                break;
+            }
+        }
+        
+        // If not found, this is a new incoming connection - add it to the cache
+        if (!found) {
+            peerConnections.addConnection(peerId, connection);
+        }
     }
     
     public List<String> getAllNodes() {

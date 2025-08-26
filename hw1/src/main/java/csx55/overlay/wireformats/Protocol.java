@@ -13,5 +13,6 @@ public interface Protocol {
     int PULL_TRAFFIC_SUMMARY = 8;
     int TRAFFIC_SUMMARY = 9;
     int DEREGISTER_RESPONSE = 10;
+    int PEER_IDENTIFICATION = 11;
     
 }

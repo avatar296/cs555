@@ -53,7 +53,6 @@ public class TaskOrchestrationService {
             for (TCPConnection connection : registeredNodes.values()) {
                 connection.sendEvent(message);
             }
-            System.out.println("Initiated messaging task for " + numberOfRounds + " rounds");
         } catch (IOException e) {
             System.err.println("Failed to initiate messaging task: " + e.getMessage());
             taskInProgress = false;
@@ -62,7 +61,6 @@ public class TaskOrchestrationService {
     
     public synchronized void handleTaskComplete(TaskComplete taskComplete, TCPConnection connection) {
         String nodeId = taskComplete.getNodeIpAddress() + ":" + taskComplete.getNodePortNumber();
-        System.out.println("Task completed by node: " + nodeId);
         
         completedNodes++;
         
@@ -85,7 +83,6 @@ public class TaskOrchestrationService {
             for (TCPConnection connection : registeredNodes.values()) {
                 connection.sendEvent(message);
             }
-            System.out.println("Requested traffic summaries from all nodes");
         } catch (IOException e) {
             System.err.println("Failed to request traffic summaries: " + e.getMessage());
         }

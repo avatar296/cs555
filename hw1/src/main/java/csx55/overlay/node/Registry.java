@@ -119,7 +119,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
 
     public static void main(String[] args) {
         if (args.length != 1) {
-            System.out.println("Usage: java Registry <port>");
+            System.out.println("Usage: java csx55.overlay.node.Registry <port>");
             return;
         }
         new Registry().start(Integer.parseInt(args[0]));

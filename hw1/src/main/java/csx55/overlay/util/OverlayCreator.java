@@ -76,9 +76,9 @@ public class OverlayCreator {
         }
         
         // Create a ring topology first to ensure connectivity
-        for (int i = 0; i < nodeIds.size(); i++) {
-            String currentNode = nodeIds.get(i);
-            String nextNode = nodeIds.get((i + 1) % nodeIds.size());
+        for (int e = 0; e < nodeIds.size(); e++) {
+            String currentNode = nodeIds.get(e);
+            String nextNode = nodeIds.get((e + 1) % nodeIds.size());
             
             plan.nodeConnections.get(currentNode).add(nextNode);
             plan.nodeConnections.get(nextNode).add(currentNode);

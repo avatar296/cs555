@@ -15,14 +15,16 @@ import java.util.concurrent.ExecutorService;
 public class TaskExecutionService {
     private final MessageRoutingService routingService;
     private final ExecutorService executorService;
+    private final NodeStatisticsService statisticsService;
     private String nodeId;
     private String ipAddress;
     private int portNumber;
     private TCPConnection registryConnection;
     
-    public TaskExecutionService(MessageRoutingService routingService, ExecutorService executorService) {
+    public TaskExecutionService(MessageRoutingService routingService, ExecutorService executorService, NodeStatisticsService statisticsService) {
         this.routingService = routingService;
         this.executorService = executorService;
+        this.statisticsService = statisticsService;
     }
     
     public void setNodeInfo(String nodeId, String ipAddress, int portNumber, TCPConnection registryConnection) {
@@ -34,6 +36,8 @@ public class TaskExecutionService {
     
     public void handleTaskInitiate(TaskInitiate taskInitiate, List<String> allNodes) {
         int rounds = taskInitiate.getRounds();
+        // Reset statistics at the beginning of a new task
+        statisticsService.resetCounters();
         executorService.execute(() -> performMessagingTask(rounds, allNodes));
     }
     

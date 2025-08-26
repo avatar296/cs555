@@ -23,7 +23,6 @@ public class StatisticsCollectionService {
         String nodeId = summary.getNodeId();
         
         statsCollector.addSummary(summary);
-        System.out.println("Received traffic summary from: " + nodeId);
         
         if (statsCollector.hasAllSummaries()) {
             printFinalStatistics();
@@ -32,8 +31,6 @@ public class StatisticsCollectionService {
     
     private void printFinalStatistics() {
         if (statsCollector != null) {
-            System.out.println("\nFinal Statistics:");
-            System.out.println("=================");
             statsCollector.printStatistics();
             statsCollector.reset();
         }

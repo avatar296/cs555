@@ -45,12 +45,12 @@ public class StatisticsCollector {
         for (String nodeId : sortedNodeIds) {
             TrafficSummary summary = summaries.get(nodeId);
             
-            System.out.printf("%s %d %d %.2f %.2f %d%n",
+            System.out.printf("%s %d %d %d %d %d%n",
                 nodeId,
                 summary.getMessagesSent(),
                 summary.getMessagesReceived(),
-                (double)summary.getSumSentMessages(),
-                (double)summary.getSumReceivedMessages(),
+                summary.getSumSentMessages(),
+                summary.getSumReceivedMessages(),
                 summary.getMessagesRelayed()
             );
             
@@ -61,21 +61,12 @@ public class StatisticsCollector {
         }
         
         // Print totals
-        System.out.printf("sum %d %d %.2f %.2f%n",
+        System.out.printf("sum %d %d %d %d%n",
             totalSent,
             totalReceived,
-            (double)totalSumSent,
-            (double)totalSumReceived
+            totalSumSent,
+            totalSumReceived
         );
-        
-        // Verify correctness
-        if (totalSent != totalReceived) {
-            System.out.println("WARNING: Total sent (" + totalSent + ") != Total received (" + totalReceived + ")");
-        }
-        
-        if (totalSumSent != totalSumReceived) {
-            System.out.println("WARNING: Sum of sent (" + totalSumSent + ") != Sum of received (" + totalSumReceived + ")");
-        }
     }
     
     public synchronized Map<String, TrafficSummary> getSummaries() {

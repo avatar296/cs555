@@ -38,7 +38,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
         this.statisticsService = new NodeStatisticsService();
         this.routingService = new MessageRoutingService(peerConnections, statisticsService);
         this.protocolHandler = new ProtocolHandlerService(peerConnections, routingService);
-        this.taskService = new TaskExecutionService(routingService, executorService);
+        this.taskService = new TaskExecutionService(routingService, executorService, statisticsService);
         this.commandHandler = new MessagingNodeCommandHandler(this);
     }
 
@@ -68,11 +68,9 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                     try {
                         Socket peerSocket = serverSocket.accept();
                         // Create connection for incoming peer
-                        // The peer's actual node ID will be identified through messages
+                        // The peer will identify itself through a PEER_IDENTIFICATION message
                         TCPConnection peerConnection = new TCPConnection(peerSocket, this);
-                        // Store temporarily with socket info - will be updated when we know the real node ID
-                        String tempId = peerSocket.getInetAddress().getHostAddress() + ":" + peerSocket.getPort();
-                        peerConnections.addConnection(tempId, peerConnection);
+                        // Don't add to cache yet - wait for peer identification
                     } catch (IOException e) {
                         if (running) {
                             System.err.println("Error accepting peer: " + e.getMessage());
@@ -134,6 +132,9 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                 case Protocol.DATA_MESSAGE:
                     routingService.handleDataMessage((DataMessage) event);
                     break;
+                case Protocol.PEER_IDENTIFICATION:
+                    protocolHandler.handlePeerIdentification((PeerIdentification) event, connection);
+                    break;
             }
         } catch (IOException e) {
             System.err.println("Error handling event: " + e.getMessage());
@@ -170,7 +171,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
 
     public static void main(String[] args) {
         if (args.length != 2) {
-            System.out.println("Usage: java MessagingNode <registry-host> <registry-port>");
+            System.out.println("Usage: java csx55.overlay.node.MessagingNode <registry-host> <registry-port>");
             return;
         }
         new MessagingNode().start(args[0], Integer.parseInt(args[1]));

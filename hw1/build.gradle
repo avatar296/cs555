@@ -39,8 +39,7 @@ task runMessagingNode(type: JavaExec) {
 
 // Custom task to create the final .tar submission file
 task createTar(type: Tar) {
-    // IMPORTANT: Change this to your first and last name!
-    archiveBaseName.set('FirstName_LastName_HW1')
+    archiveBaseName.set('Christopher_Cowart_HW1')
     archiveExtension.set('tar')
     
     // Include all required files for submission

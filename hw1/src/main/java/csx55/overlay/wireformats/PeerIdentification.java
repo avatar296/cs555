@@ -7,36 +7,29 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
-public class MessagingNodesList implements Event {
+/**
+ * Message sent between peers to identify themselves after connection establishment
+ */
+public class PeerIdentification implements Event {
     
-    private final int type = Protocol.MESSAGING_NODES_LIST;
-    private int numberOfPeerNodes;
-    private List<String> peerNodes;
+    private final int type = Protocol.PEER_IDENTIFICATION;
+    private String nodeId;
     
-    public MessagingNodesList(List<String> peerNodes) {
-        this.peerNodes = peerNodes;
-        this.numberOfPeerNodes = peerNodes.size();
+    public PeerIdentification(String nodeId) {
+        this.nodeId = nodeId;
     }
     
-    public MessagingNodesList(byte[] marshalledBytes) throws IOException {
+    public PeerIdentification(byte[] marshalledBytes) throws IOException {
         ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
         DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
         
         int messageType = din.readInt();
-        if (messageType != Protocol.MESSAGING_NODES_LIST) {
-            throw new IOException("Invalid message type for MessagingNodesList");
+        if (messageType != Protocol.PEER_IDENTIFICATION) {
+            throw new IOException("Invalid message type for PeerIdentification");
         }
         
-        this.numberOfPeerNodes = din.readInt();
-        this.peerNodes = new ArrayList<>();
-        
-        for (int e = 0; e < numberOfPeerNodes; e++) {
-            String nodeInfo = din.readUTF();
-            peerNodes.add(nodeInfo);
-        }
+        this.nodeId = din.readUTF();
         
         baInputStream.close();
         din.close();
@@ -53,12 +46,7 @@ public class MessagingNodesList implements Event {
         DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
         
         dout.writeInt(type);
-        dout.writeInt(numberOfPeerNodes);
-        
-        for (String nodeInfo : peerNodes) {
-            dout.writeUTF(nodeInfo);
-        }
-        
+        dout.writeUTF(nodeId);
         dout.flush();
         
         byte[] marshalledBytes = baOutputStream.toByteArray();
@@ -68,11 +56,7 @@ public class MessagingNodesList implements Event {
         return marshalledBytes;
     }
     
-    public int getNumberOfPeerNodes() {
-        return numberOfPeerNodes;
-    }
-    
-    public List<String> getPeerNodes() {
-        return peerNodes;
+    public String getNodeId() {
+        return nodeId;
     }
 }

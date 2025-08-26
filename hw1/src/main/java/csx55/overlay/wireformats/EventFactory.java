@@ -62,6 +62,9 @@ public class EventFactory {
             case Protocol.DATA_MESSAGE:
                 return new DataMessage(marshalledBytes);
                 
+            case Protocol.PEER_IDENTIFICATION:
+                return new PeerIdentification(marshalledBytes);
+                
             default:
                 throw new IOException("Unknown message type: " + messageType);
         }
