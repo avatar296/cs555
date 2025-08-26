@@ -22,6 +22,7 @@ public class MessagingNodeCommandHandler {
                 node.printMinimumSpanningTree();
             } else if ("exit-overlay".equalsIgnoreCase(command)) {
                 node.deregister();
+                System.out.println("exited overlay");
                 break;
             } else {
                 System.out.println("Unknown command: " + command);

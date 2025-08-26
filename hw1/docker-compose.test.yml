@@ -1,0 +1,159 @@
+version: '3.8'
+
+services:
+  registry:
+    build: .
+    container_name: overlay-registry
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.Registry 8080
+    ports:
+      - "8080:8080"
+    networks:
+      - overlay-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  node-1:
+    build: .
+    container_name: overlay-node-1
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - overlay-net
+
+  node-2:
+    build: .
+    container_name: overlay-node-2
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - overlay-net
+
+  node-3:
+    build: .
+    container_name: overlay-node-3
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - overlay-net
+
+  node-4:
+    build: .
+    container_name: overlay-node-4
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - overlay-net
+
+  node-5:
+    build: .
+    container_name: overlay-node-5
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - overlay-net
+
+  node-6:
+    build: .
+    container_name: overlay-node-6
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - overlay-net
+
+  node-7:
+    build: .
+    container_name: overlay-node-7
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - overlay-net
+
+  node-8:
+    build: .
+    container_name: overlay-node-8
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - overlay-net
+
+  node-9:
+    build: .
+    container_name: overlay-node-9
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - overlay-net
+
+  node-10:
+    build: .
+    container_name: overlay-node-10
+    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - overlay-net
+
+  test-runner:
+    build: .
+    container_name: overlay-test-runner
+    volumes:
+      - ./test-scripts:/test-scripts
+      - ./test-results:/test-results
+    command: |
+      bash -c "
+        echo 'Waiting for all nodes to start...'
+        sleep 10
+        
+        echo 'list-messaging-nodes' | nc registry 8080
+        sleep 2
+        
+        echo 'setup-overlay 4' | nc registry 8080
+        sleep 5
+        
+        echo 'send-overlay-link-weights' | nc registry 8080
+        sleep 5
+        
+        echo 'start 100' | nc registry 8080
+        sleep 30
+        
+        echo 'Test execution complete'
+      "
+    depends_on:
+      - node-1
+      - node-2
+      - node-3
+      - node-4
+      - node-5
+      - node-6
+      - node-7
+      - node-8
+      - node-9
+      - node-10
+    networks:
+      - overlay-net
+
+networks:
+  overlay-net:
+    driver: bridge
