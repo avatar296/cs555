@@ -89,48 +89,64 @@ public class OverlayCreator {
         // Add additional connections to reach the connection requirement
         Random random = new Random();
         
-        for (String nodeId : nodeIds) {
-            while (plan.nodeConnections.get(nodeId).size() < connectionRequirement) {
-                // Find a node to connect to
-                List<String> candidates = new ArrayList<>();
+        // Calculate total links needed
+        int targetLinks = (nodeIds.size() * connectionRequirement) / 2;
+        int currentLinks = plan.allLinks.size(); // Currently have ring topology links
+        
+        // Build list of all possible additional connections
+        List<Link> possibleLinks = new ArrayList<>();
+        for (int i = 0; i < nodeIds.size(); i++) {
+            for (int j = i + 1; j < nodeIds.size(); j++) {
+                String nodeA = nodeIds.get(i);
+                String nodeB = nodeIds.get(j);
                 
-                for (String candidate : nodeIds) {
-                    if (!candidate.equals(nodeId) && 
-                        !plan.nodeConnections.get(nodeId).contains(candidate) &&
-                        plan.nodeConnections.get(candidate).size() < connectionRequirement) {
-                        candidates.add(candidate);
-                    }
+                // Skip if connection already exists
+                if (!plan.nodeConnections.get(nodeA).contains(nodeB)) {
+                    possibleLinks.add(new Link(nodeA, nodeB));
                 }
-                
-                if (candidates.isEmpty()) {
-                    // This can happen if we can't satisfy the connection requirement
-                    // Log this for debugging
-                    LoggerUtil.warn("OverlayCreator", 
-                        "Cannot find more candidates for node " + nodeId + 
-                        " (current connections: " + plan.nodeConnections.get(nodeId).size() + ")");
-                    break;
-                }
-                
-                // Select a random candidate
-                String selectedNode = candidates.get(random.nextInt(candidates.size()));
-                
-                // Add the connection
-                plan.nodeConnections.get(nodeId).add(selectedNode);
-                plan.nodeConnections.get(selectedNode).add(nodeId);
-                plan.allLinks.add(new Link(nodeId, selectedNode));
             }
         }
         
+        // Sort by nodes that need connections most
+        // This ensures we prioritize connections for nodes that are furthest from their CR
+        possibleLinks.sort((a, b) -> {
+            int aNeeds = (connectionRequirement - plan.nodeConnections.get(a.nodeA).size()) +
+                        (connectionRequirement - plan.nodeConnections.get(a.nodeB).size());
+            int bNeeds = (connectionRequirement - plan.nodeConnections.get(b.nodeA).size()) +
+                        (connectionRequirement - plan.nodeConnections.get(b.nodeB).size());
+            return Integer.compare(bNeeds, aNeeds); // Higher needs first
+        });
+        
+        // Add connections until we reach the target or run out of valid options
+        for (Link link : possibleLinks) {
+            if (currentLinks >= targetLinks) {
+                break; // We have enough links
+            }
+            
+            // Check if both nodes can accept more connections
+            if (plan.nodeConnections.get(link.nodeA).size() < connectionRequirement &&
+                plan.nodeConnections.get(link.nodeB).size() < connectionRequirement) {
+                
+                // Add the connection
+                plan.nodeConnections.get(link.nodeA).add(link.nodeB);
+                plan.nodeConnections.get(link.nodeB).add(link.nodeA);
+                plan.allLinks.add(link);
+                currentLinks++;
+            }
+        }
+        
+        // Log if we couldn't create enough links
+        if (currentLinks < targetLinks) {
+            LoggerUtil.warn("OverlayCreator", 
+                "Could only create " + currentLinks + " links out of " + targetLinks + " target links");
+        }
+        
         // Assign unique weights to all links
-        Set<Integer> usedWeights = new HashSet<>();
+        // Use sequential weights starting from 1 to ensure uniqueness
+        // and stay within the lower range when possible
+        int weight = 1;
         for (Link link : plan.allLinks) {
-            int weight;
-            do {
-                // Use a wider range to ensure uniqueness
-                weight = random.nextInt(1000) + 1;
-            } while (usedWeights.contains(weight));
-            usedWeights.add(weight);
-            link.weight = weight;
+            link.weight = weight++;
         }
         
         return plan;

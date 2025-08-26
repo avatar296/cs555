@@ -12,6 +12,7 @@ import java.util.List;
  * End-to-end integration tests for the overlay network
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class OverlayIntegrationTest {
     
     private static TestOrchestrator orchestrator;

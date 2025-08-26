@@ -203,6 +203,7 @@ public class WireFormatProtocolTest {
         int node2 = orchestrator.startMessagingNode("localhost", REGISTRY_PORT);
         Thread.sleep(2000);
         
+        orchestrator.clearOutputs();  // Clear accumulated output before checking current state
         orchestrator.sendRegistryCommand("list-messaging-nodes");
         Thread.sleep(1000);
         
@@ -249,6 +250,7 @@ public class WireFormatProtocolTest {
             .isTrue();
         
         // Verify node was removed from registry
+        orchestrator.clearOutputs();  // Clear accumulated output before checking current state
         orchestrator.sendRegistryCommand("list-messaging-nodes");
         Thread.sleep(1000);
         int afterCount = TestValidator.parseNodeList(orchestrator.getRegistryOutput()).size();
@@ -313,6 +315,7 @@ public class WireFormatProtocolTest {
         Thread.sleep(2000);
         
         // Verify all registered
+        orchestrator.clearOutputs();  // Clear accumulated output before checking current state
         orchestrator.sendRegistryCommand("list-messaging-nodes");
         Thread.sleep(1000);
         assertThat(TestValidator.parseNodeList(orchestrator.getRegistryOutput()))
@@ -325,6 +328,7 @@ public class WireFormatProtocolTest {
         Thread.sleep(2000);
         
         // Verify correct nodes remain
+        orchestrator.clearOutputs();  // Clear accumulated output before checking current state
         orchestrator.sendRegistryCommand("list-messaging-nodes");
         Thread.sleep(1000);
         assertThat(TestValidator.parseNodeList(orchestrator.getRegistryOutput()))
@@ -337,6 +341,7 @@ public class WireFormatProtocolTest {
         Thread.sleep(2000);
         
         // Verify final count
+        orchestrator.clearOutputs();  // Clear accumulated output before checking current state
         orchestrator.sendRegistryCommand("list-messaging-nodes");
         Thread.sleep(1000);
         assertThat(TestValidator.parseNodeList(orchestrator.getRegistryOutput()))
@@ -410,6 +415,7 @@ public class WireFormatProtocolTest {
             Thread.sleep(2000);
             
             // Verify deregistered
+            orchestrator.clearOutputs();  // Clear accumulated output before checking current state
             orchestrator.sendRegistryCommand("list-messaging-nodes");
             Thread.sleep(500);
             assertThat(TestValidator.parseNodeList(orchestrator.getRegistryOutput()))
@@ -421,6 +427,7 @@ public class WireFormatProtocolTest {
         int finalNode = orchestrator.startMessagingNode("localhost", REGISTRY_PORT);
         Thread.sleep(2000);
         
+        orchestrator.clearOutputs();  // Clear accumulated output before checking current state
         orchestrator.sendRegistryCommand("list-messaging-nodes");
         Thread.sleep(1000);
         assertThat(TestValidator.parseNodeList(orchestrator.getRegistryOutput()))

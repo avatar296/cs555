@@ -403,17 +403,14 @@ public class RegistryComponentTest {
         // Start a messaging task
         orchestrator.sendRegistryCommand("start 5");
         
-        // Kill a node during the task to simulate failure
+        // Kill one specific node during the task to simulate failure
         Thread.sleep(2000);
-        // Force stop the node process
-        Process nodeProcess = new ProcessBuilder(
-            "pkill", "-f", "MessagingNode"
-        ).start();
-        nodeProcess.waitFor(1, TimeUnit.SECONDS);
+        orchestrator.killNode(0); // Kill the first node
         
         Thread.sleep(10000);
         
         // Registry should still be functional
+        orchestrator.clearOutputs(); // Clear accumulated output before checking current state
         orchestrator.sendRegistryCommand("list-messaging-nodes");
         Thread.sleep(1000);
         

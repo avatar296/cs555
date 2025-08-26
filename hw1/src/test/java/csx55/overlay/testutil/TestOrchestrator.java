@@ -184,6 +184,19 @@ public class TestOrchestrator {
     }
 
     /**
+     * Kill a specific messaging node by ID
+     */
+    public void killNode(int nodeId) {
+        if (nodeId >= 0 && nodeId < messagingNodeProcesses.size()) {
+            Process nodeProcess = messagingNodeProcesses.get(nodeId);
+            if (nodeProcess != null && nodeProcess.isAlive()) {
+                nodeProcess.destroyForcibly();
+                System.out.println("[TestOrchestrator] Forcibly killed MessagingNode " + nodeId);
+            }
+        }
+    }
+
+    /**
      * Shutdown all processes
      */
     public void shutdown() {
