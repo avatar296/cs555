@@ -1,0 +1,98 @@
+package csx55.overlay.node.messaging;
+
+import csx55.overlay.routing.RoutingTable;
+import csx55.overlay.transport.TCPConnection;
+import csx55.overlay.transport.TCPConnectionsCache;
+import csx55.overlay.wireformats.DataMessage;
+
+import java.io.IOException;
+
+/**
+ * Service for routing messages through the overlay network
+ */
+public class MessageRoutingService {
+    private RoutingTable routingTable;
+    private final TCPConnectionsCache peerConnections;
+    private final NodeStatisticsService statisticsService;
+    private String nodeId;
+    
+    public MessageRoutingService(TCPConnectionsCache peerConnections, NodeStatisticsService statisticsService) {
+        this.peerConnections = peerConnections;
+        this.statisticsService = statisticsService;
+    }
+    
+    public void setNodeId(String nodeId) {
+        this.nodeId = nodeId;
+        this.routingTable = new RoutingTable(nodeId);
+    }
+    
+    public void updateRoutingTable(RoutingTable routingTable) {
+        this.routingTable = routingTable;
+    }
+    
+    public synchronized void sendMessage(String sinkId, int payload) {
+        statisticsService.incrementSendStats(payload);
+        
+        String nextHop = routingTable.getNextHop(sinkId);
+        
+        if (nextHop == null) {
+            System.err.println("No route to " + sinkId);
+            return;
+        }
+        
+        TCPConnection connection = peerConnections.getConnection(nextHop);
+        if (connection == null) {
+            System.err.println("No connection to next hop " + nextHop);
+            return;
+        }
+        
+        try {
+            DataMessage message = new DataMessage(nodeId, sinkId, payload);
+            connection.sendEvent(message);
+        } catch (IOException e) {
+            System.err.println("Failed to send message: " + e.getMessage());
+        }
+    }
+    
+    public synchronized void relayMessage(String sourceId, String sinkId, int payload) {
+        statisticsService.incrementRelayStats();
+        
+        String nextHop = routingTable.getNextHop(sinkId);
+        
+        if (nextHop == null) {
+            System.err.println("No route to " + sinkId + " for relay");
+            return;
+        }
+        
+        TCPConnection connection = peerConnections.getConnection(nextHop);
+        if (connection == null) {
+            System.err.println("No connection to next hop " + nextHop + " for relay");
+            return;
+        }
+        
+        try {
+            DataMessage message = new DataMessage(sourceId, sinkId, payload);
+            connection.sendEvent(message);
+        } catch (IOException e) {
+            System.err.println("Failed to relay message: " + e.getMessage());
+        }
+    }
+    
+    public void handleDataMessage(DataMessage message) {
+        String sourceId = message.getSourceId();
+        String sinkId = message.getSinkId();
+        int payload = message.getPayload();
+        
+        if (sinkId.equals(nodeId)) {
+            // Message is for us
+            statisticsService.incrementReceiveStats(payload);
+        } else {
+            // Relay the message
+            relayMessage(sourceId, sinkId, payload);
+        }
+    }
+    
+    public RoutingTable getRoutingTable() {
+        return routingTable;
+    }
+}

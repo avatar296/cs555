@@ -1,143 +1,105 @@
 package csx55.overlay.node;
 
+import csx55.overlay.node.registry.*;
+import csx55.overlay.transport.TCPConnection;
+import csx55.overlay.transport.TCPConnectionsCache;
+import csx55.overlay.wireformats.*;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Scanner;
 
-public class Registry {
-    private final Map<String, ServerThread> registeredNodes = new HashMap<>();
-    private final List<String[]> overlayLinks = new ArrayList<>();
+public class Registry implements TCPConnection.TCPConnectionListener {
+    private final TCPConnectionsCache connectionsCache = new TCPConnectionsCache();
+    private final NodeRegistrationService registrationService;
+    private final OverlayManagementService overlayService;
+    private final TaskOrchestrationService taskService;
+    private final StatisticsCollectionService statisticsService;
+    private final RegistryCommandHandler commandHandler;
 
-    private void start(int port) {
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
+    public Registry() {
+        this.registrationService = new NodeRegistrationService(connectionsCache);
+        this.overlayService = new OverlayManagementService(registrationService);
+        this.statisticsService = new StatisticsCollectionService();
+        this.taskService = new TaskOrchestrationService(registrationService, statisticsService);
+        this.commandHandler = new RegistryCommandHandler(this);
+    }
+
+    public void start(int port) {
+        try {
+            ServerSocket serverSocket = new ServerSocket(port);
             System.out.println("Registry listening on port: " + port);
-            new Thread(this::handleUserCommands).start();
 
+            // Start command handler
+            new Thread(commandHandler::startCommandLoop).start();
+
+            // Accept incoming connections
             while (true) {
                 Socket clientSocket = serverSocket.accept();
-                ServerThread serverThread = new ServerThread(clientSocket, this);
-                new Thread(serverThread).start();
+                try {
+                    new TCPConnection(clientSocket, this);
+                } catch (IOException e) {
+                    System.err.println("Failed to create connection: " + e.getMessage());
+                }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Failed to start registry: " + e.getMessage());
         }
     }
 
-    @SuppressWarnings("resource")
-    private void handleUserCommands() {
-        Scanner scanner = new Scanner(System.in);
-        while (true) {
-            System.out.print("Registry> ");
-            String[] commandParts = scanner.nextLine().split("\\s+");
-            String command = commandParts[0];
-
-            switch (command.toLowerCase()) {
-                case "list-messaging-nodes":
-                    listMessagingNodes();
+    @Override
+    public void onEvent(Event event, TCPConnection connection) {
+        try {
+            switch (event.getType()) {
+                case Protocol.REGISTER_REQUEST:
+                    registrationService.handleRegisterRequest((RegisterRequest) event, connection);
                     break;
-                case "setup-overlay":
-                    if (commandParts.length == 2) {
-                        setupOverlay(Integer.parseInt(commandParts[1]));
-                    }
+                case Protocol.DEREGISTER_REQUEST:
+                    registrationService.handleDeregisterRequest((DeregisterRequest) event, connection);
                     break;
-                case "send-overlay-link-weights":
-                    sendOverlayLinkWeights();
+                case Protocol.TASK_COMPLETE:
+                    taskService.handleTaskComplete((TaskComplete) event, connection);
+                    break;
+                case Protocol.TRAFFIC_SUMMARY:
+                    statisticsService.handleTrafficSummary((TrafficSummary) event, connection);
                     break;
                 default:
-                    System.out.println("Unknown command.");
+                    System.out.println("Unknown event type: " + event.getType());
             }
+        } catch (IOException e) {
+            System.err.println("Error handling event: " + e.getMessage());
         }
     }
 
-    public synchronized void registerNode(String nodeId, ServerThread serverThread) {
-        registeredNodes.put(nodeId, serverThread);
-        System.out.println("Registered node: " + nodeId);
+    @Override
+    public void onConnectionLost(TCPConnection connection) {
+        System.out.println("Connection lost with: " + connection.getSocket().getInetAddress());
     }
 
-    public synchronized void deregisterNode(String nodeId) {
-        registeredNodes.remove(nodeId);
-        System.out.println("Deregistered node: " + nodeId);
+    // Command handler delegates
+    void listMessagingNodes() {
+        registrationService.listMessagingNodes();
     }
 
-    private void listMessagingNodes() {
-        if (registeredNodes.isEmpty()) {
-            System.out.println("No messaging nodes registered.");
-        } else {
-            System.out.println("Registered Nodes (" + registeredNodes.size() + "):");
-            registeredNodes.keySet().forEach(System.out::println);
-        }
+    void listWeights() {
+        overlayService.listWeights();
     }
 
-    private void setupOverlay(int cr) {
-        synchronized (registeredNodes) {
-            if (registeredNodes.size() < cr) {
-                System.out.println("Not enough nodes for the specified connection limit.");
-                return;
-            }
-            overlayLinks.clear();
-            List<String> nodeIds = new ArrayList<>(registeredNodes.keySet());
-            Map<String, List<String>> connectionPlan = new HashMap<>();
-
-            for (int i = 0; i < nodeIds.size(); i++) {
-                for (int j = 1; j <= cr / 2; j++) {
-                    String node1 = nodeIds.get(i);
-                    String node2 = nodeIds.get((i + j) % nodeIds.size());
-
-                    connectionPlan.computeIfAbsent(node1, k -> new ArrayList<>()).add(node2);
-                    connectionPlan.computeIfAbsent(node2, k -> new ArrayList<>()).add(node1);
-                    overlayLinks.add(new String[] { node1, node2 });
-                }
-            }
-
-            for (Map.Entry<String, List<String>> entry : connectionPlan.entrySet()) {
-                try {
-                    registeredNodes.get(entry.getKey()).sendPeerList(entry.getValue());
-                } catch (IOException e) {
-                    System.err.println("Failed to send peer list to " + entry.getKey());
-                }
-            }
-            System.out.println("Overlay setup complete. " + overlayLinks.size() + " links created.");
-        }
+    void setupOverlay(int cr) {
+        overlayService.setupOverlay(cr);
     }
 
-    private void sendOverlayLinkWeights() {
-        if (overlayLinks.isEmpty()) {
-            System.out.println("Overlay not set up.");
-            return;
-        }
-
-        List<String> weightedLinks = new ArrayList<>();
-        Random random = new Random();
-        for (String[] link : overlayLinks) {
-            int weight = random.nextInt(10) + 1;
-            weightedLinks.add(link[0] + " " + link[1] + " " + weight);
-        }
-
-        System.out.println("Sending link weights to all " + registeredNodes.size() + " nodes...");
-        synchronized (registeredNodes) {
-            for (ServerThread thread : registeredNodes.values()) {
-                try {
-                    thread.sendLinkWeights(weightedLinks);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
+    void sendOverlayLinkWeights() {
+        overlayService.sendOverlayLinkWeights();
     }
 
-    public int getRegisteredNodeCount() {
-        return registeredNodes.size();
+    void startMessaging(int numberOfRounds) {
+        taskService.startMessaging(numberOfRounds);
     }
 
     public static void main(String[] args) {
         if (args.length != 1) {
-            System.out.println("Usage: java csx55.overlay.node.Registry <port-number>");
+            System.out.println("Usage: java Registry <port>");
             return;
         }
         new Registry().start(Integer.parseInt(args[0]));
