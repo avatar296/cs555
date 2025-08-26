@@ -34,6 +34,11 @@ public class TaskOrchestrationService {
             return;
         }
         
+        if (numberOfRounds <= 0) {
+            System.out.println("Error: Number of rounds must be greater than 0");
+            return;
+        }
+        
         this.rounds = numberOfRounds;
         this.completedNodes = 0;
         this.taskInProgress = true;
@@ -60,8 +65,6 @@ public class TaskOrchestrationService {
     }
     
     public synchronized void handleTaskComplete(TaskComplete taskComplete, TCPConnection connection) {
-        String nodeId = taskComplete.getNodeIpAddress() + ":" + taskComplete.getNodePortNumber();
-        
         completedNodes++;
         
         if (completedNodes == registrationService.getNodeCount()) {

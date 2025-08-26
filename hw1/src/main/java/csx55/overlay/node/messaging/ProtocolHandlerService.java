@@ -73,7 +73,7 @@ public class ProtocolHandlerService {
         System.out.println("Link weights received and processed. Ready to send messages.");
     }
     
-    public void handlePeerIdentification(PeerIdentification identification, TCPConnection connection) {
+    public synchronized void handlePeerIdentification(PeerIdentification identification, TCPConnection connection) {
         String peerId = identification.getNodeId();
         
         // Update the connection's remote node ID

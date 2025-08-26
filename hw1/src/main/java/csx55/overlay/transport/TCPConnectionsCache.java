@@ -39,7 +39,7 @@ public class TCPConnectionsCache {
         return connections.size();
     }
     
-    public void closeAll() {
+    public synchronized void closeAll() {
         for (TCPConnection connection : connections.values()) {
             connection.close();
         }

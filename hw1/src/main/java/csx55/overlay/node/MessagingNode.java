@@ -98,6 +98,17 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                 serverSocket.close();
             }
             executorService.shutdownNow();
+            try {
+                if (!executorService.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                    System.err.println("ExecutorService did not terminate in time");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            peerConnections.closeAll();
+            if (registryConnection != null) {
+                registryConnection.close();
+            }
         } catch (IOException e) {
             System.err.println("Error during cleanup: " + e.getMessage());
         }
@@ -143,11 +154,21 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
 
     @Override
     public void onConnectionLost(TCPConnection connection) {
-        // Remove from cache by finding matching connection
-        for (String nodeId : peerConnections.getAllConnections().keySet()) {
-            if (peerConnections.getConnection(nodeId) == connection) {
-                peerConnections.removeConnection(nodeId);
-                break;
+        // Check if this is the registry connection
+        if (connection == registryConnection) {
+            System.err.println("Lost connection to Registry. Shutting down...");
+            cleanup();
+            System.exit(1);
+        }
+        
+        // Remove from peer connections cache by finding matching connection
+        synchronized (peerConnections) {
+            for (String nodeId : peerConnections.getAllConnections().keySet()) {
+                if (peerConnections.getConnection(nodeId) == connection) {
+                    peerConnections.removeConnection(nodeId);
+                    System.out.println("Lost connection to peer: " + nodeId);
+                    break;
+                }
             }
         }
     }

@@ -23,11 +23,21 @@ public class OverlayManagementService {
     }
     
     public void setupOverlay(int cr) {
+        if (cr <= 0) {
+            System.out.println("Error: Connection requirement must be greater than 0");
+            return;
+        }
+        
         Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
         
         synchronized (registeredNodes) {
             if (registeredNodes.size() <= cr) {
                 System.out.println("Error: Not enough nodes. Need more than " + cr + " nodes, have " + registeredNodes.size());
+                return;
+            }
+            
+            if (cr >= registeredNodes.size()) {
+                System.out.println("Error: Connection requirement must be less than the number of nodes");
                 return;
             }
             
