@@ -1,4 +1,4 @@
-package csx55.overlay.node;
+package csx55.overlay.cli;
 
 import java.util.Scanner;
 

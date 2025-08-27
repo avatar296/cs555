@@ -24,7 +24,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
     private final OverlayManagementService overlayService;
     private final TaskOrchestrationService taskService;
     private final StatisticsCollectionService statisticsService;
-    private final RegistryCommandHandler commandHandler;
+    private final csx55.overlay.cli.RegistryCommandHandler commandHandler;
     private volatile boolean running = true;
     private ServerSocket serverSocket;
 
@@ -37,7 +37,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
         this.statisticsService = new StatisticsCollectionService();
         this.taskService = new TaskOrchestrationService(registrationService, statisticsService, overlayService);
         this.registrationService.setTaskService(taskService);
-        this.commandHandler = new RegistryCommandHandler(this);
+        this.commandHandler = new csx55.overlay.cli.RegistryCommandHandler(this);
     }
 
     /**
@@ -132,7 +132,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
      * Lists all registered messaging nodes.
      * Delegates to the registration service.
      */
-    void listMessagingNodes() {
+    public void listMessagingNodes() {
         registrationService.listMessagingNodes();
     }
 
@@ -140,7 +140,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
      * Lists all link weights in the overlay.
      * Delegates to the overlay management service.
      */
-    void listWeights() {
+    public void listWeights() {
         overlayService.listWeights();
     }
 
@@ -149,7 +149,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
      * 
      * @param cr the number of connections per node
      */
-    void setupOverlay(int cr) {
+    public void setupOverlay(int cr) {
         overlayService.setupOverlay(cr);
     }
 
@@ -157,7 +157,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
      * Sends link weights to all messaging nodes.
      * Delegates to the overlay management service.
      */
-    void sendOverlayLinkWeights() {
+    public void sendOverlayLinkWeights() {
         overlayService.sendOverlayLinkWeights();
     }
 
@@ -166,7 +166,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
      * 
      * @param numberOfRounds the number of rounds for the messaging task
      */
-    void startMessaging(int numberOfRounds) {
+    public void startMessaging(int numberOfRounds) {
         taskService.startMessaging(numberOfRounds);
     }
 

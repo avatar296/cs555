@@ -1,6 +1,5 @@
-package csx55.overlay.node.registry;
+package csx55.overlay.util;
 
-import csx55.overlay.node.messaging.MessageRoutingHelper;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.wireformats.DeregisterResponse;
 import csx55.overlay.wireformats.RegisterResponse;

@@ -1,7 +1,7 @@
 package csx55.overlay.node;
 
 import csx55.overlay.node.messaging.*;
-import csx55.overlay.node.registry.NodeValidationHelper;
+import csx55.overlay.util.NodeValidationHelper;
 import csx55.overlay.routing.RoutingTable;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
@@ -33,7 +33,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     private final MessageRoutingService routingService;
     private final ProtocolHandlerService protocolHandler;
     private final TaskExecutionService taskService;
-    private final MessagingNodeCommandHandler commandHandler;
+    private final csx55.overlay.cli.MessagingNodeCommandHandler commandHandler;
     private final List<String> allNodes = new ArrayList<>();
 
     private volatile boolean running = true;
@@ -51,7 +51,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
         this.routingService = new MessageRoutingService(peerConnections, statisticsService);
         this.protocolHandler = new ProtocolHandlerService(peerConnections, routingService);
         this.taskService = new TaskExecutionService(routingService, executorService, statisticsService);
-        this.commandHandler = new MessagingNodeCommandHandler(this);
+        this.commandHandler = new csx55.overlay.cli.MessagingNodeCommandHandler(this);
     }
 
     /**
@@ -207,7 +207,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
      * Deregisters this node from the overlay network.
      * Sends a deregistration request to the registry.
      */
-    void deregister() {
+    public void deregister() {
         try {
             DeregisterRequest request = new DeregisterRequest(ipAddress, portNumber);
             registryConnection.sendEvent(request);
@@ -220,7 +220,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
      * Prints the minimum spanning tree from this node's perspective.
      * Shows the shortest paths to all other nodes in the overlay.
      */
-    void printMinimumSpanningTree() {
+    public void printMinimumSpanningTree() {
         RoutingTable table = routingService.getRoutingTable();
         if (table != null) {
             table.printMST();

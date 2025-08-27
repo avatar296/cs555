@@ -1,8 +1,6 @@
-package csx55.overlay.node.registry;
+package csx55.overlay.util;
 
 import csx55.overlay.transport.TCPConnection;
-import csx55.overlay.util.LoggerUtil;
-import csx55.overlay.util.ValidationUtil;
 
 import java.net.Socket;
 import java.util.Map;

@@ -1,4 +1,4 @@
-package csx55.overlay.node;
+package csx55.overlay.routing;
 
 /**
  * Represents an edge in the overlay network graph.

@@ -3,6 +3,8 @@ package csx55.overlay.node.registry;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
 import csx55.overlay.util.LoggerUtil;
+import csx55.overlay.util.NodeValidationHelper;
+import csx55.overlay.util.RegistrationResponseHelper;
 import csx55.overlay.wireformats.DeregisterRequest;
 import csx55.overlay.wireformats.RegisterRequest;
 

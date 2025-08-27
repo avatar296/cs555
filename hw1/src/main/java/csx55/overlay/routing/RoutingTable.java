@@ -1,6 +1,5 @@
 package csx55.overlay.routing;
 
-import csx55.overlay.node.Edge;
 import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.LinkWeights;
 

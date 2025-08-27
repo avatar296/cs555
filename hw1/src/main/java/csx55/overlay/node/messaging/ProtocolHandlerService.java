@@ -4,6 +4,7 @@ import csx55.overlay.routing.RoutingTable;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
 import csx55.overlay.util.LoggerUtil;
+import csx55.overlay.util.MessageRoutingHelper;
 import csx55.overlay.wireformats.*;
 
 import java.io.IOException;

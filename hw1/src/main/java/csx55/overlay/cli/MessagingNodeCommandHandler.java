@@ -1,4 +1,6 @@
-package csx55.overlay.node;
+package csx55.overlay.cli;
+
+import csx55.overlay.node.MessagingNode;
 
 /**
  * Handles command-line interface for MessagingNode.
