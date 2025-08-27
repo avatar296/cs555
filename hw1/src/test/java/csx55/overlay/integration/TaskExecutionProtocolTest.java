@@ -12,10 +12,14 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests for sections 2.5 and 2.6 of the protocol specification:
- * - TASK_INITIATE message protocol (2.5)
- * - Message sending and routing (2.6)
- * - TASK_COMPLETE protocol (2.7)
+ * Integration test suite for task execution protocol validation.
+ * Tests sections 2.5, 2.6, and 2.7 of the protocol specification covering
+ * TASK_INITIATE message distribution, message routing during task execution,
+ * and TASK_COMPLETE protocol handling.
+ * 
+ * Validates the complete task execution lifecycle from initiation through
+ * message rounds to completion reporting, ensuring proper protocol adherence
+ * and correct state transitions.
  */
 @TestMethodOrder(OrderAnnotation.class)
 public class TaskExecutionProtocolTest {
@@ -23,6 +27,12 @@ public class TaskExecutionProtocolTest {
     private TestOrchestrator orchestrator;
     private int registryPort;
     
+    /**
+     * Sets up the test environment before each test.
+     * Initializes the test orchestrator and starts a registry on a random port.
+     * 
+     * @throws Exception if setup fails
+     */
     @BeforeEach
     void setup() throws Exception {
         orchestrator = new TestOrchestrator();
@@ -30,11 +40,22 @@ public class TaskExecutionProtocolTest {
         orchestrator.startRegistry(registryPort);
     }
     
+    /**
+     * Cleans up test resources after each test.
+     * Shuts down all nodes and the test orchestrator.
+     */
     @AfterEach
     void cleanup() {
         orchestrator.shutdown();
     }
     
+    /**
+     * Tests TASK_INITIATE message distribution (Section 2.5).
+     * Verifies that the registry correctly distributes TASK_INITIATE messages
+     * to all nodes when a messaging task is started.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(1)
     @DisplayName("Test TASK_INITIATE message distribution (Section 2.5)")
@@ -82,6 +103,14 @@ public class TaskExecutionProtocolTest {
         assertTrue(foundCompletion, "Should see task completion after rounds finish");
     }
     
+    /**
+     * Tests TASK_COMPLETE protocol (Section 2.7).
+     * Verifies that nodes correctly send TASK_COMPLETE messages to the registry
+     * after finishing their messaging rounds, and that the registry properly
+     * aggregates completion notifications.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(2)
     @DisplayName("Test TASK_COMPLETE protocol (Section 2.7)")
@@ -126,6 +155,14 @@ public class TaskExecutionProtocolTest {
         assertEquals(1, completedRounds, "Should complete exactly 1 round");
     }
     
+    /**
+     * Tests message routing with multiple rounds (Section 2.6).
+     * Verifies that nodes correctly route messages through the overlay network
+     * for the specified number of rounds, with each node sending the required
+     * number of messages per round.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(3)
     @DisplayName("Test message routing with multiple rounds (Section 2.6)")
@@ -163,6 +200,13 @@ public class TaskExecutionProtocolTest {
         // This would be verified in traffic summary
     }
     
+    /**
+     * Tests task initiation triggers message sending (Section 2.5-2.6).
+     * Verifies that receiving a TASK_INITIATE message causes nodes to immediately
+     * begin sending messages according to the protocol specifications.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(4)
     @DisplayName("Test task initiation triggers message sending (Section 2.5-2.6)")
@@ -196,6 +240,14 @@ public class TaskExecutionProtocolTest {
         assertTrue(foundCompletion, "Task should complete after message rounds");
     }
     
+    /**
+     * Tests registry waits for all TASK_COMPLETE messages.
+     * Verifies that the registry properly aggregates TASK_COMPLETE messages from
+     * all nodes and only reports task completion after receiving messages from
+     * every participating node.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(5)
     @DisplayName("Test registry waits for all TASK_COMPLETE messages")

@@ -13,9 +13,15 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Comprehensive tests for sections 3.1 and 3.2 of the protocol specification:
- * - Section 3.1: Registry commands (list-messaging-nodes, list-weights, setup-overlay, send-overlay-link-weights, start)
- * - Section 3.2: Messaging node commands (print-mst, exit-overlay)
+ * Integration test suite for overlay command protocol operations.
+ * Comprehensive tests for sections 3.1 and 3.2 of the protocol specification.
+ * 
+ * Section 3.1: Tests Registry commands including list-messaging-nodes, list-weights,
+ * setup-overlay, send-overlay-link-weights, and start commands.
+ * 
+ * Section 3.2: Tests Messaging node commands including print-mst and exit-overlay.
+ * 
+ * Validates command syntax, output formats, error handling, and state transitions.
  */
 @TestMethodOrder(OrderAnnotation.class)
 public class OverlayCommandProtocolTest {
@@ -23,6 +29,12 @@ public class OverlayCommandProtocolTest {
     private TestOrchestrator orchestrator;
     private int registryPort;
     
+    /**
+     * Sets up the test environment before each test.
+     * Starts a registry on a random port to avoid conflicts.
+     * 
+     * @throws Exception if setup fails
+     */
     @BeforeEach
     void setup() throws Exception {
         orchestrator = new TestOrchestrator();
@@ -31,6 +43,10 @@ public class OverlayCommandProtocolTest {
         Thread.sleep(1000);
     }
     
+    /**
+     * Cleans up test resources after each test.
+     * Shuts down all nodes and the registry.
+     */
     @AfterEach
     void cleanup() {
         orchestrator.shutdown();
@@ -38,6 +54,12 @@ public class OverlayCommandProtocolTest {
     
     // ==================== Section 3.1: Registry Commands ====================
     
+    /**
+     * Tests list-messaging-nodes command with empty registry (Section 3.1).
+     * Verifies that the command returns no nodes when registry is empty.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(1)
     @DisplayName("Test list-messaging-nodes with no nodes (Section 3.1)")
@@ -60,6 +82,12 @@ public class OverlayCommandProtocolTest {
         assertEquals(0, nodeCount, "Should have no nodes listed when registry is empty");
     }
     
+    /**
+     * Tests list-messaging-nodes command with multiple registered nodes (Section 3.1).
+     * Verifies correct IP:port format and that all registered nodes are listed.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(2)
     @DisplayName("Test list-messaging-nodes with multiple nodes (Section 3.1)")
@@ -101,6 +129,12 @@ public class OverlayCommandProtocolTest {
         assertEquals(nodes.size(), uniqueNodes.size(), "All nodes should be unique");
     }
     
+    /**
+     * Tests setup-overlay command with valid connection requirement (Section 3.1).
+     * Verifies overlay creation with specified CR and proper connection establishment.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(3)
     @DisplayName("Test setup-overlay with valid CR (Section 3.1)")
@@ -147,6 +181,12 @@ public class OverlayCommandProtocolTest {
             "All nodes should establish connections");
     }
     
+    /**
+     * Tests setup-overlay command with invalid CR >= N (Section 3.1).
+     * Verifies that overlay setup fails when CR is greater than or equal to node count.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(4)
     @DisplayName("Test setup-overlay with CR >= N (Section 3.1)")
@@ -190,6 +230,12 @@ public class OverlayCommandProtocolTest {
         }
     }
     
+    /**
+     * Tests list-weights command before overlay setup (Section 3.1).
+     * Verifies that no weights are listed when overlay hasn't been established.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(5)
     @DisplayName("Test list-weights before overlay setup (Section 3.1)")
@@ -226,6 +272,12 @@ public class OverlayCommandProtocolTest {
             "Should have no weights before overlay is setup");
     }
     
+    /**
+     * Tests list-weights command after overlay setup (Section 3.1).
+     * Verifies correct weight format and that all links have weights in range 1-10.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(6)
     @DisplayName("Test list-weights after overlay setup and weights assigned (Section 3.1)")
@@ -290,6 +342,12 @@ public class OverlayCommandProtocolTest {
         assertFalse(weights.isEmpty(), "Should have weights listed");
     }
     
+    /**
+     * Tests send-overlay-link-weights command before overlay setup (Section 3.1).
+     * Verifies that weight assignment fails when overlay isn't established.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(7)
     @DisplayName("Test send-overlay-link-weights before overlay setup (Section 3.1)")
@@ -328,6 +386,12 @@ public class OverlayCommandProtocolTest {
         }
     }
     
+    /**
+     * Tests send-overlay-link-weights command after overlay setup (Section 3.1).
+     * Verifies successful weight assignment and distribution to all nodes.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(8)
     @DisplayName("Test send-overlay-link-weights after overlay setup (Section 3.1)")
@@ -379,6 +443,12 @@ public class OverlayCommandProtocolTest {
             "All nodes should receive and process weights");
     }
     
+    /**
+     * Tests start command with valid number of rounds (Section 3.1).
+     * Verifies task initiation, completion, and output format.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(9)
     @DisplayName("Test start command with valid rounds (Section 3.1)")
@@ -419,6 +489,12 @@ public class OverlayCommandProtocolTest {
             "Should output exactly '" + rounds + " rounds completed'");
     }
     
+    /**
+     * Tests start command with zero rounds edge case (Section 3.1).
+     * Verifies proper handling of zero rounds parameter.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(10)
     @DisplayName("Test start command with 0 rounds (Section 3.1)")
@@ -461,6 +537,12 @@ public class OverlayCommandProtocolTest {
     
     // ==================== Section 3.2: Messaging Node Commands ====================
     
+    /**
+     * Tests print-mst command output format (Section 3.2).
+     * Verifies MST has N-1 edges and follows correct output format.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(11)
     @DisplayName("Test print-mst command format (Section 3.2)")
@@ -517,6 +599,12 @@ public class OverlayCommandProtocolTest {
         assertEquals(5, nodes.size(), "MST should include all 5 nodes");
     }
     
+    /**
+     * Tests print-mst command consistency (Section 3.2).
+     * Verifies that MST computation is deterministic and consistent across calls.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(12)
     @DisplayName("Test print-mst consistency (Section 3.2)")
@@ -580,6 +668,12 @@ public class OverlayCommandProtocolTest {
             "MST should be consistent across multiple calls");
     }
     
+    /**
+     * Tests exit-overlay command functionality (Section 3.2).
+     * Verifies node deregistration and removal from registry.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(13)
     @DisplayName("Test exit-overlay command (Section 3.2)")
@@ -626,6 +720,12 @@ public class OverlayCommandProtocolTest {
             "Should have 2 nodes after one exits");
     }
     
+    /**
+     * Tests exit-overlay followed by re-registration (Section 3.2).
+     * Verifies that nodes can exit and new nodes can register successfully.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(14)
     @DisplayName("Test exit-overlay and re-registration (Section 3.2)")
@@ -669,6 +769,13 @@ public class OverlayCommandProtocolTest {
             "Should have 2 nodes after re-registration");
     }
     
+    /**
+     * Tests complete command sequence workflow (Sections 3.1 & 3.2).
+     * Validates end-to-end functionality including node registration, overlay setup,
+     * weight assignment, messaging, MST computation, and node exit.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(15)
     @DisplayName("Test complete command sequence (Sections 3.1 & 3.2)")

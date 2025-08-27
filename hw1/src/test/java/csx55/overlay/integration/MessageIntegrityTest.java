@@ -9,7 +9,12 @@ import static org.assertj.core.api.Assertions.*;
 import java.util.List;
 
 /**
- * Tests message integrity, correct counts, and summations as specified in PDF Section 4
+ * Integration test suite for message integrity and traffic validation.
+ * Tests message integrity, correct counts, and summations as specified in PDF Section 4,
+ * ensuring no message loss, duplication, or corruption during routing.
+ * 
+ * Validates that message counts match expected values (rounds * 5 per node),
+ * summations balance correctly, and relay tracking functions properly.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MessageIntegrityTest {
@@ -19,6 +24,13 @@ public class MessageIntegrityTest {
     private static final int NODE_COUNT = 5;
     private static final int CR = 3;
     
+    /**
+     * Sets up the test environment with a complete overlay network.
+     * Starts a registry and multiple messaging nodes, establishes overlay connections,
+     * and distributes link weights for routing.
+     * 
+     * @throws Exception if setup fails
+     */
     @BeforeAll
     static void setup() throws Exception {
         orchestrator = new TestOrchestrator();
@@ -45,6 +57,9 @@ public class MessageIntegrityTest {
         Thread.sleep(3000);
     }
     
+    /**
+     * Cleans up all test resources and shuts down the overlay network.
+     */
     @AfterAll
     static void teardown() {
         if (orchestrator != null) {
@@ -52,6 +67,13 @@ public class MessageIntegrityTest {
         }
     }
     
+    /**
+     * Tests message count accuracy (PDF Section 4).
+     * Verifies that each node sends exactly rounds * 5 messages and that
+     * the total sent equals total received across the overlay.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(1)
     @DisplayName("Test message count: rounds * 5 per node (PDF Section 4)")
@@ -88,6 +110,13 @@ public class MessageIntegrityTest {
             .isEqualTo(totalExpectedMessages);
     }
     
+    /**
+     * Tests payload summation integrity (PDF Section 4.2).
+     * Verifies that the cumulative sum of all sent payloads exactly matches
+     * the cumulative sum of all received payloads, proving no corruption.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(2)
     @DisplayName("Test summation integrity: sendSummation == receiveSummation (PDF Section 4.2)")
@@ -126,6 +155,13 @@ public class MessageIntegrityTest {
             .isCloseTo(validation.actualSumReceived, within(0.01));
     }
     
+    /**
+     * Tests payload value range (PDF Section 4).
+     * Verifies that message payloads use the full integer range (-2^31 to 2^31-1)
+     * by checking for both positive and negative summation values.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(3)
     @DisplayName("Test payload range: -2147483648 to 2147483647 (PDF Section 4)")
@@ -171,6 +207,13 @@ public class MessageIntegrityTest {
             .isTrue();
     }
     
+    /**
+     * Tests message distribution across nodes (PDF Section 4.1).
+     * Verifies that messages are distributed across all nodes in the overlay
+     * with reasonable variance based on the routing topology.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(4)
     @DisplayName("Test message distribution across receivers (PDF Section 4.1)")
@@ -217,6 +260,13 @@ public class MessageIntegrityTest {
             .isLessThan(expectedAverage * 2);
     }
     
+    /**
+     * Tests relay counter tracking functionality (PDF Section 4.1).
+     * Verifies that nodes correctly track and report the number of messages
+     * they relay for other nodes in the overlay.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(5)
     @DisplayName("Test relay counter tracking (PDF Section 4.1)")
@@ -261,6 +311,13 @@ public class MessageIntegrityTest {
             .isGreaterThan(0);
     }
     
+    /**
+     * Tests counter reset functionality (PDF Section 2.9).
+     * Verifies that all traffic counters are properly reset after sending
+     * traffic summaries, ensuring clean state for subsequent messaging rounds.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(6)
     @DisplayName("Test counter reset after traffic summary (PDF Section 2.9)")
@@ -302,6 +359,13 @@ public class MessageIntegrityTest {
             .isCloseTo(secondValidation.actualSumReceived, within(0.01));
     }
     
+    /**
+     * Tests for duplicate message prevention (PDF Section 2.6).
+     * Verifies that no messages are duplicated during routing by checking
+     * that total received count exactly equals total sent count.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(7)
     @DisplayName("Test no duplicate messages received (PDF Section 2.6)")

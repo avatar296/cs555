@@ -12,11 +12,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
+ * Integration test suite for correctness verification and output validation.
  * Comprehensive tests for PDF Sections 4.2 (Correctness Verification) 
- * and 4.3 (Collecting and printing outputs)
+ * and 4.3 (Collecting and printing outputs).
  * 
- * Section 4.2: Verifies message counts and summations match exactly
- * Section 4.3: Verifies table format, timing, and counter reset
+ * Section 4.2: Verifies message counts and summations match exactly across all nodes,
+ * ensuring no message corruption or loss during routing.
+ * 
+ * Section 4.3: Validates traffic summary table format, timing requirements,
+ * and counter reset functionality after each messaging round.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -25,11 +29,19 @@ public class CorrectnessVerificationTest {
     private TestOrchestrator orchestrator;
     private static final int REGISTRY_PORT = 9500;
     
+    /**
+     * Initializes the test orchestrator for managing test nodes.
+     * 
+     * @throws Exception if initialization fails
+     */
     @BeforeAll
     void setup() throws Exception {
         orchestrator = new TestOrchestrator();
     }
     
+    /**
+     * Cleans up test resources and shuts down all nodes.
+     */
     @AfterAll
     void teardown() {
         if (orchestrator != null) {
@@ -37,6 +49,9 @@ public class CorrectnessVerificationTest {
         }
     }
     
+    /**
+     * Clears output buffers before each test to ensure clean test runs.
+     */
     @BeforeEach
     void clearOutputs() {
         if (orchestrator != null) {
@@ -45,7 +60,11 @@ public class CorrectnessVerificationTest {
     }
     
     /**
-     * Section 4.2: Test cumulative sum verification across all nodes
+     * Tests cumulative sum verification across all nodes (Section 4.2).
+     * Verifies that the sum of all sendTracker values equals the sum of all
+     * receiveTracker values, ensuring message integrity during routing.
+     * 
+     * @throws Exception if test execution fails
      */
     @Test
     @Order(1)
@@ -123,7 +142,11 @@ public class CorrectnessVerificationTest {
     }
     
     /**
-     * Section 4.2: Test corruption detection
+     * Tests message corruption detection capabilities (Section 4.2).
+     * Runs multiple messaging rounds and verifies that no corruption occurs
+     * by checking that sent and received sums match exactly.
+     * 
+     * @throws Exception if test execution fails
      */
     @Test
     @Order(2)
@@ -169,7 +192,11 @@ public class CorrectnessVerificationTest {
     }
     
     /**
-     * Section 4.3: Test exact table format with space separation
+     * Tests exact table format with space separation (Section 4.3).
+     * Validates that traffic summary output follows the specified format:
+     * "IP:port sent received sentSum.00 receivedSum.00 relayed"
+     * 
+     * @throws Exception if test execution fails
      */
     @Test
     @Order(3)
@@ -251,7 +278,11 @@ public class CorrectnessVerificationTest {
     }
     
     /**
-     * Section 4.3: Test TASK_COMPLETE from all nodes requirement
+     * Tests TASK_COMPLETE message from all nodes requirement (Section 4.3).
+     * Verifies that all nodes send TASK_COMPLETE messages and appear in the
+     * traffic summary, ensuring proper task completion reporting.
+     * 
+     * @throws Exception if test execution fails
      */
     @Test
     @Order(4)
@@ -305,7 +336,11 @@ public class CorrectnessVerificationTest {
     }
     
     /**
-     * Section 4.3: Test sum line calculation accuracy
+     * Tests sum line calculation accuracy (Section 4.3).
+     * Verifies that the sum line at the end of the traffic summary table
+     * correctly aggregates all individual node statistics.
+     * 
+     * @throws Exception if test execution fails
      */
     @Test
     @Order(5)
@@ -383,7 +418,11 @@ public class CorrectnessVerificationTest {
     }
     
     /**
-     * Section 4.3: Test table with negative summations
+     * Tests table format with negative summations (Section 4.3).
+     * Validates that the table correctly formats negative values when
+     * random payloads result in negative cumulative sums.
+     * 
+     * @throws Exception if test execution fails
      */
     @Test
     @Order(6)
@@ -449,7 +488,11 @@ public class CorrectnessVerificationTest {
     }
     
     /**
-     * Section 4.2: Test verification with edge case node counts
+     * Tests verification with minimum node count edge case (Section 4.2).
+     * Validates that correctness verification works properly even with
+     * the minimum viable overlay configuration (3 nodes, CR=2).
+     * 
+     * @throws Exception if test execution fails
      */
     @Test
     @Order(7)

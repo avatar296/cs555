@@ -8,18 +8,34 @@ import static org.assertj.core.api.Assertions.*;
 import java.util.List;
 
 /**
- * Tests the overlay with different scales and connection requirements
+ * Integration test suite for overlay scalability testing.
+ * Tests the overlay network with different scales and connection requirements,
+ * validating that the system works correctly with varying numbers of nodes
+ * and different CR values.
+ * 
+ * Includes tests for minimum overlay configurations, standard configurations,
+ * large-scale deployments, and edge cases like fully connected graphs.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class ScaleTest {
     
     private TestOrchestrator orchestrator;
     
+    /**
+     * Sets up the test environment before each test.
+     * Initializes the test orchestrator for managing test nodes.
+     * 
+     * @throws Exception if setup fails
+     */
     @BeforeEach
     void setup() throws Exception {
         orchestrator = new TestOrchestrator();
     }
     
+    /**
+     * Cleans up test resources after each test.
+     * Shuts down all nodes and the test orchestrator.
+     */
     @AfterEach
     void teardown() {
         if (orchestrator != null) {
@@ -27,6 +43,13 @@ public class ScaleTest {
         }
     }
     
+    /**
+     * Tests minimum viable overlay configuration.
+     * Verifies that a 3-node overlay with CR=2 works correctly,
+     * representing the smallest functional overlay.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(1)
     @DisplayName("Test minimum overlay with 3 nodes and CR=2")
@@ -86,6 +109,13 @@ public class ScaleTest {
             .isTrue();
     }
     
+    /**
+     * Tests standard overlay configuration as per PDF default.
+     * Validates a 10-node overlay with CR=4, which is the standard
+     * configuration used in most examples.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(2)
     @DisplayName("Test standard 10-node overlay with CR=4 (PDF default)")
@@ -137,6 +167,13 @@ public class ScaleTest {
             .isEqualTo(expectedEdges);
     }
     
+    /**
+     * Tests large-scale overlay deployment.
+     * Verifies that the system scales to handle 20 nodes with CR=4,
+     * testing performance with increased network size.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(3)
     @DisplayName("Test large overlay with 20 nodes and CR=4")
@@ -177,6 +214,13 @@ public class ScaleTest {
             .isTrue();
     }
     
+    /**
+     * Tests fully connected overlay configuration.
+     * Verifies that an overlay with CR = N-1 creates a fully connected graph
+     * where every node is connected to every other node.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(4)
     @DisplayName("Test fully connected overlay (CR = N-1)")
@@ -238,6 +282,13 @@ public class ScaleTest {
             .isEqualTo(expectedEdges);
     }
     
+    /**
+     * Tests overlay with varying connection requirements.
+     * Validates that the system correctly handles different CR values
+     * (2, 3, 5, 6) with the same number of nodes.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(5)
     @DisplayName("Test varying connection requirements (CR=2,3,5,6)")
@@ -298,6 +349,13 @@ public class ScaleTest {
         }
     }
     
+    /**
+     * Tests overlay with odd number of nodes and odd CR.
+     * Verifies that the system correctly handles edge cases where both
+     * node count and CR are odd numbers, ensuring proper graph construction.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(6)
     @DisplayName("Test odd number of nodes with odd CR")

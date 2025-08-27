@@ -13,11 +13,14 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests for sections 2.8 and 2.9 of the protocol specification:
- * - PULL_TRAFFIC_SUMMARY message protocol (2.8)
- * - TRAFFIC_SUMMARY response protocol (2.9)
- * - Counter reset after traffic summary
- * - Registry table output format
+ * Integration test suite for traffic summary protocol validation.
+ * Tests sections 2.8 and 2.9 of the protocol specification covering
+ * PULL_TRAFFIC_SUMMARY message timing, TRAFFIC_SUMMARY response format,
+ * counter reset behavior, and registry table output formatting.
+ * 
+ * Validates the complete traffic collection and reporting lifecycle,
+ * ensuring proper timing (15 second delay), correct aggregation,
+ * and proper state reset after summary collection.
  */
 @TestMethodOrder(OrderAnnotation.class)
 public class TrafficSummaryProtocolTest {
@@ -25,6 +28,12 @@ public class TrafficSummaryProtocolTest {
     private TestOrchestrator orchestrator;
     private int registryPort;
     
+    /**
+     * Sets up the test environment before each test.
+     * Initializes the test orchestrator and starts a registry on a random port.
+     * 
+     * @throws Exception if setup fails
+     */
     @BeforeEach
     void setup() throws Exception {
         orchestrator = new TestOrchestrator();
@@ -32,11 +41,22 @@ public class TrafficSummaryProtocolTest {
         orchestrator.startRegistry(registryPort);
     }
     
+    /**
+     * Cleans up test resources after each test.
+     * Shuts down all nodes and the test orchestrator.
+     */
     @AfterEach
     void cleanup() {
         orchestrator.shutdown();
     }
     
+    /**
+     * Tests PULL_TRAFFIC_SUMMARY timing after TASK_COMPLETE (Section 2.8).
+     * Verifies that the registry waits approximately 15 seconds after receiving
+     * all TASK_COMPLETE messages before sending PULL_TRAFFIC_SUMMARY to nodes.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(1)
     @DisplayName("Test PULL_TRAFFIC_SUMMARY timing after TASK_COMPLETE (Section 2.8)")
@@ -92,6 +112,13 @@ public class TrafficSummaryProtocolTest {
             "PULL_TRAFFIC_SUMMARY should be sent ~15 seconds after TASK_COMPLETE (was " + delay + " seconds)");
     }
     
+    /**
+     * Tests TRAFFIC_SUMMARY message contains all required fields (Section 2.9).
+     * Verifies that each node's TRAFFIC_SUMMARY response includes all required
+     * fields: messages sent, received, sum of sent/received, and messages relayed.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(2)
     @DisplayName("Test TRAFFIC_SUMMARY message contains all required fields (Section 2.9)")
@@ -153,6 +180,13 @@ public class TrafficSummaryProtocolTest {
         assertEquals(30, totalSent, "Each of 3 nodes should send 10 messages (2 rounds * 5)");
     }
     
+    /**
+     * Tests counter reset after TRAFFIC_SUMMARY (Section 2.9).
+     * Verifies that nodes correctly reset their traffic counters after sending
+     * TRAFFIC_SUMMARY responses, ensuring clean state for subsequent tasks.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(3)
     @DisplayName("Test counter reset after TRAFFIC_SUMMARY (Section 2.9)")
@@ -204,6 +238,13 @@ public class TrafficSummaryProtocolTest {
             "Both rounds should have same actual received count");
     }
     
+    /**
+     * Tests Registry table format matches specification.
+     * Verifies that the registry's traffic summary table follows the required
+     * format with node entries and a summary line showing totals.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(4)
     @DisplayName("Test Registry table format matches specification")
@@ -252,6 +293,13 @@ public class TrafficSummaryProtocolTest {
         assertTrue(foundSumLine, "Should have sum line at end of table");
     }
     
+    /**
+     * Tests PULL_TRAFFIC_SUMMARY sent to all nodes.
+     * Verifies that the registry sends PULL_TRAFFIC_SUMMARY to all registered
+     * nodes and receives responses from each, as evidenced by the complete table.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(5)
     @DisplayName("Test PULL_TRAFFIC_SUMMARY sent to all nodes")
@@ -289,6 +337,13 @@ public class TrafficSummaryProtocolTest {
             "All 3 nodes should appear in traffic summary, indicating they all received PULL_TRAFFIC_SUMMARY");
     }
     
+    /**
+     * Tests traffic summary with minimal messages.
+     * Verifies that the traffic summary protocol works correctly even with
+     * minimal message traffic (single round with small overlay).
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(6)
     @DisplayName("Test traffic summary with minimal messages")

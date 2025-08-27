@@ -8,7 +8,12 @@ import static org.assertj.core.api.Assertions.*;
 import java.util.List;
 
 /**
- * Tests error conditions and edge cases as specified in the PDF
+ * Integration test suite for error conditions and edge cases.
+ * Tests various error scenarios and boundary conditions as specified in the assignment PDF,
+ * ensuring the system handles failures gracefully and maintains consistency.
+ * 
+ * Covers error cases including duplicate registration (Section 2.1), invalid deregistration
+ * (Section 2.2), insufficient nodes for overlay setup, and node failures during operation.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class ErrorConditionTest {
@@ -16,6 +21,12 @@ public class ErrorConditionTest {
     private TestOrchestrator orchestrator;
     private int registryPort;
     
+    /**
+     * Sets up a fresh test environment before each test.
+     * Starts a new registry on a random port to avoid conflicts.
+     * 
+     * @throws Exception if setup fails
+     */
     @BeforeEach
     void setup() throws Exception {
         orchestrator = new TestOrchestrator();
@@ -25,6 +36,10 @@ public class ErrorConditionTest {
         Thread.sleep(2000);
     }
     
+    /**
+     * Cleans up test resources after each test.
+     * Shuts down all nodes and the registry.
+     */
     @AfterEach
     void teardown() {
         if (orchestrator != null) {
@@ -32,6 +47,13 @@ public class ErrorConditionTest {
         }
     }
     
+    /**
+     * Tests duplicate registration handling (PDF Section 2.1).
+     * Verifies that the registry properly handles multiple registration attempts
+     * from nodes and maintains a consistent node list.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(1)
     @DisplayName("Test duplicate registration error (PDF Section 2.1)")
@@ -63,6 +85,13 @@ public class ErrorConditionTest {
         assertThat(nodes).hasSizeGreaterThanOrEqualTo(2);
     }
     
+    /**
+     * Tests deregistration of non-registered nodes (PDF Section 2.2).
+     * Verifies that attempting to deregister a node that has already been
+     * deregistered is handled gracefully without system failure.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(2)
     @DisplayName("Test deregistration of non-registered node (PDF Section 2.2)")
@@ -96,6 +125,13 @@ public class ErrorConditionTest {
             .isGreaterThanOrEqualTo(0);
     }
     
+    /**
+     * Tests overlay setup with insufficient nodes for connection requirement (PDF Section 3.1).
+     * Verifies that the system properly rejects overlay setup when there are not enough
+     * nodes to satisfy the specified connection requirement (CR).
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(3)
     @DisplayName("Test overlay setup with insufficient nodes for CR (PDF Section 3.1)")
@@ -136,6 +172,13 @@ public class ErrorConditionTest {
             .isFalse();
     }
     
+    /**
+     * Tests IP address validation during registration (PDF Section 2.1).
+     * Verifies that nodes must register with their actual IP address and that
+     * the registry validates the source IP matches the registration request.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(4)
     @DisplayName("Test IP address mismatch in registration (PDF Section 2.1)")
@@ -168,6 +211,13 @@ public class ErrorConditionTest {
             .isTrue();
     }
     
+    /**
+     * Tests command execution before overlay setup.
+     * Verifies that commands requiring an established overlay (like sending link weights
+     * or starting messaging tasks) fail gracefully when executed before overlay setup.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(5)
     @DisplayName("Test sending commands before overlay setup")
@@ -214,6 +264,13 @@ public class ErrorConditionTest {
         }
     }
     
+    /**
+     * Tests overlay setup with zero connection requirement edge case.
+     * Verifies that the system handles CR=0 appropriately, either rejecting it
+     * or creating an overlay with no connections between nodes.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(6)
     @DisplayName("Test overlay setup with CR = 0")
@@ -259,6 +316,14 @@ public class ErrorConditionTest {
             .isFalse();
     }
     
+    /**
+     * Tests node failure during registration process (PDF Section 2.1 NOTE).
+     * Simulates the rare case where a node fails immediately after sending a
+     * registration request, verifying that the registry handles this gracefully
+     * and maintains system stability.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(7)
     @DisplayName("Test node failure during registration (PDF Section 2.1 NOTE)")

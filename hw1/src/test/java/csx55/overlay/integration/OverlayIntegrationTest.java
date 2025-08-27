@@ -9,7 +9,12 @@ import static org.assertj.core.api.Assertions.*;
 import java.util.List;
 
 /**
- * End-to-end integration tests for the overlay network
+ * End-to-end integration test suite for the overlay network.
+ * Validates complete overlay functionality including node registration,
+ * overlay setup, link weight distribution, message routing, and node deregistration.
+ * 
+ * Tests the entire workflow from startup to shutdown, ensuring all components
+ * work together correctly as specified in the assignment PDF.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -20,6 +25,12 @@ public class OverlayIntegrationTest {
     private static final int NODE_COUNT = 10;
     private static final int CONNECTION_REQUIREMENT = 4;
     
+    /**
+     * Sets up the complete test system before all tests.
+     * Starts the registry and multiple messaging nodes for integration testing.
+     * 
+     * @throws Exception if system setup fails
+     */
     @BeforeAll
     static void setupSystem() throws Exception {
         orchestrator = new TestOrchestrator();
@@ -40,6 +51,10 @@ public class OverlayIntegrationTest {
         Thread.sleep(2000);
     }
     
+    /**
+     * Tears down the test system after all tests complete.
+     * Shuts down all nodes and the registry.
+     */
     @AfterAll
     static void teardownSystem() {
         if (orchestrator != null) {
@@ -47,6 +62,12 @@ public class OverlayIntegrationTest {
         }
     }
     
+    /**
+     * Tests node registration functionality.
+     * Verifies that all started nodes successfully register with the registry.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(1)
     @DisplayName("Verify all nodes registered successfully")
@@ -62,6 +83,13 @@ public class OverlayIntegrationTest {
             .hasSize(NODE_COUNT);
     }
     
+    /**
+     * Tests overlay setup with specified connection requirement.
+     * Verifies that the overlay is established correctly and all nodes
+     * successfully establish their required connections.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(2)
     @DisplayName("Setup overlay with specified connection requirement")
@@ -96,6 +124,13 @@ public class OverlayIntegrationTest {
             .isTrue();
     }
     
+    /**
+     * Tests link weight distribution and verification.
+     * Validates that link weights are correctly assigned, distributed to all nodes,
+     * and follow the expected format and count.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(3)
     @DisplayName("Send and verify link weights")
@@ -135,6 +170,13 @@ public class OverlayIntegrationTest {
             .isEqualTo(expectedEdges);
     }
     
+    /**
+     * Tests messaging task execution and traffic verification.
+     * Validates that nodes correctly send and receive messages, and that
+     * traffic summaries show correct counts and summations.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(4)
     @DisplayName("Execute messaging task and verify traffic")
@@ -183,6 +225,13 @@ public class OverlayIntegrationTest {
             .isCloseTo(validation.expectedSumReceived, within(0.01));
     }
     
+    /**
+     * Tests MST computation at individual nodes.
+     * Verifies that nodes correctly compute the Minimum Spanning Tree
+     * with exactly N-1 edges and valid properties.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(5)
     @DisplayName("Verify MST computation at each node")
@@ -206,6 +255,13 @@ public class OverlayIntegrationTest {
             .isTrue();
     }
     
+    /**
+     * Tests node deregistration functionality.
+     * Verifies that nodes can cleanly exit the overlay and that
+     * the registry correctly updates its node list.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(6)
     @DisplayName("Test node deregistration")

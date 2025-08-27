@@ -10,8 +10,13 @@ import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
 /**
- * Tests wire format protocol messages for sections 2.1 (Registration) and 2.2 (Deregistration)
- * Validates exact message formats and protocol compliance as specified in the PDF
+ * Integration test suite for wire format protocol validation.
+ * Tests sections 2.1 and 2.2 of the protocol specification covering
+ * REGISTER_REQUEST/RESPONSE and DEREGISTER_REQUEST/RESPONSE message formats.
+ * 
+ * Validates exact message formats, protocol compliance, error handling,
+ * and state management for node registration and deregistration operations
+ * as specified in the assignment PDF.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class WireFormatProtocolTest {
@@ -19,6 +24,12 @@ public class WireFormatProtocolTest {
     private static TestOrchestrator orchestrator;
     private static final int REGISTRY_PORT = 9400;
     
+    /**
+     * Sets up the test environment before all tests.
+     * Initializes the test orchestrator and starts the registry.
+     * 
+     * @throws Exception if setup fails
+     */
     @BeforeAll
     static void setup() throws Exception {
         orchestrator = new TestOrchestrator();
@@ -26,6 +37,10 @@ public class WireFormatProtocolTest {
         Thread.sleep(2000);
     }
     
+    /**
+     * Cleans up test resources after all tests.
+     * Shuts down all nodes and the test orchestrator.
+     */
     @AfterAll
     static void teardown() {
         if (orchestrator != null) {
@@ -33,6 +48,13 @@ public class WireFormatProtocolTest {
         }
     }
     
+    /**
+     * Tests REGISTER_REQUEST and REGISTER_RESPONSE format (Section 2.1).
+     * Verifies that registration messages follow the correct wire format
+     * and that nodes receive appropriate success responses.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(1)
     @DisplayName("Test REGISTER_REQUEST and REGISTER_RESPONSE format (Section 2.1)")
@@ -75,6 +97,13 @@ public class WireFormatProtocolTest {
             .hasSize(1);
     }
     
+    /**
+     * Tests registration success information string format (Section 2.1).
+     * Verifies that the REGISTER_RESPONSE success message includes the
+     * correct node count information in the expected format.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(2)
     @DisplayName("Test registration success information string format (Section 2.1)")
@@ -134,6 +163,13 @@ public class WireFormatProtocolTest {
         assertThat(nodes).hasSize(3);
     }
     
+    /**
+     * Tests registration on same host with different ports (Section 2.1).
+     * Verifies that multiple nodes on the same host can register
+     * successfully with unique port assignments.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(3)
     @DisplayName("Test registration on same host with different ports (Section 2.1)")
@@ -179,6 +215,13 @@ public class WireFormatProtocolTest {
             .isEqualTo(ports.size());
     }
     
+    /**
+     * Tests duplicate registration error response (Section 2.1).
+     * Verifies that the registry properly handles duplicate registration
+     * attempts and maintains correct node count.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(4)
     @DisplayName("Test duplicate registration error response (Section 2.1)")
@@ -215,6 +258,13 @@ public class WireFormatProtocolTest {
             .isEqualTo(initialCount + 1);
     }
     
+    /**
+     * Tests DEREGISTER_REQUEST and DEREGISTER_RESPONSE format (Section 2.2).
+     * Verifies that deregistration messages follow the correct wire format
+     * and that nodes are properly removed from the registry.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(5)
     @DisplayName("Test DEREGISTER_REQUEST and DEREGISTER_RESPONSE format (Section 2.2)")
@@ -260,6 +310,13 @@ public class WireFormatProtocolTest {
             .isEqualTo(beforeCount - 1);
     }
     
+    /**
+     * Tests deregistration of non-registered node error (Section 2.2).
+     * Verifies that attempting to deregister a non-existent or already
+     * deregistered node is handled gracefully.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(6)
     @DisplayName("Test deregistration of non-registered node error (Section 2.2)")
@@ -295,6 +352,13 @@ public class WireFormatProtocolTest {
             .isEqualTo(0);
     }
     
+    /**
+     * Tests registry state after multiple registrations and deregistrations.
+     * Verifies that the registry correctly maintains state through multiple
+     * registration and deregistration operations (Sections 2.1 & 2.2).
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(7)
     @DisplayName("Test registry state after multiple registrations and deregistrations (Section 2.1 & 2.2)")
@@ -349,6 +413,13 @@ public class WireFormatProtocolTest {
             .hasSize(5);
     }
     
+    /**
+     * Tests registration with port number validation (Section 2.1).
+     * Verifies that port numbers in registration responses are valid
+     * and follow the correct format.
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(8)
     @DisplayName("Test registration with port number validation (Section 2.1)")
@@ -385,6 +456,13 @@ public class WireFormatProtocolTest {
         }
     }
     
+    /**
+     * Tests rapid registration and deregistration sequence.
+     * Verifies that the registry correctly handles rapid cycles of
+     * registration and deregistration operations (Sections 2.1 & 2.2).
+     * 
+     * @throws Exception if test execution fails
+     */
     @Test
     @Order(9)
     @DisplayName("Test rapid registration and deregistration sequence (Section 2.1 & 2.2)")
