@@ -95,7 +95,7 @@ public class OverlayManagementService {
         
         for (OverlayCreator.Link link : currentOverlay.getAllLinks()) {
             LinkWeights.LinkInfo linkInfo = new LinkWeights.LinkInfo(
-                link.nodeA, link.nodeB, link.weight
+                link.nodeA, link.nodeB, link.getWeight()
             );
             linkInfos.add(linkInfo);
         }
