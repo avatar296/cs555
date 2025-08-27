@@ -85,7 +85,8 @@ public class ProtocolHandlerService {
             peerConnections.addConnection(peer, connection);
             
             PeerIdentification identification = new PeerIdentification(nodeId);
-            connection.sendEvent(identification);
+            MessageRoutingHelper.sendEventSafely(connection, identification, 
+                String.format("sending peer identification to %s", peer));
         }
         LoggerUtil.info("ProtocolHandler", "All connections established. Number of connections: " + peerConnections.size());
         System.out.println("All connections are established. Number of connections: " + peerConnections.size());

@@ -3,14 +3,10 @@ package csx55.overlay.node.registry;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
 import csx55.overlay.util.LoggerUtil;
-import csx55.overlay.util.ValidationUtil;
 import csx55.overlay.wireformats.DeregisterRequest;
-import csx55.overlay.wireformats.DeregisterResponse;
 import csx55.overlay.wireformats.RegisterRequest;
-import csx55.overlay.wireformats.RegisterResponse;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -55,54 +51,45 @@ public class NodeRegistrationService {
      * @throws IOException if an error occurs while sending the response
      */
     public void handleRegisterRequest(RegisterRequest request, TCPConnection connection) throws IOException {
-        if (!ValidationUtil.isValidIpAddress(request.getIpAddress())) {
-            LoggerUtil.warn("NodeRegistration", "Invalid IP address in registration: " + request.getIpAddress());
-            connection.sendEvent(new RegisterResponse(
-                (byte) 0,
-                "Registration failed: Invalid IP address format"
-            ));
+        // Validate IP format
+        NodeValidationHelper.ValidationResult ipFormatResult = 
+            NodeValidationHelper.validateIpFormat(request.getIpAddress());
+        if (!ipFormatResult.isSuccess()) {
+            RegistrationResponseHelper.sendRegistrationFailure(connection, ipFormatResult.getErrorMessage());
             return;
         }
         
-        if (!ValidationUtil.isValidPort(request.getPortNumber())) {
-            LoggerUtil.warn("NodeRegistration", "Invalid port in registration: " + request.getPortNumber());
-            connection.sendEvent(new RegisterResponse(
-                (byte) 0,
-                "Registration failed: Invalid port number (must be " + ValidationUtil.MIN_PORT + "-" + ValidationUtil.MAX_PORT + ")"
-            ));
+        // Validate port
+        NodeValidationHelper.ValidationResult portResult = 
+            NodeValidationHelper.validatePort(request.getPortNumber());
+        if (!portResult.isSuccess()) {
+            RegistrationResponseHelper.sendRegistrationFailure(connection, portResult.getErrorMessage());
             return;
         }
         
-        String nodeId = request.getIpAddress() + ":" + request.getPortNumber();
-        Socket socket = connection.getSocket();
-        String actualAddress = socket.getInetAddress().getHostAddress();
-        
-        if (!request.getIpAddress().equals(actualAddress)) {
-            LoggerUtil.warn("NodeRegistration", "IP mismatch - claimed: " + request.getIpAddress() + ", actual: " + actualAddress);
-            connection.sendEvent(new RegisterResponse(
-                (byte) 0, 
-                "Registration failed: IP mismatch (claimed: " + request.getIpAddress() + ", actual: " + actualAddress + ")"
-            ));
+        // Validate IP match
+        NodeValidationHelper.ValidationResult ipMatchResult = 
+            NodeValidationHelper.validateIpMatch(request.getIpAddress(), connection.getSocket());
+        if (!ipMatchResult.isSuccess()) {
+            RegistrationResponseHelper.sendRegistrationFailure(connection, ipMatchResult.getErrorMessage());
             return;
         }
+        
+        String nodeId = NodeValidationHelper.createNodeId(request.getIpAddress(), request.getPortNumber());
         
         synchronized (registeredNodes) {
-            if (registeredNodes.containsKey(nodeId)) {
-                connection.sendEvent(new RegisterResponse(
-                    (byte) 0,
-                    "Registration failed: Node already registered"
-                ));
+            // Check if node already exists
+            NodeValidationHelper.ValidationResult existsResult = 
+                NodeValidationHelper.validateNodeDoesNotExist(nodeId, registeredNodes);
+            if (!existsResult.isSuccess()) {
+                RegistrationResponseHelper.sendRegistrationFailure(connection, existsResult.getErrorMessage());
                 return;
             }
             
             registeredNodes.put(nodeId, connection);
             connectionsCache.addConnection(nodeId, connection);
             
-            String successMsg = String.format(
-                "Registration request successful. The number of messaging nodes currently constituting the overlay is (%d)",
-                registeredNodes.size()
-            );
-            connection.sendEvent(new RegisterResponse((byte) 1, successMsg));
+            RegistrationResponseHelper.sendRegistrationSuccess(connection, nodeId, registeredNodes.size());
             LoggerUtil.info("NodeRegistration", "Registered node: " + nodeId + " (total: " + registeredNodes.size() + ")");
         }
     }
@@ -117,43 +104,35 @@ public class NodeRegistrationService {
      * @throws IOException if an error occurs while sending the response
      */
     public void handleDeregisterRequest(DeregisterRequest request, TCPConnection connection) throws IOException {
-        String nodeId = request.getIpAddress() + ":" + request.getPortNumber();
-        Socket socket = connection.getSocket();
-        String actualAddress = socket.getInetAddress().getHostAddress();
+        String nodeId = NodeValidationHelper.createNodeId(request.getIpAddress(), request.getPortNumber());
         
-        if (!request.getIpAddress().equals(actualAddress)) {
-            connection.sendEvent(new DeregisterResponse(
-                (byte) 0,
-                "Deregistration failed: IP mismatch"
-            ));
+        // Validate IP match
+        NodeValidationHelper.ValidationResult ipMatchResult = 
+            NodeValidationHelper.validateIpMatch(request.getIpAddress(), connection.getSocket());
+        if (!ipMatchResult.isSuccess()) {
+            RegistrationResponseHelper.sendDeregistrationFailure(connection, "IP mismatch");
             return;
         }
         
         if (taskService != null && taskService.isTaskInProgress()) {
-            connection.sendEvent(new DeregisterResponse(
-                (byte) 0,
-                "Deregistration failed: Task is in progress. Please wait for completion."
-            ));
+            RegistrationResponseHelper.sendDeregistrationFailure(connection, 
+                "Task is in progress. Please wait for completion.");
             return;
         }
         
         synchronized (registeredNodes) {
-            if (!registeredNodes.containsKey(nodeId)) {
-                connection.sendEvent(new DeregisterResponse(
-                    (byte) 0,
-                    "Deregistration failed: Node not registered"
-                ));
+            // Check if node exists
+            NodeValidationHelper.ValidationResult existsResult = 
+                NodeValidationHelper.validateNodeExists(nodeId, registeredNodes);
+            if (!existsResult.isSuccess()) {
+                RegistrationResponseHelper.sendDeregistrationFailure(connection, existsResult.getErrorMessage());
                 return;
             }
             
             registeredNodes.remove(nodeId);
             connectionsCache.removeConnection(nodeId);
             
-            String successMsg = String.format(
-                "Deregistration successful. Remaining nodes: %d",
-                registeredNodes.size()
-            );
-            connection.sendEvent(new DeregisterResponse((byte) 1, successMsg));
+            RegistrationResponseHelper.sendDeregistrationSuccess(connection, registeredNodes.size());
             LoggerUtil.info("NodeRegistration", "Deregistered node: " + nodeId + " (remaining: " + registeredNodes.size() + ")");
         }
     }

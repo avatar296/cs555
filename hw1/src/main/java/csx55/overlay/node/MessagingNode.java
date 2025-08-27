@@ -1,6 +1,7 @@
 package csx55.overlay.node;
 
 import csx55.overlay.node.messaging.*;
+import csx55.overlay.node.registry.NodeValidationHelper;
 import csx55.overlay.routing.RoutingTable;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
@@ -66,7 +67,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
             serverSocket = new ServerSocket(0);
             this.portNumber = serverSocket.getLocalPort();
             this.ipAddress = InetAddress.getLocalHost().getHostAddress();
-            this.nodeId = ipAddress + ":" + portNumber;
+            this.nodeId = NodeValidationHelper.createNodeId(ipAddress, portNumber);
 
             routingService.setNodeId(nodeId);
             protocolHandler.setNodeInfo(nodeId, allNodes);
@@ -139,41 +140,41 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
      */
     @Override
     public void onEvent(Event event, TCPConnection connection) {
-        try {
-            switch (event.getType()) {
-                case Protocol.REGISTER_RESPONSE:
-                    protocolHandler.handleRegisterResponse((RegisterResponse) event);
-                    break;
-                case Protocol.DEREGISTER_RESPONSE:
-                    if (protocolHandler.handleDeregisterResponse((DeregisterResponse) event)) {
-                        cleanup();
-                        System.exit(0);
-                    }
-                    break;
-                case Protocol.MESSAGING_NODES_LIST:
+        switch (event.getType()) {
+            case Protocol.REGISTER_RESPONSE:
+                protocolHandler.handleRegisterResponse((RegisterResponse) event);
+                break;
+            case Protocol.DEREGISTER_RESPONSE:
+                if (protocolHandler.handleDeregisterResponse((DeregisterResponse) event)) {
+                    cleanup();
+                    System.exit(0);
+                }
+                break;
+            case Protocol.MESSAGING_NODES_LIST:
+                try {
                     protocolHandler.handlePeerList((MessagingNodesList) event, this);
-                    break;
-                case Protocol.LINK_WEIGHTS:
-                    protocolHandler.handleLinkWeights((LinkWeights) event);
-                    // Note: protocolHandler already updates the shared allNodes list
-                    LoggerUtil.info("MessagingNode", "Updated allNodes list with " + allNodes.size() + " nodes after receiving link weights");
-                    break;
-                case Protocol.TASK_INITIATE:
-                    LoggerUtil.info("MessagingNode", "Handling task initiate with allNodes size: " + allNodes.size());
-                    taskService.handleTaskInitiate((TaskInitiate) event, allNodes);
-                    break;
-                case Protocol.PULL_TRAFFIC_SUMMARY:
-                    statisticsService.sendTrafficSummary(ipAddress, portNumber, registryConnection);
-                    break;
-                case Protocol.DATA_MESSAGE:
-                    routingService.handleDataMessage((DataMessage) event);
-                    break;
-                case Protocol.PEER_IDENTIFICATION:
-                    protocolHandler.handlePeerIdentification((PeerIdentification) event, connection);
-                    break;
-            }
-        } catch (IOException e) {
-            LoggerUtil.error("MessagingNode", "Error handling event type " + event.getType(), e);
+                } catch (IOException e) {
+                    LoggerUtil.error("MessagingNode", "Error handling peer list", e);
+                }
+                break;
+            case Protocol.LINK_WEIGHTS:
+                protocolHandler.handleLinkWeights((LinkWeights) event);
+                // Note: protocolHandler already updates the shared allNodes list
+                LoggerUtil.info("MessagingNode", "Updated allNodes list with " + allNodes.size() + " nodes after receiving link weights");
+                break;
+            case Protocol.TASK_INITIATE:
+                LoggerUtil.info("MessagingNode", "Handling task initiate with allNodes size: " + allNodes.size());
+                taskService.handleTaskInitiate((TaskInitiate) event, allNodes);
+                break;
+            case Protocol.PULL_TRAFFIC_SUMMARY:
+                statisticsService.sendTrafficSummary(ipAddress, portNumber, registryConnection);
+                break;
+            case Protocol.DATA_MESSAGE:
+                routingService.handleDataMessage((DataMessage) event);
+                break;
+            case Protocol.PEER_IDENTIFICATION:
+                protocolHandler.handlePeerIdentification((PeerIdentification) event, connection);
+                break;
         }
     }
 

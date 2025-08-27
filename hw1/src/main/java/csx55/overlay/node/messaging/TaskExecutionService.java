@@ -5,7 +5,6 @@ import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.TaskComplete;
 import csx55.overlay.wireformats.TaskInitiate;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -84,13 +83,7 @@ public class TaskExecutionService {
         
         if (allNodes.isEmpty()) {
             LoggerUtil.error("TaskExecutionService", "AllNodes list is empty, cannot send messages. Sending TaskComplete anyway.");
-            try {
-                TaskComplete complete = new TaskComplete(ipAddress, portNumber);
-                registryConnection.sendEvent(complete);
-                LoggerUtil.info("TaskExecutionService", "Sent TaskComplete despite empty node list");
-            } catch (IOException e) {
-                LoggerUtil.error("TaskExecutionService", "Failed to send task complete message", e);
-            }
+            sendTaskComplete("despite empty node list");
             return;
         }
         
@@ -107,13 +100,22 @@ public class TaskExecutionService {
         }
         
         LoggerUtil.info("TaskExecutionService", "Completed all rounds, sending TaskComplete to registry");
+        sendTaskComplete("after completing all rounds");
+    }
+    
+    /**
+     * Helper method to send a TaskComplete message to the registry.
+     * Uses the MessageRoutingHelper for consistent error handling.
+     * 
+     * @param context additional context for logging
+     */
+    private void sendTaskComplete(String context) {
+        TaskComplete complete = new TaskComplete(ipAddress, portNumber);
+        boolean success = MessageRoutingHelper.sendEventSafely(registryConnection, complete,
+            String.format("sending TaskComplete %s", context));
         
-        try {
-            TaskComplete complete = new TaskComplete(ipAddress, portNumber);
-            registryConnection.sendEvent(complete);
+        if (success) {
             LoggerUtil.info("TaskExecutionService", "Successfully sent TaskComplete message");
-        } catch (IOException e) {
-            LoggerUtil.error("TaskExecutionService", "Failed to send task complete message", e);
         }
     }
 }

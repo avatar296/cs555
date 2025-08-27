@@ -1,9 +1,5 @@
 package csx55.overlay.wireformats;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -17,13 +13,13 @@ import java.io.IOException;
  * - int: message type (TASK_INITIATE)
  * - int: number of rounds to execute
  */
-public class TaskInitiate implements Event {
+public class TaskInitiate extends AbstractEvent {
     
     /** Message type identifier */
-    private final int type = Protocol.TASK_INITIATE;
+    private static final int TYPE = Protocol.TASK_INITIATE;
     
     /** Number of messaging rounds to execute */
-    private final int rounds;
+    private int rounds;
     
     /**
      * Constructs a new TaskInitiate message.
@@ -41,18 +37,7 @@ public class TaskInitiate implements Event {
      * @throws IOException if deserialization fails or message type is invalid
      */
     public TaskInitiate(byte[] marshalledBytes) throws IOException {
-        ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
-        DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
-        
-        int messageType = din.readInt();
-        if (messageType != Protocol.TASK_INITIATE) {
-            throw new IOException("Invalid message type for TaskInitiate");
-        }
-        
-        this.rounds = din.readInt();
-        
-        baInputStream.close();
-        din.close();
+        deserializeFrom(marshalledBytes);
     }
     
     /**
@@ -62,29 +47,29 @@ public class TaskInitiate implements Event {
      */
     @Override
     public int getType() {
-        return type;
+        return TYPE;
     }
     
     /**
-     * Serializes this message to bytes for network transmission.
+     * Writes the TaskInitiate-specific data to the output stream.
      * 
-     * @return the serialized message as a byte array
-     * @throws IOException if serialization fails
+     * @param dout the data output stream
+     * @throws IOException if writing fails
      */
     @Override
-    public byte[] getBytes() throws IOException {
-        ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
-        DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
-        
-        dout.writeInt(type);
+    protected void writeData(DataOutputStream dout) throws IOException {
         dout.writeInt(rounds);
-        dout.flush();
-        
-        byte[] marshalledBytes = baOutputStream.toByteArray();
-        baOutputStream.close();
-        dout.close();
-        
-        return marshalledBytes;
+    }
+    
+    /**
+     * Reads the TaskInitiate-specific data from the input stream.
+     * 
+     * @param din the data input stream
+     * @throws IOException if reading fails
+     */
+    @Override
+    protected void readData(DataInputStream din) throws IOException {
+        this.rounds = din.readInt();
     }
     
     /**

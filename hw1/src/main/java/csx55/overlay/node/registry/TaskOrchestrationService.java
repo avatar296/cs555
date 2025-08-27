@@ -1,12 +1,12 @@
 package csx55.overlay.node.registry;
 
+import csx55.overlay.node.messaging.MessageRoutingHelper;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.PullTrafficSummary;
 import csx55.overlay.wireformats.TaskComplete;
 import csx55.overlay.wireformats.TaskInitiate;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -81,13 +81,13 @@ public class TaskOrchestrationService {
         LoggerUtil.info("TaskOrchestration", "Starting messaging task with " + numberOfRounds + " rounds for " + registeredNodes.size() + " nodes");
         
         TaskInitiate message = new TaskInitiate(numberOfRounds);
-        try {
-            for (TCPConnection connection : registeredNodes.values()) {
-                connection.sendEvent(message);
-            }
-            LoggerUtil.info("TaskOrchestration", "Task initiate messages sent to all " + registeredNodes.size() + " nodes");
-        } catch (IOException e) {
-            LoggerUtil.error("TaskOrchestration", "Failed to initiate messaging task with " + numberOfRounds + " rounds", e);
+        int sent = MessageRoutingHelper.broadcastToAllNodes(registeredNodes, message, 
+            "initiating task with " + numberOfRounds + " rounds");
+        
+        if (sent > 0) {
+            LoggerUtil.info("TaskOrchestration", "Task initiate messages sent to all " + sent + " nodes");
+        } else {
+            LoggerUtil.error("TaskOrchestration", "Failed to initiate messaging task with " + numberOfRounds + " rounds");
             taskInProgress = false;
         }
     }
@@ -123,12 +123,11 @@ public class TaskOrchestrationService {
         
         PullTrafficSummary message = new PullTrafficSummary();
         
-        try {
-            for (TCPConnection connection : registeredNodes.values()) {
-                connection.sendEvent(message);
-            }
-        } catch (IOException e) {
-            LoggerUtil.error("TaskOrchestration", "Failed to request traffic summaries from nodes", e);
+        int sent = MessageRoutingHelper.broadcastToAllNodes(registeredNodes, message, 
+            "requesting traffic summaries");
+        
+        if (sent == 0) {
+            LoggerUtil.error("TaskOrchestration", "Failed to request traffic summaries from nodes");
         }
     }
     

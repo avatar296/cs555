@@ -1,13 +1,10 @@
 package csx55.overlay.wireformats;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -20,16 +17,16 @@ import java.util.List;
  * - int: number of peer nodes
  * - For each peer: String containing node identifier (IP:port)
  */
-public class MessagingNodesList implements Event {
+public class MessagingNodesList extends AbstractEvent {
     
     /** Message type identifier */
-    private final int type = Protocol.MESSAGING_NODES_LIST;
+    private static final int TYPE = Protocol.MESSAGING_NODES_LIST;
     
     /** Number of peer nodes to connect to */
-    private final int numberOfPeerNodes;
+    private int numberOfPeerNodes;
     
     /** List of peer node identifiers (IP:port format) */
-    private final List<String> peerNodes;
+    private List<String> peerNodes;
     
     /**
      * Constructs a new MessagingNodesList.
@@ -48,24 +45,7 @@ public class MessagingNodesList implements Event {
      * @throws IOException if deserialization fails or message type is invalid
      */
     public MessagingNodesList(byte[] marshalledBytes) throws IOException {
-        ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
-        DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
-        
-        int messageType = din.readInt();
-        if (messageType != Protocol.MESSAGING_NODES_LIST) {
-            throw new IOException("Invalid message type for MessagingNodesList");
-        }
-        
-        this.numberOfPeerNodes = din.readInt();
-        this.peerNodes = new ArrayList<>();
-        
-        for (int i = 0; i < numberOfPeerNodes; i++) {
-            String nodeInfo = din.readUTF();
-            peerNodes.add(nodeInfo);
-        }
-        
-        baInputStream.close();
-        din.close();
+        deserializeFrom(marshalledBytes);
     }
     
     /**
@@ -75,34 +55,32 @@ public class MessagingNodesList implements Event {
      */
     @Override
     public int getType() {
-        return type;
+        return TYPE;
     }
     
     /**
-     * Serializes this message to bytes for network transmission.
+     * Writes the MessagingNodesList-specific data to the output stream.
      * 
-     * @return the serialized message as a byte array
-     * @throws IOException if serialization fails
+     * @param dout the data output stream
+     * @throws IOException if writing fails
      */
     @Override
-    public byte[] getBytes() throws IOException {
-        ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
-        DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
-        
-        dout.writeInt(type);
-        dout.writeInt(numberOfPeerNodes);
-        
-        for (String nodeInfo : peerNodes) {
-            dout.writeUTF(nodeInfo);
-        }
-        
-        dout.flush();
-        
-        byte[] marshalledBytes = baOutputStream.toByteArray();
-        baOutputStream.close();
-        dout.close();
-        
-        return marshalledBytes;
+    protected void writeData(DataOutputStream dout) throws IOException {
+        String[] peerArray = peerNodes.toArray(new String[0]);
+        writeStringArray(dout, peerArray);
+    }
+    
+    /**
+     * Reads the MessagingNodesList-specific data from the input stream.
+     * 
+     * @param din the data input stream
+     * @throws IOException if reading fails
+     */
+    @Override
+    protected void readData(DataInputStream din) throws IOException {
+        String[] peerArray = readStringArray(din);
+        this.peerNodes = new ArrayList<>(Arrays.asList(peerArray));
+        this.numberOfPeerNodes = peerNodes.size();
     }
     
     /**

@@ -1,9 +1,5 @@
 package csx55.overlay.wireformats;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -18,16 +14,16 @@ import java.io.IOException;
  * - byte: status code (1 for success, 0 for failure)
  * - String: additional information or error message
  */
-public class RegisterResponse implements Event {
+public class RegisterResponse extends AbstractEvent {
     
     /** Message type identifier */
-    private final int type = Protocol.REGISTER_RESPONSE;
+    private static final int TYPE = Protocol.REGISTER_RESPONSE;
     
     /** Status code: 1 for success, 0 for failure */
-    private final byte statusCode;
+    private byte statusCode;
     
     /** Additional information or error message */
-    private final String additionalInfo;
+    private String additionalInfo;
     
     /**
      * Constructs a new RegisterResponse.
@@ -47,19 +43,7 @@ public class RegisterResponse implements Event {
      * @throws IOException if deserialization fails or message type is invalid
      */
     public RegisterResponse(byte[] marshalledBytes) throws IOException {
-        ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
-        DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
-        
-        int messageType = din.readInt();
-        if (messageType != Protocol.REGISTER_RESPONSE) {
-            throw new IOException("Invalid message type for RegisterResponse");
-        }
-        
-        this.statusCode = din.readByte();
-        this.additionalInfo = din.readUTF();
-        
-        baInputStream.close();
-        din.close();
+        deserializeFrom(marshalledBytes);
     }
     
     /**
@@ -69,7 +53,7 @@ public class RegisterResponse implements Event {
      */
     @Override
     public int getType() {
-        return type;
+        return TYPE;
     }
     
     /**
@@ -79,20 +63,15 @@ public class RegisterResponse implements Event {
      * @throws IOException if serialization fails
      */
     @Override
-    public byte[] getBytes() throws IOException {
-        ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
-        DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
-        
-        dout.writeInt(type);
+    protected void writeData(DataOutputStream dout) throws IOException {
         dout.writeByte(statusCode);
         dout.writeUTF(additionalInfo);
-        dout.flush();
-        
-        byte[] marshalledBytes = baOutputStream.toByteArray();
-        baOutputStream.close();
-        dout.close();
-        
-        return marshalledBytes;
+    }
+    
+    @Override
+    protected void readData(DataInputStream din) throws IOException {
+        this.statusCode = din.readByte();
+        this.additionalInfo = din.readUTF();
     }
     
     /**

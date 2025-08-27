@@ -47,17 +47,35 @@ public class RoutingTable {
      * @param linkWeights the new link weight information for the overlay
      */
     public synchronized void updateLinkWeights(LinkWeights linkWeights) {
-        graph.clear();
-        mst.clear();
-        nextHopCache.clear();
+        clearAllData();
         for (LinkWeights.LinkInfo link : linkWeights.getLinks()) {
-            graph.computeIfAbsent(link.nodeA, k -> new ArrayList<>())
-                .add(new Edge(link.nodeB, link.weight));
-            graph.computeIfAbsent(link.nodeB, k -> new ArrayList<>())
-                .add(new Edge(link.nodeA, link.weight));
+            addBidirectionalEdge(link.nodeA, link.nodeB, link.weight);
         }
         
         calculateMST();
+    }
+    
+    /**
+     * Clears all internal data structures.
+     */
+    private void clearAllData() {
+        graph.clear();
+        mst.clear();
+        nextHopCache.clear();
+    }
+    
+    /**
+     * Adds a bidirectional edge between two nodes in the graph.
+     * 
+     * @param nodeA the first node
+     * @param nodeB the second node
+     * @param weight the weight of the edge
+     */
+    private void addBidirectionalEdge(String nodeA, String nodeB, int weight) {
+        graph.computeIfAbsent(nodeA, k -> new ArrayList<>())
+            .add(new Edge(nodeB, weight));
+        graph.computeIfAbsent(nodeB, k -> new ArrayList<>())
+            .add(new Edge(nodeA, weight));
     }
     
     /**
@@ -71,7 +89,7 @@ public class RoutingTable {
             return;
         }
         
-        mst.clear();
+        // MST already cleared in clearAllData() if called from updateLinkWeights
         Map<String, String> parent = new HashMap<>();
         Map<String, Integer> minWeight = new HashMap<>();
         PriorityQueue<Edge> pq = new PriorityQueue<>(Comparator.comparingInt(Edge::getWeight));
@@ -158,6 +176,51 @@ public class RoutingTable {
     }
     
     /**
+     * Formats an edge as a string.
+     * 
+     * @param parent the parent node
+     * @param child the child node
+     * @param weight the edge weight
+     * @return formatted string "parent, child, weight"
+     */
+    private String formatEdge(String parent, String child, int weight) {
+        return parent + ", " + child + ", " + weight;
+    }
+    
+    /**
+     * Internal class representing an MST edge with parent-child relationship.
+     */
+    private static class MSTEdge {
+        final String parent;
+        final String child;
+        final int weight;
+        
+        MSTEdge(String parent, String child, int weight) {
+            this.parent = parent;
+            this.child = child;
+            this.weight = weight;
+        }
+    }
+    
+    /**
+     * Extracts all MST edges into a structured format.
+     * 
+     * @return list of MST edges
+     */
+    private List<MSTEdge> extractMSTEdges() {
+        List<MSTEdge> edges = new ArrayList<>();
+        
+        for (Map.Entry<String, Edge> entry : mst.entrySet()) {
+            String childNode = entry.getKey();
+            Edge edgeToParent = entry.getValue();
+            String parentNode = edgeToParent.getDestination();
+            edges.add(new MSTEdge(parentNode, childNode, edgeToParent.getWeight()));
+        }
+        
+        return edges;
+    }
+    
+    /**
      * Prints the Minimum Spanning Tree in breadth-first order.
      * Displays each edge as: parent, child, weight.
      * Output starts from the local node as root.
@@ -170,6 +233,7 @@ public class RoutingTable {
         
         Queue<String> queue = new LinkedList<>();
         Set<String> visited = new HashSet<>();
+        List<MSTEdge> mstEdges = extractMSTEdges();
         
         queue.add(localNodeId);
         visited.add(localNodeId);
@@ -177,15 +241,11 @@ public class RoutingTable {
         while (!queue.isEmpty()) {
             String currentNode = queue.poll();
             
-            for (Map.Entry<String, Edge> entry : mst.entrySet()) {
-                String childNode = entry.getKey();
-                Edge edgeToParent = entry.getValue();
-                String parentNode = edgeToParent.getDestination();
-                
-                if (parentNode.equals(currentNode) && !visited.contains(childNode)) {
-                    System.out.println(parentNode + ", " + childNode + ", " + edgeToParent.getWeight());
-                    visited.add(childNode);
-                    queue.add(childNode);
+            for (MSTEdge edge : mstEdges) {
+                if (edge.parent.equals(currentNode) && !visited.contains(edge.child)) {
+                    System.out.println(formatEdge(edge.parent, edge.child, edge.weight));
+                    visited.add(edge.child);
+                    queue.add(edge.child);
                 }
             }
         }
@@ -199,11 +259,8 @@ public class RoutingTable {
     public synchronized List<String> getMSTEdges() {
         List<String> edges = new ArrayList<>();
         
-        for (Map.Entry<String, Edge> entry : mst.entrySet()) {
-            String childNode = entry.getKey();
-            Edge edgeToParent = entry.getValue();
-            String parentNode = edgeToParent.getDestination();
-            edges.add(parentNode + ", " + childNode + ", " + edgeToParent.getWeight());
+        for (MSTEdge mstEdge : extractMSTEdges()) {
+            edges.add(formatEdge(mstEdge.parent, mstEdge.child, mstEdge.weight));
         }
         
         return edges;

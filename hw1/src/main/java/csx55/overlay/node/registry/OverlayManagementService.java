@@ -1,12 +1,12 @@
 package csx55.overlay.node.registry;
 
+import csx55.overlay.node.messaging.MessageRoutingHelper;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.util.OverlayCreator;
 import csx55.overlay.wireformats.LinkWeights;
 import csx55.overlay.wireformats.MessagingNodesList;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -55,27 +55,23 @@ public class OverlayManagementService {
             
             connectionRequirement = cr;
             
-            try {
-                List<String> nodeIds = new ArrayList<>(registeredNodes.keySet());
-                currentOverlay = OverlayCreator.createOverlay(nodeIds, cr);
-                
-                Map<String, List<String>> initiators = OverlayCreator.determineConnectionInitiators(currentOverlay);
-                
-                for (String nodeId : nodeIds) {
-                    List<String> peers = initiators.getOrDefault(nodeId, new ArrayList<>());
-                    TCPConnection connection = registeredNodes.get(nodeId);
-                    if (connection != null) {
-                        MessagingNodesList message = new MessagingNodesList(peers);
-                        connection.sendEvent(message);
-                    }
+            List<String> nodeIds = new ArrayList<>(registeredNodes.keySet());
+            currentOverlay = OverlayCreator.createOverlay(nodeIds, cr);
+            
+            Map<String, List<String>> initiators = OverlayCreator.determineConnectionInitiators(currentOverlay);
+            
+            for (String nodeId : nodeIds) {
+                List<String> peers = initiators.getOrDefault(nodeId, new ArrayList<>());
+                TCPConnection connection = registeredNodes.get(nodeId);
+                if (connection != null) {
+                    MessagingNodesList message = new MessagingNodesList(peers);
+                    MessageRoutingHelper.sendEventSafely(connection, message,
+                        String.format("sending peer list to %s", nodeId));
                 }
-                
-                LoggerUtil.info("OverlayManagement", "Overlay setup completed with CR=" + connectionRequirement + " connections per node");
-                System.out.println("setup completed with " + connectionRequirement + " connections");
-                
-            } catch (IOException e) {
-                LoggerUtil.error("OverlayManagement", "Failed to setup overlay with CR=" + cr, e);
             }
+            
+            LoggerUtil.info("OverlayManagement", "Overlay setup completed with CR=" + connectionRequirement + " connections per node");
+            System.out.println("setup completed with " + connectionRequirement + " connections");
         }
     }
     
@@ -101,14 +97,10 @@ public class OverlayManagementService {
         }
         
         LinkWeights message = new LinkWeights(linkInfos);
-        try {
-            for (TCPConnection connection : registeredNodes.values()) {
-                connection.sendEvent(message);
-            }
+        int sent = MessageRoutingHelper.broadcastToAllNodes(registeredNodes, message, "sending link weights");
+        if (sent > 0) {
             LoggerUtil.info("OverlayManagement", "Link weights successfully assigned to all nodes");
             System.out.println("link weights assigned");
-        } catch (IOException e) {
-            LoggerUtil.error("OverlayManagement", "Failed to send link weights to nodes", e);
         }
     }
     

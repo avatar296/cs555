@@ -3,10 +3,9 @@ package csx55.overlay.node.messaging;
 import csx55.overlay.routing.RoutingTable;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
-import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.DataMessage;
 
-import java.io.IOException;
+import java.util.Optional;
 
 /**
  * Service responsible for routing messages through the overlay network.
@@ -62,26 +61,7 @@ public class MessageRoutingService {
      */
     public synchronized void sendMessage(String sinkId, int payload) {
         statisticsService.incrementSendStats(payload);
-        
-        String nextHop = routingTable.findNextHop(sinkId);
-        
-        if (nextHop == null) {
-            LoggerUtil.warn("MessageRouting", "No route found to destination: " + sinkId);
-            return;
-        }
-        
-        TCPConnection connection = peerConnections.getConnection(nextHop);
-        if (connection == null) {
-            LoggerUtil.warn("MessageRouting", "No connection to next hop: " + nextHop + " for destination: " + sinkId);
-            return;
-        }
-        
-        try {
-            DataMessage message = new DataMessage(nodeId, sinkId, payload);
-            connection.sendEvent(message);
-        } catch (IOException e) {
-            LoggerUtil.error("MessageRouting", "Failed to send message to " + sinkId + " via " + nextHop, e);
-        }
+        routeMessageInternal(nodeId, sinkId, payload, "send");
     }
     
     /**
@@ -95,26 +75,39 @@ public class MessageRoutingService {
      */
     public synchronized void relayMessage(String sourceId, String sinkId, int payload) {
         statisticsService.incrementRelayStats();
-        
+        routeMessageInternal(sourceId, sinkId, payload, "relay");
+    }
+    
+    /**
+     * Internal method to handle common message routing logic.
+     * Validates the route, retrieves the connection, and sends the message.
+     * 
+     * @param sourceId the source node identifier
+     * @param sinkId the destination node identifier
+     * @param payload the message payload
+     * @param operation the operation type ("send" or "relay") for logging
+     */
+    private void routeMessageInternal(String sourceId, String sinkId, int payload, String operation) {
         String nextHop = routingTable.findNextHop(sinkId);
         
-        if (nextHop == null) {
-            LoggerUtil.warn("MessageRouting", "No route for relay to destination: " + sinkId);
+        if (!MessageRoutingHelper.validateRoute(nextHop, sinkId, operation)) {
             return;
         }
         
-        TCPConnection connection = peerConnections.getConnection(nextHop);
-        if (connection == null) {
-            LoggerUtil.warn("MessageRouting", "No connection for relay to next hop: " + nextHop);
+        Optional<TCPConnection> connectionOpt = MessageRoutingHelper.getValidatedConnection(
+            peerConnections, nextHop, 
+            String.format("%s to destination: %s", operation, sinkId));
+        
+        if (!connectionOpt.isPresent()) {
             return;
         }
         
-        try {
-            DataMessage message = new DataMessage(sourceId, sinkId, payload);
-            connection.sendEvent(message);
-        } catch (IOException e) {
-            LoggerUtil.error("MessageRouting", "Failed to relay message from " + sourceId + " to " + sinkId, e);
-        }
+        DataMessage message = new DataMessage(sourceId, sinkId, payload);
+        String errorContext = operation.equals("send") 
+            ? String.format("sending message to %s via %s", sinkId, nextHop)
+            : String.format("relaying message from %s to %s via %s", sourceId, sinkId, nextHop);
+        
+        MessageRoutingHelper.sendEventSafely(connectionOpt.get(), message, errorContext);
     }
     
     /**

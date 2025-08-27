@@ -44,83 +44,31 @@ public class ConnectionRetryPolicy {
     }
     
     /**
-     * Attempts to connect to the specified host and port with retry logic.
-     * Uses exponential backoff between attempts.
-     * 
-     * @param host the host to connect to
-     * @param port the port to connect to
-     * @return established socket connection
-     * @throws IOException if all retry attempts fail
-     */
-    public Socket connectWithRetry(String host, int port) throws IOException {
-        IOException lastException = null;
-        
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                LoggerUtil.info("ConnectionRetry", 
-                    String.format("Attempting connection to %s:%d (attempt %d/%d)", 
-                    host, port, attempt, maxAttempts));
-                    
-                Socket socket = new Socket(host, port);
-                
-                if (attempt > 1) {
-                    LoggerUtil.info("ConnectionRetry", 
-                        String.format("Successfully connected to %s:%d after %d attempts", 
-                        host, port, attempt));
-                }
-                
-                return socket;
-                
-            } catch (IOException ex) {
-                lastException = ex;
-                LoggerUtil.warn("ConnectionRetry", 
-                    String.format("Connection attempt %d failed: %s", attempt, ex.getMessage()));
-                
-                if (attempt < maxAttempts) {
-                    long delay = calculateBackoffDelay(attempt);
-                    LoggerUtil.debug("ConnectionRetry", 
-                        String.format("Waiting %dms before retry", delay));
-                    
-                    try {
-                        Thread.sleep(delay);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw new IOException("Retry interrupted", ie);
-                    }
-                }
-            }
-        }
-        
-        throw new IOException(String.format(
-            "Failed to connect to %s:%d after %d attempts", 
-            host, port, maxAttempts), lastException);
-    }
-    
-    /**
-     * Executes an operation with retry logic.
-     * Only retries if the exception is determined to be retryable.
+     * Generic retry template for executing operations with exponential backoff.
      * 
      * @param <T> the return type of the operation
-     * @param operation the operation to execute
      * @param operationName name for logging purposes
+     * @param operation the operation to execute
+     * @param checkRetryable whether to check if exceptions are retryable
      * @return result of the operation
      * @throws Exception if all retry attempts fail or exception is not retryable
      */
-    public <T> T executeWithRetry(RetryableOperation<T> operation, String operationName) throws Exception {
+    private <T> T retryWithTemplate(String operationName, RetryableOperation<T> operation, 
+                                    boolean checkRetryable) throws Exception {
         Exception lastException = null;
+        int lastAttempt = 0;
         
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            lastAttempt = attempt;
             try {
                 LoggerUtil.debug("ConnectionRetry", 
-                    String.format("Executing %s (attempt %d/%d)", 
-                    operationName, attempt, maxAttempts));
+                    String.format("%s (attempt %d/%d)", operationName, attempt, maxAttempts));
                     
                 T result = operation.execute();
                 
                 if (attempt > 1) {
                     LoggerUtil.info("ConnectionRetry", 
-                        String.format("%s succeeded after %d attempts", 
-                        operationName, attempt));
+                        String.format("%s succeeded after %d attempts", operationName, attempt));
                 }
                 
                 return result;
@@ -128,11 +76,15 @@ public class ConnectionRetryPolicy {
             } catch (Exception ex) {
                 lastException = ex;
                 LoggerUtil.warn("ConnectionRetry", 
-                    String.format("%s attempt %d failed: %s", 
-                    operationName, attempt, ex.getMessage()));
+                    String.format("%s attempt %d failed: %s", operationName, attempt, ex.getMessage()));
                 
-                if (attempt < maxAttempts && isRetryable(ex)) {
+                boolean shouldRetry = attempt < maxAttempts && 
+                                    (!checkRetryable || isRetryable(ex));
+                
+                if (shouldRetry) {
                     long delay = calculateBackoffDelay(attempt);
+                    LoggerUtil.debug("ConnectionRetry", 
+                        String.format("Waiting %dms before retry", delay));
                     
                     try {
                         Thread.sleep(delay);
@@ -147,8 +99,45 @@ public class ConnectionRetryPolicy {
         }
         
         throw new Exception(String.format(
-            "%s failed after %d attempts", 
-            operationName, maxAttempts), lastException);
+            "%s failed after %d attempts", operationName, lastAttempt), lastException);
+    }
+    
+    /**
+     * Attempts to connect to the specified host and port with retry logic.
+     * Uses exponential backoff between attempts.
+     * 
+     * @param host the host to connect to
+     * @param port the port to connect to
+     * @return established socket connection
+     * @throws IOException if all retry attempts fail
+     */
+    public Socket connectWithRetry(String host, int port) throws IOException {
+        String operationName = String.format("Attempting connection to %s:%d", host, port);
+        
+        try {
+            return retryWithTemplate(operationName, 
+                () -> new Socket(host, port), 
+                false);  // Don't check retryable for socket connections
+        } catch (Exception e) {
+            if (e instanceof IOException) {
+                throw (IOException) e;
+            }
+            throw new IOException("Connection failed", e);
+        }
+    }
+    
+    /**
+     * Executes an operation with retry logic.
+     * Only retries if the exception is determined to be retryable.
+     * 
+     * @param <T> the return type of the operation
+     * @param operation the operation to execute
+     * @param operationName name for logging purposes
+     * @return result of the operation
+     * @throws Exception if all retry attempts fail or exception is not retryable
+     */
+    public <T> T executeWithRetry(RetryableOperation<T> operation, String operationName) throws Exception {
+        return retryWithTemplate("Executing " + operationName, operation, true);
     }
     
     /**

@@ -136,35 +136,39 @@ public class HeartbeatService {
     }
     
     /**
+     * Common cleanup logic for removing a connection
+     * 
+     * @param nodeId the node identifier
+     * @param gracefulClose whether to attempt graceful close first
+     * @param reason the reason for cleanup (for logging)
+     */
+    private void cleanupConnection(String nodeId, boolean gracefulClose, String reason) {
+        LoggerUtil.info("HeartbeatService", reason + ": " + nodeId);
+        
+        if (gracefulClose) {
+            TCPConnection connection = connectionsCache.getConnection(nodeId);
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        
+        connectionsCache.removeConnection(nodeId);
+        lastActivityMap.remove(nodeId);
+        notifyConnectionLoss(nodeId);
+    }
+    
+    /**
      * Handle a dead connection
      */
     private void handleDeadConnection(String nodeId) {
-        LoggerUtil.info("HeartbeatService", "Removing dead connection: " + nodeId);
-        connectionsCache.removeConnection(nodeId);
-        lastActivityMap.remove(nodeId);
-        
-        // Could trigger reconnection logic here if needed
-        notifyConnectionLoss(nodeId);
+        cleanupConnection(nodeId, false, "Removing dead connection");
     }
     
     /**
      * Handle a timed-out connection
      */
     private void handleTimeoutConnection(String nodeId) {
-        LoggerUtil.info("HeartbeatService", "Handling timeout for connection: " + nodeId);
-        
-        // First try to close gracefully
-        TCPConnection connection = connectionsCache.getConnection(nodeId);
-        if (connection != null) {
-            connection.close();
-        }
-        
-        // Remove from cache
-        connectionsCache.removeConnection(nodeId);
-        lastActivityMap.remove(nodeId);
-        
-        // Notify about connection loss
-        notifyConnectionLoss(nodeId);
+        cleanupConnection(nodeId, true, "Handling timeout for connection");
     }
     
     /**

@@ -1,9 +1,5 @@
 package csx55.overlay.wireformats;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -19,19 +15,19 @@ import java.io.IOException;
  * - String: sink node ID  
  * - int: payload value
  */
-public class DataMessage implements Event {
+public class DataMessage extends AbstractEvent {
     
     /** Message type identifier */
-    private final int type = Protocol.DATA_MESSAGE;
+    private static final int TYPE = Protocol.DATA_MESSAGE;
     
     /** Identifier of the node that originated this message */
-    private final String sourceNodeId;
+    private String sourceNodeId;
     
     /** Identifier of the destination node */
-    private final String sinkNodeId;
+    private String sinkNodeId;
     
     /** The data payload being transmitted */
-    private final int payload;
+    private int payload;
     
     /**
      * Constructs a new DataMessage.
@@ -53,20 +49,7 @@ public class DataMessage implements Event {
      * @throws IOException if deserialization fails or message type is invalid
      */
     public DataMessage(byte[] marshalledBytes) throws IOException {
-        ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
-        DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
-        
-        int messageType = din.readInt();
-        if (messageType != Protocol.DATA_MESSAGE) {
-            throw new IOException("Invalid message type for DataMessage");
-        }
-        
-        this.sourceNodeId = din.readUTF();
-        this.sinkNodeId = din.readUTF();
-        this.payload = din.readInt();
-        
-        baInputStream.close();
-        din.close();
+        deserializeFrom(marshalledBytes);
     }
     
     /**
@@ -76,31 +59,33 @@ public class DataMessage implements Event {
      */
     @Override
     public int getType() {
-        return type;
+        return TYPE;
     }
     
     /**
-     * Serializes this message to bytes for network transmission.
+     * Writes the DataMessage-specific data to the output stream.
      * 
-     * @return the serialized message as a byte array
-     * @throws IOException if serialization fails
+     * @param dout the data output stream
+     * @throws IOException if writing fails
      */
     @Override
-    public byte[] getBytes() throws IOException {
-        ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
-        DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
-        
-        dout.writeInt(type);
+    protected void writeData(DataOutputStream dout) throws IOException {
         dout.writeUTF(sourceNodeId);
         dout.writeUTF(sinkNodeId);
         dout.writeInt(payload);
-        dout.flush();
-        
-        byte[] marshalledBytes = baOutputStream.toByteArray();
-        baOutputStream.close();
-        dout.close();
-        
-        return marshalledBytes;
+    }
+    
+    /**
+     * Reads the DataMessage-specific data from the input stream.
+     * 
+     * @param din the data input stream
+     * @throws IOException if reading fails
+     */
+    @Override
+    protected void readData(DataInputStream din) throws IOException {
+        this.sourceNodeId = din.readUTF();
+        this.sinkNodeId = din.readUTF();
+        this.payload = din.readInt();
     }
     
     /**

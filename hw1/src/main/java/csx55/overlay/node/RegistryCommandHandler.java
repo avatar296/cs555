@@ -1,7 +1,5 @@
 package csx55.overlay.node;
 
-import java.util.Scanner;
-
 /**
  * Handles command-line interface for the Registry.
  * Provides an interactive command loop for managing the overlay network.
@@ -13,9 +11,8 @@ import java.util.Scanner;
  * - send-overlay-link-weights: distributes link weights to all nodes
  * - start <number>: initiates a messaging task with specified rounds
  */
-public class RegistryCommandHandler {
+public class RegistryCommandHandler extends AbstractCommandHandler {
     private final Registry registry;
-    private volatile boolean running = true;
     
     /**
      * Constructs a new RegistryCommandHandler.
@@ -27,57 +24,59 @@ public class RegistryCommandHandler {
     }
     
     /**
-     * Starts the interactive command loop.
-     * Reads user input, parses commands, and executes corresponding operations.
-     * Handles command parsing errors and provides usage information.
+     * Processes commands specific to Registry.
+     * Handles command parsing and delegates to appropriate registry methods.
+     * 
+     * @param input the raw command input from the user
      */
-    public void startCommandLoop() {
-        Scanner scanner = new Scanner(System.in);
-        while (running) {
-            String input = scanner.nextLine();
-            String[] parts = input.trim().split("\\s+");
-            String command = parts[0];
-            
-            try {
-                switch (command.toLowerCase()) {
-                    case "list-messaging-nodes":
-                        registry.listMessagingNodes();
-                        break;
-                    case "list-weights":
-                        registry.listWeights();
-                        break;
-                    case "setup-overlay":
-                        if (parts.length == 2) {
-                            registry.setupOverlay(Integer.parseInt(parts[1]));
-                        } else {
-                            System.out.println("Usage: setup-overlay <number-of-connections>");
-                        }
-                        break;
-                    case "send-overlay-link-weights":
-                        registry.sendOverlayLinkWeights();
-                        break;
-                    case "start":
-                        if (parts.length == 2) {
-                            registry.startMessaging(Integer.parseInt(parts[1]));
-                        } else {
-                            System.out.println("Usage: start <number-of-rounds>");
-                        }
-                        break;
-                    default:
-                        System.out.println("Unknown command.");
-                }
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid number argument for command.");
-            }
+    @Override
+    protected void processCommand(String input) {
+        String[] parts = parseCommand(input);
+        if (parts.length == 0) {
+            return;
         }
-        scanner.close();
-    }
-    
-    /**
-     * Stops the command loop.
-     * Sets the running flag to false to terminate the loop.
-     */
-    public void stop() {
-        running = false;
+        
+        String command = parts[0].toLowerCase();
+        
+        switch (command) {
+            case "list-messaging-nodes":
+                registry.listMessagingNodes();
+                break;
+                
+            case "list-weights":
+                registry.listWeights();
+                break;
+                
+            case "setup-overlay":
+                if (parts.length == 2) {
+                    int connections = parseIntArgument(parts[1], 
+                        "Invalid number argument for setup-overlay command.");
+                    if (connections > 0) {
+                        registry.setupOverlay(connections);
+                    }
+                } else {
+                    printUsageError("setup-overlay <number-of-connections>");
+                }
+                break;
+                
+            case "send-overlay-link-weights":
+                registry.sendOverlayLinkWeights();
+                break;
+                
+            case "start":
+                if (parts.length == 2) {
+                    int rounds = parseIntArgument(parts[1], 
+                        "Invalid number argument for start command.");
+                    if (rounds > 0) {
+                        registry.startMessaging(rounds);
+                    }
+                } else {
+                    printUsageError("start <number-of-rounds>");
+                }
+                break;
+                
+            default:
+                System.out.println("Unknown command.");
+        }
     }
 }

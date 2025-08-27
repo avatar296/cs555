@@ -1,9 +1,5 @@
 package csx55.overlay.wireformats;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -18,16 +14,16 @@ import java.io.IOException;
  * - String: IP address of the node
  * - int: port number of the node
  */
-public class DeregisterRequest implements Event {
+public class DeregisterRequest extends AbstractEvent {
     
     /** Message type identifier */
-    private final int type = Protocol.DEREGISTER_REQUEST;
+    private static final int TYPE = Protocol.DEREGISTER_REQUEST;
     
     /** IP address of the node requesting deregistration */
-    private final String ipAddress;
+    private String ipAddress;
     
     /** Port number of the node requesting deregistration */
-    private final int portNumber;
+    private int portNumber;
     
     /**
      * Constructs a new DeregisterRequest.
@@ -47,19 +43,7 @@ public class DeregisterRequest implements Event {
      * @throws IOException if deserialization fails or message type is invalid
      */
     public DeregisterRequest(byte[] marshalledBytes) throws IOException {
-        ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
-        DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
-        
-        int messageType = din.readInt();
-        if (messageType != Protocol.DEREGISTER_REQUEST) {
-            throw new IOException("Invalid message type for DeregisterRequest");
-        }
-        
-        this.ipAddress = din.readUTF();
-        this.portNumber = din.readInt();
-        
-        baInputStream.close();
-        din.close();
+        deserializeFrom(marshalledBytes);
     }
     
     /**
@@ -69,30 +53,31 @@ public class DeregisterRequest implements Event {
      */
     @Override
     public int getType() {
-        return type;
+        return TYPE;
     }
     
     /**
-     * Serializes this message to bytes for network transmission.
+     * Writes the event-specific data to the output stream.
      * 
-     * @return the serialized message as a byte array
-     * @throws IOException if serialization fails
+     * @param dout the data output stream
+     * @throws IOException if writing fails
      */
     @Override
-    public byte[] getBytes() throws IOException {
-        ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
-        DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
-        
-        dout.writeInt(type);
+    protected void writeData(DataOutputStream dout) throws IOException {
         dout.writeUTF(ipAddress);
         dout.writeInt(portNumber);
-        dout.flush();
-        
-        byte[] marshalledBytes = baOutputStream.toByteArray();
-        baOutputStream.close();
-        dout.close();
-        
-        return marshalledBytes;
+    }
+    
+    /**
+     * Reads the event-specific data from the input stream.
+     * 
+     * @param din the data input stream
+     * @throws IOException if reading fails
+     */
+    @Override
+    protected void readData(DataInputStream din) throws IOException {
+        this.ipAddress = din.readUTF();
+        this.portNumber = din.readInt();
     }
     
     /**

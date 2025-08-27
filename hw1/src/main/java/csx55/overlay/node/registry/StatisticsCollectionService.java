@@ -39,8 +39,6 @@ public class StatisticsCollectionService {
             return;
         }
         
-        String nodeId = summary.getNodeId();
-        
         statsCollector.addSummary(summary);
         
         if (statsCollector.hasAllSummaries()) {

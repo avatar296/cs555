@@ -4,8 +4,6 @@ import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.wireformats.TrafficSummary;
 
-import java.io.IOException;
-
 /**
  * Service responsible for tracking and managing node message statistics.
  * Maintains counters for sent, received, and relayed messages along with
@@ -58,9 +56,9 @@ public class NodeStatisticsService {
      * @param nodeIp the IP address of this node
      * @param nodePort the port number of this node
      * @param registryConnection the TCP connection to the registry
-     * @throws IOException if an error occurs while sending the summary
+     * @return true if the summary was sent successfully, false otherwise
      */
-    public synchronized void sendTrafficSummary(String nodeIp, int nodePort, TCPConnection registryConnection) throws IOException {
+    public synchronized boolean sendTrafficSummary(String nodeIp, int nodePort, TCPConnection registryConnection) {
         TrafficSummary summary = new TrafficSummary(
             nodeIp,
             nodePort,
@@ -71,8 +69,14 @@ public class NodeStatisticsService {
             relayTracker
         );
         
-        registryConnection.sendEvent(summary);
-        LoggerUtil.debug("NodeStatistics", "Sent traffic summary to registry");
+        boolean success = MessageRoutingHelper.sendEventSafely(registryConnection, summary, 
+            String.format("sending traffic summary from %s:%d", nodeIp, nodePort));
+        
+        if (success) {
+            LoggerUtil.debug("NodeStatistics", "Sent traffic summary to registry");
+        }
+        
+        return success;
     }
     
     /**

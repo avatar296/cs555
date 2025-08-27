@@ -1,9 +1,5 @@
 package csx55.overlay.wireformats;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -17,13 +13,13 @@ import java.io.IOException;
  * - int: message type (PEER_IDENTIFICATION)
  * - String: node identifier (IP:port format)
  */
-public class PeerIdentification implements Event {
+public class PeerIdentification extends AbstractEvent {
     
     /** Message type identifier */
-    private final int type = Protocol.PEER_IDENTIFICATION;
+    private static final int TYPE = Protocol.PEER_IDENTIFICATION;
     
     /** Identifier of the sending node (IP:port format) */
-    private final String nodeId;
+    private String nodeId;
     
     /**
      * Constructs a new PeerIdentification message.
@@ -41,18 +37,7 @@ public class PeerIdentification implements Event {
      * @throws IOException if deserialization fails or message type is invalid
      */
     public PeerIdentification(byte[] marshalledBytes) throws IOException {
-        ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
-        DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
-        
-        int messageType = din.readInt();
-        if (messageType != Protocol.PEER_IDENTIFICATION) {
-            throw new IOException("Invalid message type for PeerIdentification");
-        }
-        
-        this.nodeId = din.readUTF();
-        
-        baInputStream.close();
-        din.close();
+        deserializeFrom(marshalledBytes);
     }
     
     /**
@@ -62,29 +47,29 @@ public class PeerIdentification implements Event {
      */
     @Override
     public int getType() {
-        return type;
+        return TYPE;
     }
     
     /**
-     * Serializes this message to bytes for network transmission.
+     * Writes the PeerIdentification-specific data to the output stream.
      * 
-     * @return the serialized message as a byte array
-     * @throws IOException if serialization fails
+     * @param dout the data output stream
+     * @throws IOException if writing fails
      */
     @Override
-    public byte[] getBytes() throws IOException {
-        ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
-        DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
-        
-        dout.writeInt(type);
+    protected void writeData(DataOutputStream dout) throws IOException {
         dout.writeUTF(nodeId);
-        dout.flush();
-        
-        byte[] marshalledBytes = baOutputStream.toByteArray();
-        baOutputStream.close();
-        dout.close();
-        
-        return marshalledBytes;
+    }
+    
+    /**
+     * Reads the PeerIdentification-specific data from the input stream.
+     * 
+     * @param din the data input stream
+     * @throws IOException if reading fails
+     */
+    @Override
+    protected void readData(DataInputStream din) throws IOException {
+        this.nodeId = din.readUTF();
     }
     
     /**

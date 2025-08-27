@@ -1,9 +1,5 @@
 package csx55.overlay.wireformats;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -18,16 +14,16 @@ import java.io.IOException;
  * - String: IP address of the node
  * - int: port number of the node
  */
-public class TaskComplete implements Event {
+public class TaskComplete extends AbstractEvent {
     
     /** Message type identifier */
-    private final int type = Protocol.TASK_COMPLETE;
+    private static final int TYPE = Protocol.TASK_COMPLETE;
     
     /** IP address of the node that completed the task */
-    private final String nodeIpAddress;
+    private String nodeIpAddress;
     
     /** Port number of the node that completed the task */
-    private final int nodePortNumber;
+    private int nodePortNumber;
     
     /**
      * Constructs a new TaskComplete message.
@@ -47,19 +43,7 @@ public class TaskComplete implements Event {
      * @throws IOException if deserialization fails or message type is invalid
      */
     public TaskComplete(byte[] marshalledBytes) throws IOException {
-        ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
-        DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
-        
-        int messageType = din.readInt();
-        if (messageType != Protocol.TASK_COMPLETE) {
-            throw new IOException("Invalid message type for TaskComplete");
-        }
-        
-        this.nodeIpAddress = din.readUTF();
-        this.nodePortNumber = din.readInt();
-        
-        baInputStream.close();
-        din.close();
+        deserializeFrom(marshalledBytes);
     }
     
     /**
@@ -69,30 +53,31 @@ public class TaskComplete implements Event {
      */
     @Override
     public int getType() {
-        return type;
+        return TYPE;
     }
     
     /**
-     * Serializes this message to bytes for network transmission.
+     * Writes the TaskComplete-specific data to the output stream.
      * 
-     * @return the serialized message as a byte array
-     * @throws IOException if serialization fails
+     * @param dout the data output stream
+     * @throws IOException if writing fails
      */
     @Override
-    public byte[] getBytes() throws IOException {
-        ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
-        DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
-        
-        dout.writeInt(type);
+    protected void writeData(DataOutputStream dout) throws IOException {
         dout.writeUTF(nodeIpAddress);
         dout.writeInt(nodePortNumber);
-        dout.flush();
-        
-        byte[] marshalledBytes = baOutputStream.toByteArray();
-        baOutputStream.close();
-        dout.close();
-        
-        return marshalledBytes;
+    }
+    
+    /**
+     * Reads the TaskComplete-specific data from the input stream.
+     * 
+     * @param din the data input stream
+     * @throws IOException if reading fails
+     */
+    @Override
+    protected void readData(DataInputStream din) throws IOException {
+        this.nodeIpAddress = din.readUTF();
+        this.nodePortNumber = din.readInt();
     }
     
     /**

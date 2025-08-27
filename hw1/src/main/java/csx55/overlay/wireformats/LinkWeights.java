@@ -1,9 +1,5 @@
 package csx55.overlay.wireformats;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -20,16 +16,16 @@ import java.util.List;
  * - int: number of links
  * - For each link: String containing "nodeA nodeB weight"
  */
-public class LinkWeights implements Event {
+public class LinkWeights extends AbstractEvent {
     
     /** Message type identifier */
-    private final int type = Protocol.LINK_WEIGHTS;
+    private static final int TYPE = Protocol.LINK_WEIGHTS;
     
     /** Number of links in the overlay */
-    private final int numberOfLinks;
+    private int numberOfLinks;
     
     /** List of all weighted links in the topology */
-    private final List<LinkInfo> links;
+    private List<LinkInfo> links;
     
     /**
      * Represents a weighted link between two nodes in the overlay.
@@ -85,14 +81,42 @@ public class LinkWeights implements Event {
      * @throws IOException if deserialization fails or message type is invalid
      */
     public LinkWeights(byte[] marshalledBytes) throws IOException {
-        ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
-        DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
+        deserializeFrom(marshalledBytes);
+    }
+    
+    /**
+     * Gets the message type.
+     * 
+     * @return the protocol message type (LINK_WEIGHTS)
+     */
+    @Override
+    public int getType() {
+        return TYPE;
+    }
+    
+    /**
+     * Writes the LinkWeights-specific data to the output stream.
+     * 
+     * @param dout the data output stream
+     * @throws IOException if writing fails
+     */
+    @Override
+    protected void writeData(DataOutputStream dout) throws IOException {
+        dout.writeInt(numberOfLinks);
         
-        int messageType = din.readInt();
-        if (messageType != Protocol.LINK_WEIGHTS) {
-            throw new IOException("Invalid message type for LinkWeights");
+        for (LinkInfo link : links) {
+            dout.writeUTF(link.nodeA + " " + link.nodeB + " " + link.weight);
         }
-        
+    }
+    
+    /**
+     * Reads the LinkWeights-specific data from the input stream.
+     * 
+     * @param din the data input stream
+     * @throws IOException if reading fails
+     */
+    @Override
+    protected void readData(DataInputStream din) throws IOException {
         this.numberOfLinks = din.readInt();
         this.links = new ArrayList<>();
         
@@ -103,46 +127,6 @@ public class LinkWeights implements Event {
                 links.add(new LinkInfo(parts[0], parts[1], Integer.parseInt(parts[2])));
             }
         }
-        
-        baInputStream.close();
-        din.close();
-    }
-    
-    /**
-     * Gets the message type.
-     * 
-     * @return the protocol message type (LINK_WEIGHTS)
-     */
-    @Override
-    public int getType() {
-        return type;
-    }
-    
-    /**
-     * Serializes this message to bytes for network transmission.
-     * 
-     * @return the serialized message as a byte array
-     * @throws IOException if serialization fails
-     */
-    @Override
-    public byte[] getBytes() throws IOException {
-        ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
-        DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
-        
-        dout.writeInt(type);
-        dout.writeInt(numberOfLinks);
-        
-        for (LinkInfo link : links) {
-            dout.writeUTF(link.nodeA + " " + link.nodeB + " " + link.weight);
-        }
-        
-        dout.flush();
-        
-        byte[] marshalledBytes = baOutputStream.toByteArray();
-        baOutputStream.close();
-        dout.close();
-        
-        return marshalledBytes;
     }
     
     /**
