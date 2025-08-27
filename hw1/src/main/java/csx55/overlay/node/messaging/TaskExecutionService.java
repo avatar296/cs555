@@ -61,6 +61,7 @@ public class TaskExecutionService {
      */
     public void handleTaskInitiate(TaskInitiate taskInitiate, List<String> allNodes) {
         int rounds = taskInitiate.getRounds();
+        LoggerUtil.info("TaskExecutionService", "Received task initiate for " + rounds + " rounds");
         statisticsService.resetCounters();
         executorService.execute(() -> performMessagingTask(rounds, allNodes));
     }
@@ -74,6 +75,25 @@ public class TaskExecutionService {
      * @param allNodes the list of all nodes to choose destinations from
      */
     private void performMessagingTask(int rounds, List<String> allNodes) {
+        LoggerUtil.info("TaskExecutionService", "Starting messaging task for " + rounds + " rounds with " + allNodes.size() + " nodes");
+        
+        if (registryConnection == null) {
+            LoggerUtil.error("TaskExecutionService", "Registry connection is null, cannot send task complete");
+            return;
+        }
+        
+        if (allNodes.isEmpty()) {
+            LoggerUtil.error("TaskExecutionService", "AllNodes list is empty, cannot send messages. Sending TaskComplete anyway.");
+            try {
+                TaskComplete complete = new TaskComplete(ipAddress, portNumber);
+                registryConnection.sendEvent(complete);
+                LoggerUtil.info("TaskExecutionService", "Sent TaskComplete despite empty node list");
+            } catch (IOException e) {
+                LoggerUtil.error("TaskExecutionService", "Failed to send task complete message", e);
+            }
+            return;
+        }
+        
         Random rand = new Random();
         for (int round = 0; round < rounds; round++) {
             for (int messageIndex = 0; messageIndex < 5; messageIndex++) {
@@ -86,9 +106,12 @@ public class TaskExecutionService {
             }
         }
         
+        LoggerUtil.info("TaskExecutionService", "Completed all rounds, sending TaskComplete to registry");
+        
         try {
             TaskComplete complete = new TaskComplete(ipAddress, portNumber);
             registryConnection.sendEvent(complete);
+            LoggerUtil.info("TaskExecutionService", "Successfully sent TaskComplete message");
         } catch (IOException e) {
             LoggerUtil.error("TaskExecutionService", "Failed to send task complete message", e);
         }

@@ -106,6 +106,8 @@ public class ProtocolHandlerService {
             if (!allNodes.contains(node2)) allNodes.add(node2);
         }
         
+        LoggerUtil.info("ProtocolHandler", "Populated allNodes with " + allNodes.size() + " nodes from link weights");
+        
         RoutingTable routingTable = new RoutingTable(nodeId);
         routingTable.updateLinkWeights(linkWeights);
         routingService.updateRoutingTable(routingTable);

@@ -155,10 +155,11 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                     break;
                 case Protocol.LINK_WEIGHTS:
                     protocolHandler.handleLinkWeights((LinkWeights) event);
-                    this.allNodes.clear();
-                    this.allNodes.addAll(protocolHandler.getAllNodes());
+                    // Note: protocolHandler already updates the shared allNodes list
+                    LoggerUtil.info("MessagingNode", "Updated allNodes list with " + allNodes.size() + " nodes after receiving link weights");
                     break;
                 case Protocol.TASK_INITIATE:
+                    LoggerUtil.info("MessagingNode", "Handling task initiate with allNodes size: " + allNodes.size());
                     taskService.handleTaskInitiate((TaskInitiate) event, allNodes);
                     break;
                 case Protocol.PULL_TRAFFIC_SUMMARY:

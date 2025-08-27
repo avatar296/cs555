@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 public class TaskOrchestrationService {
     private final NodeRegistrationService registrationService;
     private final StatisticsCollectionService statisticsService;
+    private final OverlayManagementService overlayService;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private volatile int completedNodes;
     private volatile int rounds;
@@ -33,11 +34,14 @@ public class TaskOrchestrationService {
      * 
      * @param registrationService the node registration service for accessing registered nodes
      * @param statisticsService the statistics collection service for handling traffic summaries
+     * @param overlayService the overlay management service for checking overlay status
      */
     public TaskOrchestrationService(NodeRegistrationService registrationService,
-                                   StatisticsCollectionService statisticsService) {
+                                   StatisticsCollectionService statisticsService,
+                                   OverlayManagementService overlayService) {
         this.registrationService = registrationService;
         this.statisticsService = statisticsService;
+        this.overlayService = overlayService;
     }
     
     /**
@@ -57,6 +61,11 @@ public class TaskOrchestrationService {
             return;
         }
         
+        if (!overlayService.isOverlaySetup()) {
+            LoggerUtil.error("TaskOrchestration", "Overlay has not been set up. Cannot start messaging task.");
+            return;
+        }
+        
         this.rounds = numberOfRounds;
         this.completedNodes = 0;
         this.taskInProgress = true;
@@ -69,11 +78,14 @@ public class TaskOrchestrationService {
             return;
         }
         
+        LoggerUtil.info("TaskOrchestration", "Starting messaging task with " + numberOfRounds + " rounds for " + registeredNodes.size() + " nodes");
+        
         TaskInitiate message = new TaskInitiate(numberOfRounds);
         try {
             for (TCPConnection connection : registeredNodes.values()) {
                 connection.sendEvent(message);
             }
+            LoggerUtil.info("TaskOrchestration", "Task initiate messages sent to all " + registeredNodes.size() + " nodes");
         } catch (IOException e) {
             LoggerUtil.error("TaskOrchestration", "Failed to initiate messaging task with " + numberOfRounds + " rounds", e);
             taskInProgress = false;
@@ -89,9 +101,12 @@ public class TaskOrchestrationService {
      */
     public synchronized void handleTaskComplete(TaskComplete taskComplete, TCPConnection connection) {
         completedNodes++;
+        LoggerUtil.info("TaskOrchestration", "Received task complete from node " + taskComplete.getNodeIpAddress() + ":" + taskComplete.getNodePortNumber() + 
+                       " (" + completedNodes + "/" + registrationService.getNodeCount() + " completed)");
         
         if (completedNodes == registrationService.getNodeCount()) {
             System.out.println(rounds + " rounds completed");
+            LoggerUtil.info("TaskOrchestration", "All nodes completed task with " + rounds + " rounds");
             scheduler.schedule(this::requestTrafficSummaries, 15, TimeUnit.SECONDS);
             taskInProgress = false;
         }

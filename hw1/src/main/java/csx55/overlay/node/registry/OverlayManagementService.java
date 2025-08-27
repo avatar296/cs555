@@ -128,6 +128,15 @@ public class OverlayManagementService {
     }
     
     /**
+     * Checks if the overlay has been set up.
+     * 
+     * @return true if overlay is configured, false otherwise
+     */
+    public boolean isOverlaySetup() {
+        return currentOverlay != null && !currentOverlay.getAllLinks().isEmpty();
+    }
+    
+    /**
      * Gets the current overlay connection plan.
      * 
      * @return the current overlay structure, or null if not configured
