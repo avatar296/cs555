@@ -4,27 +4,46 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 /**
- * Utility class for input validation and parameter checking
+ * Utility class for comprehensive input validation and parameter checking.
+ * Provides validation methods for network parameters, data integrity,
+ * and security-related input sanitization.
  */
 public class ValidationUtil {
     
-    // Constants for validation bounds
+    /** Minimum allowed port number (above well-known ports) */
     public static final int MIN_PORT = 1024;
+    
+    /** Maximum allowed port number */
     public static final int MAX_PORT = 65535;
+    
+    /** Minimum number of messaging rounds */
     public static final int MIN_ROUNDS = 1;
+    
+    /** Maximum number of messaging rounds */
     public static final int MAX_ROUNDS = 100000;
+    
+    /** Minimum connection requirement */
     public static final int MIN_CR = 1;
-    public static final int MAX_MESSAGE_SIZE = 1024 * 1024; // 1MB max message size
+    
+    /** Maximum message size in bytes (1MB) */
+    public static final int MAX_MESSAGE_SIZE = 1024 * 1024;
     
     /**
-     * Validate port number
+     * Validates if a port number is within acceptable range.
+     * 
+     * @param port the port number to validate
+     * @return true if port is valid, false otherwise
      */
     public static boolean isValidPort(int port) {
         return port >= MIN_PORT && port <= MAX_PORT;
     }
     
     /**
-     * Validate IP address format
+     * Validates IP address format.
+     * Checks for proper IPv4 format with valid octets.
+     * 
+     * @param ipAddress the IP address string to validate
+     * @return true if IP address is valid, false otherwise
      */
     public static boolean isValidIpAddress(String ipAddress) {
         if (ipAddress == null || ipAddress.isEmpty()) {
@@ -33,7 +52,6 @@ public class ValidationUtil {
         
         try {
             InetAddress.getByName(ipAddress);
-            // Additional check for valid IP format
             String[] parts = ipAddress.split("\\.");
             if (parts.length != 4) {
                 return false;
@@ -55,7 +73,11 @@ public class ValidationUtil {
     }
     
     /**
-     * Validate node ID format (IP:port)
+     * Validates node ID format.
+     * Expected format: IP:port
+     * 
+     * @param nodeId the node identifier to validate
+     * @return true if node ID is valid, false otherwise
      */
     public static boolean isValidNodeId(String nodeId) {
         if (nodeId == null || !nodeId.contains(":")) {
@@ -76,7 +98,12 @@ public class ValidationUtil {
     }
     
     /**
-     * Validate connection requirement
+     * Validates connection requirement for overlay creation.
+     * Checks mathematical feasibility and balance constraints.
+     * 
+     * @param cr the connection requirement
+     * @param nodeCount the number of nodes in the overlay
+     * @return null if valid, error message otherwise
      */
     public static String validateConnectionRequirement(int cr, int nodeCount) {
         if (cr < MIN_CR) {
@@ -87,7 +114,6 @@ public class ValidationUtil {
             return "Connection requirement (" + cr + ") must be less than number of nodes (" + nodeCount + ")";
         }
         
-        // Check if overlay is mathematically possible
         int totalEdgesNeeded = (nodeCount * cr) / 2;
         int maxPossibleEdges = (nodeCount * (nodeCount - 1)) / 2;
         
@@ -96,76 +122,96 @@ public class ValidationUtil {
                    " edges but maximum possible is " + maxPossibleEdges;
         }
         
-        // Check if CR is even when node count is odd
         if ((nodeCount % 2 == 1) && (cr % 2 == 1) && cr > 1) {
             return "Warning: With odd number of nodes (" + nodeCount + 
                    ") and odd CR (" + cr + "), overlay may not be perfectly balanced";
         }
         
-        return null; // Valid
+        return null;
     }
     
     /**
-     * Validate number of rounds
+     * Validates the number of messaging rounds.
+     * 
+     * @param rounds the number of rounds to validate
+     * @return true if rounds is valid, false otherwise
      */
     public static boolean isValidRounds(int rounds) {
         return rounds >= MIN_ROUNDS && rounds <= MAX_ROUNDS;
     }
     
     /**
-     * Validate message payload size
+     * Validates message payload size.
+     * 
+     * @param data the message data to validate
+     * @return true if data size is valid, false otherwise
      */
     public static boolean isValidMessageSize(byte[] data) {
         return data != null && data.length > 0 && data.length <= MAX_MESSAGE_SIZE;
     }
     
     /**
-     * Check for integer overflow in statistics
+     * Checks if adding two long values would cause overflow.
+     * 
+     * @param current the current value
+     * @param addend the value to add
+     * @return true if overflow would occur, false otherwise
      */
     public static boolean willOverflow(long current, long addend) {
         if (addend > 0 && current > Long.MAX_VALUE - addend) {
-            return true; // Will overflow
+            return true;
         }
         if (addend < 0 && current < Long.MIN_VALUE - addend) {
-            return true; // Will underflow
+            return true;
         }
         return false;
     }
     
     /**
-     * Safe addition with overflow check
+     * Performs safe addition with overflow protection.
+     * Caps result at Long.MAX_VALUE if overflow is detected.
+     * 
+     * @param a first value
+     * @param b second value
+     * @return sum of a and b, or Long.MAX_VALUE if overflow
      */
     public static long safeAdd(long a, long b) {
         if (willOverflow(a, b)) {
             LoggerUtil.warn("ValidationUtil", 
                 "Integer overflow detected in statistics: " + a + " + " + b);
-            return Long.MAX_VALUE; // Cap at max value
+            return Long.MAX_VALUE;
         }
         return a + b;
     }
     
     /**
-     * Validate hostname
+     * Validates hostname format.
+     * Accepts both DNS hostnames and IP addresses.
+     * 
+     * @param hostname the hostname to validate
+     * @return true if hostname is valid, false otherwise
      */
     public static boolean isValidHostname(String hostname) {
         if (hostname == null || hostname.isEmpty() || hostname.length() > 255) {
             return false;
         }
         
-        // Check for valid hostname pattern
         String pattern = "^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])(\\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]))*$";
         return hostname.matches(pattern) || isValidIpAddress(hostname);
     }
     
     /**
-     * Sanitize string input to prevent injection attacks
+     * Sanitizes string input to prevent injection attacks.
+     * Removes control characters and limits length.
+     * 
+     * @param input the string to sanitize
+     * @return sanitized string
      */
     public static String sanitizeInput(String input) {
         if (input == null) {
             return "";
         }
         
-        // Remove control characters and limit length
         String sanitized = input.replaceAll("[\\p{Cntrl}]", "");
         if (sanitized.length() > 1000) {
             sanitized = sanitized.substring(0, 1000);
@@ -175,7 +221,10 @@ public class ValidationUtil {
     }
     
     /**
-     * Validate weight value for links
+     * Validates link weight value.
+     * 
+     * @param weight the weight to validate
+     * @return true if weight is valid, false otherwise
      */
     public static boolean isValidWeight(int weight) {
         return weight >= 1 && weight <= 10;

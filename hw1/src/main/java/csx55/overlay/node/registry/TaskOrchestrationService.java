@@ -13,7 +13,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Service for orchestrating messaging tasks across nodes
+ * Service responsible for orchestrating messaging tasks across all nodes in the overlay.
+ * Manages task initiation, monitors completion, and triggers statistics collection
+ * after task completion.
+ * 
+ * This service ensures coordinated task execution and handles the complete
+ * lifecycle from initiation through statistics gathering.
  */
 public class TaskOrchestrationService {
     private int completedNodes = 0;
@@ -23,12 +28,24 @@ public class TaskOrchestrationService {
     private final StatisticsCollectionService statisticsService;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     
+    /**
+     * Constructs a new TaskOrchestrationService.
+     * 
+     * @param registrationService the node registration service for accessing registered nodes
+     * @param statisticsService the statistics collection service for handling traffic summaries
+     */
     public TaskOrchestrationService(NodeRegistrationService registrationService,
                                    StatisticsCollectionService statisticsService) {
         this.registrationService = registrationService;
         this.statisticsService = statisticsService;
     }
     
+    /**
+     * Starts a messaging task with the specified number of rounds.
+     * Sends task initiation messages to all registered nodes.
+     * 
+     * @param numberOfRounds the number of rounds for the messaging task
+     */
     public synchronized void startMessaging(int numberOfRounds) {
         if (taskInProgress) {
             LoggerUtil.warn("TaskOrchestration", "Task already in progress. Please wait for completion.");
@@ -52,8 +69,6 @@ public class TaskOrchestrationService {
             return;
         }
         
-        // Don't reset statistics here - they should be reset after printing the results
-        
         TaskInitiate message = new TaskInitiate(numberOfRounds);
         try {
             for (TCPConnection connection : registeredNodes.values()) {
@@ -65,6 +80,13 @@ public class TaskOrchestrationService {
         }
     }
     
+    /**
+     * Handles a task completion notification from a node.
+     * Schedules statistics collection when all nodes have completed.
+     * 
+     * @param taskComplete the task completion message
+     * @param connection the TCP connection from the completing node
+     */
     public synchronized void handleTaskComplete(TaskComplete taskComplete, TCPConnection connection) {
         completedNodes++;
         
@@ -75,10 +97,13 @@ public class TaskOrchestrationService {
         }
     }
     
+    /**
+     * Requests traffic summaries from all registered nodes.
+     * Resets the statistics collector and sends pull requests to all nodes.
+     */
     private void requestTrafficSummaries() {
         Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
         
-        // Reset statistics collector to prepare for new summaries
         statisticsService.reset(registeredNodes.size());
         
         PullTrafficSummary message = new PullTrafficSummary();
@@ -92,10 +117,19 @@ public class TaskOrchestrationService {
         }
     }
     
+    /**
+     * Checks if a task is currently in progress.
+     * 
+     * @return true if a task is in progress, false otherwise
+     */
     public synchronized boolean isTaskInProgress() {
         return taskInProgress;
     }
     
+    /**
+     * Shuts down the task orchestration service.
+     * Properly terminates the scheduler thread pool.
+     */
     public void shutdown() {
         scheduler.shutdown();
         try {

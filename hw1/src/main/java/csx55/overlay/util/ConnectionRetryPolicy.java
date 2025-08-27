@@ -4,22 +4,39 @@ import java.io.IOException;
 import java.net.Socket;
 
 /**
- * Implements retry logic for network connections with exponential backoff
+ * Implements retry logic for network connections with exponential backoff.
+ * Provides configurable retry attempts and delays to handle transient network failures.
+ * Supports both direct socket connections and generic retryable operations.
  */
 public class ConnectionRetryPolicy {
     
+    /** Default maximum number of retry attempts */
     private static final int DEFAULT_MAX_ATTEMPTS = 3;
-    private static final long DEFAULT_BASE_DELAY_MS = 1000; // 1 second
-    private static final long DEFAULT_MAX_DELAY_MS = 30000; // 30 seconds
+    
+    /** Default base delay in milliseconds (1 second) */
+    private static final long DEFAULT_BASE_DELAY_MS = 1000;
+    
+    /** Default maximum delay in milliseconds (30 seconds) */
+    private static final long DEFAULT_MAX_DELAY_MS = 30000;
     
     private final int maxAttempts;
     private final long baseDelayMs;
     private final long maxDelayMs;
     
+    /**
+     * Constructs a ConnectionRetryPolicy with default parameters.
+     */
     public ConnectionRetryPolicy() {
         this(DEFAULT_MAX_ATTEMPTS, DEFAULT_BASE_DELAY_MS, DEFAULT_MAX_DELAY_MS);
     }
     
+    /**
+     * Constructs a ConnectionRetryPolicy with custom parameters.
+     * 
+     * @param maxAttempts the maximum number of retry attempts
+     * @param baseDelayMs the base delay in milliseconds for exponential backoff
+     * @param maxDelayMs the maximum delay in milliseconds between retries
+     */
     public ConnectionRetryPolicy(int maxAttempts, long baseDelayMs, long maxDelayMs) {
         this.maxAttempts = maxAttempts;
         this.baseDelayMs = baseDelayMs;
@@ -27,10 +44,12 @@ public class ConnectionRetryPolicy {
     }
     
     /**
-     * Attempt to connect with retry logic
-     * @param host The host to connect to
-     * @param port The port to connect to
-     * @return Established socket connection
+     * Attempts to connect to the specified host and port with retry logic.
+     * Uses exponential backoff between attempts.
+     * 
+     * @param host the host to connect to
+     * @param port the port to connect to
+     * @return established socket connection
      * @throws IOException if all retry attempts fail
      */
     public Socket connectWithRetry(String host, int port) throws IOException {
@@ -78,11 +97,14 @@ public class ConnectionRetryPolicy {
     }
     
     /**
-     * Execute an operation with retry logic
-     * @param operation The operation to execute
-     * @param operationName Name for logging
-     * @return Result of the operation
-     * @throws Exception if all retry attempts fail
+     * Executes an operation with retry logic.
+     * Only retries if the exception is determined to be retryable.
+     * 
+     * @param <T> the return type of the operation
+     * @param operation the operation to execute
+     * @param operationName name for logging purposes
+     * @return result of the operation
+     * @throws Exception if all retry attempts fail or exception is not retryable
      */
     public <T> T executeWithRetry(RetryableOperation<T> operation, String operationName) throws Exception {
         Exception lastException = null;
@@ -130,18 +152,25 @@ public class ConnectionRetryPolicy {
     }
     
     /**
-     * Calculate exponential backoff delay
+     * Calculates the exponential backoff delay for the given attempt.
+     * Delay doubles with each attempt, capped at maxDelayMs.
+     * 
+     * @param attempt the current attempt number (1-based)
+     * @return the delay in milliseconds
      */
     private long calculateBackoffDelay(int attempt) {
-        long delay = baseDelayMs * (1L << (attempt - 1)); // Exponential backoff
+        long delay = baseDelayMs * (1L << (attempt - 1));
         return Math.min(delay, maxDelayMs);
     }
     
     /**
-     * Determine if an exception is retryable
+     * Determines if an exception is retryable.
+     * Network timeouts, connection refused, and connection resets are considered retryable.
+     * 
+     * @param e the exception to check
+     * @return true if the exception is retryable, false otherwise
      */
     private boolean isRetryable(Exception e) {
-        // Network timeouts, connection refused, etc. are retryable
         if (e instanceof IOException) {
             String message = e.getMessage();
             if (message != null) {
@@ -155,9 +184,17 @@ public class ConnectionRetryPolicy {
     }
     
     /**
-     * Interface for retryable operations
+     * Interface for operations that can be retried.
+     * 
+     * @param <T> the return type of the operation
      */
     public interface RetryableOperation<T> {
+        /**
+         * Executes the operation.
+         * 
+         * @return the result of the operation
+         * @throws Exception if the operation fails
+         */
         T execute() throws Exception;
     }
 }

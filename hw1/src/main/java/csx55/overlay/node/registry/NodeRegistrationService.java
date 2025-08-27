@@ -15,23 +15,46 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Service for handling node registration and deregistration
+ * Service responsible for managing node registration and deregistration in the overlay network.
+ * Maintains a registry of all active nodes, validates registration requests,
+ * and handles connection lifecycle events.
+ * 
+ * This service ensures proper validation of node identities and manages
+ * the synchronized access to the registered nodes collection.
  */
 public class NodeRegistrationService {
     private final Map<String, TCPConnection> registeredNodes = new ConcurrentHashMap<>();
     private final TCPConnectionsCache connectionsCache;
     private TaskOrchestrationService taskService;
     
+    /**
+     * Constructs a new NodeRegistrationService.
+     * 
+     * @param connectionsCache the cache for managing TCP connections
+     */
     public NodeRegistrationService(TCPConnectionsCache connectionsCache) {
         this.connectionsCache = connectionsCache;
     }
     
+    /**
+     * Sets the task orchestration service reference.
+     * 
+     * @param taskService the task orchestration service to use
+     */
     public void setTaskService(TaskOrchestrationService taskService) {
         this.taskService = taskService;
     }
     
+    /**
+     * Handles a node registration request.
+     * Validates the request parameters including IP address and port,
+     * verifies the actual connection source, and adds the node to the registry.
+     * 
+     * @param request the registration request containing node information
+     * @param connection the TCP connection from the requesting node
+     * @throws IOException if an error occurs while sending the response
+     */
     public void handleRegisterRequest(RegisterRequest request, TCPConnection connection) throws IOException {
-        // Validate input parameters
         if (!ValidationUtil.isValidIpAddress(request.getIpAddress())) {
             LoggerUtil.warn("NodeRegistration", "Invalid IP address in registration: " + request.getIpAddress());
             connection.sendEvent(new RegisterResponse(
@@ -84,6 +107,15 @@ public class NodeRegistrationService {
         }
     }
     
+    /**
+     * Handles a node deregistration request.
+     * Validates the request, ensures no task is in progress,
+     * and removes the node from the registry.
+     * 
+     * @param request the deregistration request containing node information
+     * @param connection the TCP connection from the requesting node
+     * @throws IOException if an error occurs while sending the response
+     */
     public void handleDeregisterRequest(DeregisterRequest request, TCPConnection connection) throws IOException {
         String nodeId = request.getIpAddress() + ":" + request.getPortNumber();
         Socket socket = connection.getSocket();
@@ -97,7 +129,6 @@ public class NodeRegistrationService {
             return;
         }
         
-        // Check if a task is in progress
         if (taskService != null && taskService.isTaskInProgress()) {
             connection.sendEvent(new DeregisterResponse(
                 (byte) 0,
@@ -127,6 +158,10 @@ public class NodeRegistrationService {
         }
     }
     
+    /**
+     * Lists all registered messaging nodes to the console.
+     * Displays each node's identifier (IP:port) or a message if no nodes are registered.
+     */
     public void listMessagingNodes() {
         synchronized (registeredNodes) {
             if (registeredNodes.isEmpty()) {
@@ -140,17 +175,32 @@ public class NodeRegistrationService {
         }
     }
     
+    /**
+     * Gets a copy of all registered nodes.
+     * 
+     * @return a new map containing all registered node IDs and their connections
+     */
     public Map<String, TCPConnection> getRegisteredNodes() {
         return new ConcurrentHashMap<>(registeredNodes);
     }
     
+    /**
+     * Gets the count of registered nodes.
+     * 
+     * @return the number of nodes currently registered
+     */
     public int getNodeCount() {
         return registeredNodes.size();
     }
     
+    /**
+     * Handles the loss of a connection to a registered node.
+     * Removes the disconnected node from the registry and connections cache.
+     * 
+     * @param lostConnection the connection that was lost
+     */
     public void handleConnectionLost(TCPConnection lostConnection) {
         synchronized (registeredNodes) {
-            // Find the node ID associated with this connection
             String nodeToRemove = null;
             for (Map.Entry<String, TCPConnection> entry : registeredNodes.entrySet()) {
                 if (entry.getValue() == lostConnection) {

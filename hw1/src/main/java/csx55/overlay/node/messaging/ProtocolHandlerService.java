@@ -11,7 +11,9 @@ import java.net.Socket;
 import java.util.List;
 
 /**
- * Handles protocol messages for MessagingNode
+ * Service responsible for handling protocol messages in the MessagingNode.
+ * Manages registration responses, peer connections, routing information,
+ * and peer identification within the overlay network.
  */
 public class ProtocolHandlerService {
     private final TCPConnectionsCache peerConnections;
@@ -19,40 +21,69 @@ public class ProtocolHandlerService {
     private List<String> allNodes;
     private String nodeId;
     
+    /**
+     * Constructs a new ProtocolHandlerService.
+     * 
+     * @param peerConnections the cache for managing TCP connections to peer nodes
+     * @param routingService the service responsible for message routing
+     */
     public ProtocolHandlerService(TCPConnectionsCache peerConnections, 
                                  MessageRoutingService routingService) {
         this.peerConnections = peerConnections;
         this.routingService = routingService;
     }
     
+    /**
+     * Sets the node information.
+     * 
+     * @param nodeId the unique identifier for this node
+     * @param allNodes the list of all nodes in the overlay network
+     */
     public void setNodeInfo(String nodeId, List<String> allNodes) {
         this.nodeId = nodeId;
         this.allNodes = allNodes;
     }
     
+    /**
+     * Handles a registration response from the registry.
+     * 
+     * @param response the registration response to process
+     */
     public void handleRegisterResponse(RegisterResponse response) {
         LoggerUtil.info("ProtocolHandler", "Registration response: " + response.getAdditionalInfo());
     }
     
+    /**
+     * Handles a deregistration response from the registry.
+     * 
+     * @param response the deregistration response to process
+     * @return true if the node should exit, false otherwise
+     */
     public boolean handleDeregisterResponse(DeregisterResponse response) {
         if (response.getStatusCode() == 1) {
             LoggerUtil.info("ProtocolHandler", "Successfully exited overlay");
             System.out.println("exited overlay");
-            return true; // Signal to exit
+            return true;
         }
         return false;
     }
     
+    /**
+     * Handles the peer list received from the registry.
+     * Establishes TCP connections to all peer nodes and sends identification.
+     * 
+     * @param peerList the list of peer nodes to connect to
+     * @param listener the TCP connection listener for handling incoming messages
+     * @throws IOException if an error occurs while establishing connections
+     */
     public void handlePeerList(MessagingNodesList peerList, TCPConnection.TCPConnectionListener listener) throws IOException {
         for (String peer : peerList.getPeerNodes()) {
             String[] parts = peer.split(":");
             Socket socket = new Socket(parts[0], Integer.parseInt(parts[1]));
             TCPConnection connection = new TCPConnection(socket, listener);
-            // Set the proper remote node ID
             connection.setRemoteNodeId(peer);
             peerConnections.addConnection(peer, connection);
             
-            // Send peer identification to the connected node
             PeerIdentification identification = new PeerIdentification(nodeId);
             connection.sendEvent(identification);
         }
@@ -60,6 +91,12 @@ public class ProtocolHandlerService {
         System.out.println("All connections are established. Number of connections: " + peerConnections.size());
     }
     
+    /**
+     * Handles link weight information from the registry.
+     * Updates the list of all nodes and configures the routing table.
+     * 
+     * @param linkWeights the link weight information for the overlay network
+     */
     public void handleLinkWeights(LinkWeights linkWeights) {
         allNodes.clear();
         for (LinkWeights.LinkInfo link : linkWeights.getLinks()) {
@@ -77,19 +114,23 @@ public class ProtocolHandlerService {
         System.out.println("Link weights received and processed. Ready to send messages.");
     }
     
+    /**
+     * Handles peer identification messages from connected nodes.
+     * Updates the connection cache with the correct peer ID mapping.
+     * 
+     * @param identification the peer identification message
+     * @param connection the TCP connection from the peer
+     */
     public synchronized void handlePeerIdentification(PeerIdentification identification, TCPConnection connection) {
         String peerId = identification.getNodeId();
         
-        // Update the connection's remote node ID
         connection.setRemoteNodeId(peerId);
         
-        // Check if this connection is already in the cache
         boolean found = false;
         for (String key : peerConnections.getAllConnections().keySet()) {
             if (peerConnections.getConnection(key) == connection) {
                 found = true;
                 if (!key.equals(peerId)) {
-                    // Remove the old entry and add with correct ID
                     peerConnections.removeConnection(key);
                     peerConnections.addConnection(peerId, connection);
                 }
@@ -97,12 +138,16 @@ public class ProtocolHandlerService {
             }
         }
         
-        // If not found, this is a new incoming connection - add it to the cache
         if (!found) {
             peerConnections.addConnection(peerId, connection);
         }
     }
     
+    /**
+     * Gets the list of all nodes in the overlay network.
+     * 
+     * @return the list of all node identifiers
+     */
     public List<String> getAllNodes() {
         return allNodes;
     }

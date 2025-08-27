@@ -12,17 +12,33 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Service for managing overlay topology and link weights
+ * Service responsible for managing the overlay network topology and link weights.
+ * Handles overlay setup with specified connection requirements,
+ * distributes peer lists to nodes, and manages link weight assignments.
+ * 
+ * This service coordinates the creation of the overlay structure and ensures
+ * proper connectivity between nodes based on the connection requirement.
  */
 public class OverlayManagementService {
     private OverlayCreator.ConnectionPlan currentOverlay = null;
     private int connectionRequirement = 0;
     private final NodeRegistrationService registrationService;
     
+    /**
+     * Constructs a new OverlayManagementService.
+     * 
+     * @param registrationService the node registration service to use
+     */
     public OverlayManagementService(NodeRegistrationService registrationService) {
         this.registrationService = registrationService;
     }
     
+    /**
+     * Sets up the overlay network with the specified connection requirement.
+     * Creates the overlay topology and sends peer lists to all nodes.
+     * 
+     * @param cr the connection requirement (number of connections per node)
+     */
     public void setupOverlay(int cr) {
         if (cr <= 0) {
             LoggerUtil.error("OverlayManagement", "Connection requirement must be greater than 0, received: " + cr);
@@ -43,10 +59,8 @@ public class OverlayManagementService {
                 List<String> nodeIds = new ArrayList<>(registeredNodes.keySet());
                 currentOverlay = OverlayCreator.createOverlay(nodeIds, cr);
                 
-                // Determine who initiates connections
                 Map<String, List<String>> initiators = OverlayCreator.determineConnectionInitiators(currentOverlay);
                 
-                // Send peer lists to each node
                 for (String nodeId : nodeIds) {
                     List<String> peers = initiators.getOrDefault(nodeId, new ArrayList<>());
                     TCPConnection connection = registeredNodes.get(nodeId);
@@ -65,6 +79,10 @@ public class OverlayManagementService {
         }
     }
     
+    /**
+     * Sends overlay link weights to all registered nodes.
+     * Distributes the weighted link information needed for routing decisions.
+     */
     public void sendOverlayLinkWeights() {
         if (currentOverlay == null || currentOverlay.getAllLinks().isEmpty()) {
             LoggerUtil.error("OverlayManagement", "Overlay has not been set up. Cannot send weights.");
@@ -73,18 +91,15 @@ public class OverlayManagementService {
         
         Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
         
-        // Use existing weights from links (they were set during overlay creation)
         List<LinkWeights.LinkInfo> linkInfos = new ArrayList<>();
         
         for (OverlayCreator.Link link : currentOverlay.getAllLinks()) {
-            // Use the weight that was already assigned during overlay creation
             LinkWeights.LinkInfo linkInfo = new LinkWeights.LinkInfo(
                 link.nodeA, link.nodeB, link.weight
             );
             linkInfos.add(linkInfo);
         }
         
-        // Send to all registered nodes
         LinkWeights message = new LinkWeights(linkInfos);
         try {
             for (TCPConnection connection : registeredNodes.values()) {
@@ -97,6 +112,10 @@ public class OverlayManagementService {
         }
     }
     
+    /**
+     * Lists all link weights in the current overlay to the console.
+     * Displays each link with its associated weight.
+     */
     public void listWeights() {
         if (currentOverlay == null || currentOverlay.getAllLinks().isEmpty()) {
             LoggerUtil.warn("OverlayManagement", "No overlay has been configured to list weights");
@@ -108,10 +127,20 @@ public class OverlayManagementService {
         }
     }
     
+    /**
+     * Gets the current overlay connection plan.
+     * 
+     * @return the current overlay structure, or null if not configured
+     */
     public OverlayCreator.ConnectionPlan getCurrentOverlay() {
         return currentOverlay;
     }
     
+    /**
+     * Gets the connection requirement for the overlay.
+     * 
+     * @return the number of connections per node
+     */
     public int getConnectionRequirement() {
         return connectionRequirement;
     }

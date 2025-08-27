@@ -3,17 +3,34 @@ package csx55.overlay.node;
 import java.util.Scanner;
 
 /**
- * Handles command-line interface for Registry
- * This class simplifies Registry.java by extracting command handling logic
+ * Handles command-line interface for the Registry.
+ * Provides an interactive command loop for managing the overlay network.
+ * 
+ * Available commands:
+ * - list-messaging-nodes: displays all registered nodes
+ * - list-weights: shows all link weights in the overlay
+ * - setup-overlay <number>: configures the overlay with specified connections
+ * - send-overlay-link-weights: distributes link weights to all nodes
+ * - start <number>: initiates a messaging task with specified rounds
  */
 public class RegistryCommandHandler {
     private final Registry registry;
     private volatile boolean running = true;
     
+    /**
+     * Constructs a new RegistryCommandHandler.
+     * 
+     * @param registry the registry to control
+     */
     public RegistryCommandHandler(Registry registry) {
         this.registry = registry;
     }
     
+    /**
+     * Starts the interactive command loop.
+     * Reads user input, parses commands, and executes corresponding operations.
+     * Handles command parsing errors and provides usage information.
+     */
     public void startCommandLoop() {
         Scanner scanner = new Scanner(System.in);
         while (running) {
@@ -56,6 +73,10 @@ public class RegistryCommandHandler {
         scanner.close();
     }
     
+    /**
+     * Stops the command loop.
+     * Sets the running flag to false to terminate the loop.
+     */
     public void stop() {
         running = false;
     }

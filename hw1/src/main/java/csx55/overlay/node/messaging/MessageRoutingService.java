@@ -9,7 +9,12 @@ import csx55.overlay.wireformats.DataMessage;
 import java.io.IOException;
 
 /**
- * Service for routing messages through the overlay network
+ * Service responsible for routing messages through the overlay network.
+ * Handles both direct message sending and message relay operations while
+ * maintaining statistics for all routing activities.
+ * 
+ * This service uses a routing table to determine the next hop for messages
+ * and leverages TCP connections for reliable message delivery.
  */
 public class MessageRoutingService {
     private RoutingTable routingTable;
@@ -17,20 +22,44 @@ public class MessageRoutingService {
     private final NodeStatisticsService statisticsService;
     private String nodeId;
     
+    /**
+     * Constructs a new MessageRoutingService.
+     * 
+     * @param peerConnections the cache of TCP connections to peer nodes
+     * @param statisticsService the service for tracking message statistics
+     */
     public MessageRoutingService(TCPConnectionsCache peerConnections, NodeStatisticsService statisticsService) {
         this.peerConnections = peerConnections;
         this.statisticsService = statisticsService;
     }
     
+    /**
+     * Sets the node ID and initializes the routing table.
+     * 
+     * @param nodeId the unique identifier for this node
+     */
     public void setNodeId(String nodeId) {
         this.nodeId = nodeId;
         this.routingTable = new RoutingTable(nodeId);
     }
     
+    /**
+     * Updates the routing table with new routing information.
+     * 
+     * @param routingTable the new routing table to use
+     */
     public void updateRoutingTable(RoutingTable routingTable) {
         this.routingTable = routingTable;
     }
     
+    /**
+     * Sends a message to the specified destination node.
+     * This method increments send statistics and routes the message
+     * through the appropriate next hop.
+     * 
+     * @param sinkId the destination node identifier
+     * @param payload the message payload to send
+     */
     public synchronized void sendMessage(String sinkId, int payload) {
         statisticsService.incrementSendStats(payload);
         
@@ -55,6 +84,15 @@ public class MessageRoutingService {
         }
     }
     
+    /**
+     * Relays a message from a source node to a destination node.
+     * This method is used when this node acts as an intermediate hop
+     * in the message routing path.
+     * 
+     * @param sourceId the original source node identifier
+     * @param sinkId the final destination node identifier
+     * @param payload the message payload to relay
+     */
     public synchronized void relayMessage(String sourceId, String sinkId, int payload) {
         statisticsService.incrementRelayStats();
         
@@ -79,20 +117,30 @@ public class MessageRoutingService {
         }
     }
     
+    /**
+     * Handles incoming data messages.
+     * If the message is destined for this node, it updates receive statistics.
+     * Otherwise, it relays the message to the next hop.
+     * 
+     * @param message the data message to handle
+     */
     public void handleDataMessage(DataMessage message) {
         String sourceId = message.getSourceNodeId();
         String sinkId = message.getSinkNodeId();
         int payload = message.getPayload();
         
         if (sinkId.equals(nodeId)) {
-            // Message is for us
             statisticsService.incrementReceiveStats(payload);
         } else {
-            // Relay the message
             relayMessage(sourceId, sinkId, payload);
         }
     }
     
+    /**
+     * Gets the current routing table.
+     * 
+     * @return the routing table used by this service
+     */
     public RoutingTable getRoutingTable() {
         return routingTable;
     }
