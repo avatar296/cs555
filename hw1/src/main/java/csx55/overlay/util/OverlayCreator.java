@@ -69,81 +69,56 @@ public class OverlayCreator {
             throw new IllegalArgumentException("Impossible to create overlay with given parameters");
         }
         
+        // The product of nodes and CR must be even for a regular graph to be possible.
+        if ((nodeIds.size() * connectionRequirement) % 2 != 0) {
+            LoggerUtil.warn("OverlayCreator", 
+                "Configuration (" + nodeIds.size() + " nodes, CR=" + connectionRequirement + ") is not ideal. " +
+                "A perfect regular graph cannot be formed.");
+        }
+        
         ConnectionPlan plan = new ConnectionPlan();
+        int n = nodeIds.size();
         
         // Initialize connection sets for each node
         for (String nodeId : nodeIds) {
             plan.nodeConnections.put(nodeId, new HashSet<>());
         }
         
-        // Create a ring topology first to ensure connectivity
-        for (int e = 0; e < nodeIds.size(); e++) {
-            String currentNode = nodeIds.get(e);
-            String nextNode = nodeIds.get((e + 1) % nodeIds.size());
-            
-            plan.nodeConnections.get(currentNode).add(nextNode);
-            plan.nodeConnections.get(nextNode).add(currentNode);
-            plan.allLinks.add(new Link(currentNode, nextNode));
-        }
-        
-        // Add additional connections to reach the connection requirement
-        Random random = new Random();
-        
-        // Calculate total links needed
-        int targetLinks = (nodeIds.size() * connectionRequirement) / 2;
-        int currentLinks = plan.allLinks.size(); // Currently have ring topology links
-        
-        // Build list of all possible additional connections
-        List<Link> possibleLinks = new ArrayList<>();
-        for (int i = 0; i < nodeIds.size(); i++) {
-            for (int j = i + 1; j < nodeIds.size(); j++) {
+        // Build a k-regular graph by connecting to nearest neighbors.
+        // Loop through each node as a starting point.
+        for (int i = 0; i < n; i++) {
+            // Connect to the k/2 nearest neighbors on each side.
+            for (int k = 1; k <= connectionRequirement / 2; k++) {
                 String nodeA = nodeIds.get(i);
-                String nodeB = nodeIds.get(j);
+                String nodeB = nodeIds.get((i + k) % n);
                 
-                // Skip if connection already exists
+                // Add the link if it doesn't already exist.
                 if (!plan.nodeConnections.get(nodeA).contains(nodeB)) {
-                    possibleLinks.add(new Link(nodeA, nodeB));
+                    plan.nodeConnections.get(nodeA).add(nodeB);
+                    plan.nodeConnections.get(nodeB).add(nodeA);
+                    plan.allLinks.add(new Link(nodeA, nodeB));
                 }
             }
         }
         
-        // Sort by nodes that need connections most
-        // This ensures we prioritize connections for nodes that are furthest from their CR
-        possibleLinks.sort((a, b) -> {
-            int aNeeds = (connectionRequirement - plan.nodeConnections.get(a.nodeA).size()) +
-                        (connectionRequirement - plan.nodeConnections.get(a.nodeB).size());
-            int bNeeds = (connectionRequirement - plan.nodeConnections.get(b.nodeA).size()) +
-                        (connectionRequirement - plan.nodeConnections.get(b.nodeB).size());
-            return Integer.compare(bNeeds, aNeeds); // Higher needs first
-        });
-        
-        // Add connections until we reach the target or run out of valid options
-        for (Link link : possibleLinks) {
-            if (currentLinks >= targetLinks) {
-                break; // We have enough links
-            }
-            
-            // Check if both nodes can accept more connections
-            if (plan.nodeConnections.get(link.nodeA).size() < connectionRequirement &&
-                plan.nodeConnections.get(link.nodeB).size() < connectionRequirement) {
-                
-                // Add the connection
-                plan.nodeConnections.get(link.nodeA).add(link.nodeB);
-                plan.nodeConnections.get(link.nodeB).add(link.nodeA);
-                plan.allLinks.add(link);
-                currentLinks++;
+        // For an odd connection requirement on an even number of nodes,
+        // connect each node to the one directly across the ring.
+        if (connectionRequirement % 2 != 0) {
+            if (n % 2 == 0) {
+                for (int i = 0; i < n / 2; i++) {
+                    String nodeA = nodeIds.get(i);
+                    String nodeB = nodeIds.get(i + n / 2);
+                    
+                    if (!plan.nodeConnections.get(nodeA).contains(nodeB)) {
+                        plan.nodeConnections.get(nodeA).add(nodeB);
+                        plan.nodeConnections.get(nodeB).add(nodeA);
+                        plan.allLinks.add(new Link(nodeA, nodeB));
+                    }
+                }
             }
         }
         
-        // Log if we couldn't create enough links
-        if (currentLinks < targetLinks) {
-            LoggerUtil.warn("OverlayCreator", 
-                "Could only create " + currentLinks + " links out of " + targetLinks + " target links");
-        }
-        
-        // Assign unique weights to all links
-        // Use sequential weights starting from 1 to ensure uniqueness
-        // and stay within the lower range when possible
+        // Assign unique weights to all created links.
         int weight = 1;
         for (Link link : plan.allLinks) {
             link.weight = weight++;
