@@ -24,10 +24,10 @@ public class RegisterRequest implements Event {
     private final int type = Protocol.REGISTER_REQUEST;
     
     /** IP address of the node requesting registration */
-    private String ipAddress;
+    private final String ipAddress;
     
     /** Port number of the node requesting registration */
-    private int portNumber;
+    private final int portNumber;
     
     /**
      * Constructs a new RegisterRequest.

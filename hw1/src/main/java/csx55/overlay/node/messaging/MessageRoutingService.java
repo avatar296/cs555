@@ -17,9 +17,9 @@ import java.io.IOException;
  * and leverages TCP connections for reliable message delivery.
  */
 public class MessageRoutingService {
-    private RoutingTable routingTable;
     private final TCPConnectionsCache peerConnections;
     private final NodeStatisticsService statisticsService;
+    private RoutingTable routingTable;
     private String nodeId;
     
     /**

@@ -10,6 +10,11 @@ import java.net.UnknownHostException;
  */
 public class ValidationUtil {
     
+    // Private constructor to prevent instantiation
+    private ValidationUtil() {
+        throw new AssertionError("Utility class - do not instantiate");
+    }
+    
     /** Minimum allowed port number (above well-known ports) */
     public static final int MIN_PORT = 1024;
     

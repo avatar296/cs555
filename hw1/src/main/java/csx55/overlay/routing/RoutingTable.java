@@ -20,13 +20,13 @@ public class RoutingTable {
     private final String localNodeId;
     
     /** Graph representation as adjacency list for all nodes and their connections */
-    private Map<String, List<Edge>> graph;
+    private final Map<String, List<Edge>> graph;
     
     /** Minimum Spanning Tree mapping each node to its parent edge */
-    private Map<String, Edge> mst;
+    private final Map<String, Edge> mst;
     
     /** Cache for next hop lookups to improve performance */
-    private Map<String, String> nextHopCache;
+    private final Map<String, String> nextHopCache;
     
     /**
      * Constructs a new RoutingTable for the specified local node.
@@ -74,7 +74,7 @@ public class RoutingTable {
         mst.clear();
         Map<String, String> parent = new HashMap<>();
         Map<String, Integer> minWeight = new HashMap<>();
-        PriorityQueue<Edge> pq = new PriorityQueue<>(Comparator.comparingInt(e -> e.weight));
+        PriorityQueue<Edge> pq = new PriorityQueue<>(Comparator.comparingInt(Edge::getWeight));
         Set<String> inTree = new HashSet<>();
         
         for (String node : graph.keySet()) {
@@ -85,7 +85,7 @@ public class RoutingTable {
         pq.add(new Edge(localNodeId, 0));
         while (!pq.isEmpty()) {
             Edge current = pq.poll();
-            String currentNode = current.destination;
+            String currentNode = current.getDestination();
             
             if (inTree.contains(currentNode)) {
                 continue;
@@ -102,8 +102,8 @@ public class RoutingTable {
             List<Edge> neighbors = graph.get(currentNode);
             if (neighbors != null) {
                 for (Edge neighborEdge : neighbors) {
-                    String neighbor = neighborEdge.destination;
-                    int weight = neighborEdge.weight;
+                    String neighbor = neighborEdge.getDestination();
+                    int weight = neighborEdge.getWeight();
                     
                     if (!inTree.contains(neighbor) && weight < minWeight.get(neighbor)) {
                         minWeight.put(neighbor, weight);
@@ -141,7 +141,7 @@ public class RoutingTable {
             if (parentEdge == null) {
                 return null;
             }
-            current = parentEdge.destination;
+            current = parentEdge.getDestination();
         }
         
         if (current == null || !current.equals(localNodeId)) {
@@ -180,10 +180,10 @@ public class RoutingTable {
             for (Map.Entry<String, Edge> entry : mst.entrySet()) {
                 String childNode = entry.getKey();
                 Edge edgeToParent = entry.getValue();
-                String parentNode = edgeToParent.destination;
+                String parentNode = edgeToParent.getDestination();
                 
                 if (parentNode.equals(currentNode) && !visited.contains(childNode)) {
-                    System.out.println(parentNode + ", " + childNode + ", " + edgeToParent.weight);
+                    System.out.println(parentNode + ", " + childNode + ", " + edgeToParent.getWeight());
                     visited.add(childNode);
                     queue.add(childNode);
                 }
@@ -202,8 +202,8 @@ public class RoutingTable {
         for (Map.Entry<String, Edge> entry : mst.entrySet()) {
             String childNode = entry.getKey();
             Edge edgeToParent = entry.getValue();
-            String parentNode = edgeToParent.destination;
-            edges.add(parentNode + ", " + childNode + ", " + edgeToParent.weight);
+            String parentNode = edgeToParent.getDestination();
+            edges.add(parentNode + ", " + childNode + ", " + edgeToParent.getWeight());
         }
         
         return edges;

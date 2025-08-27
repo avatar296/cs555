@@ -21,12 +21,12 @@ import java.util.concurrent.TimeUnit;
  * lifecycle from initiation through statistics gathering.
  */
 public class TaskOrchestrationService {
-    private int completedNodes = 0;
-    private int rounds = 0;
-    private boolean taskInProgress = false;
     private final NodeRegistrationService registrationService;
     private final StatisticsCollectionService statisticsService;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private volatile int completedNodes;
+    private volatile int rounds;
+    private volatile boolean taskInProgress;
     
     /**
      * Constructs a new TaskOrchestrationService.

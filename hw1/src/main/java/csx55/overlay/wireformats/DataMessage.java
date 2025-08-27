@@ -25,13 +25,13 @@ public class DataMessage implements Event {
     private final int type = Protocol.DATA_MESSAGE;
     
     /** Identifier of the node that originated this message */
-    private String sourceNodeId;
+    private final String sourceNodeId;
     
     /** Identifier of the destination node */
-    private String sinkNodeId;
+    private final String sinkNodeId;
     
     /** The data payload being transmitted */
-    private int payload;
+    private final int payload;
     
     /**
      * Constructs a new DataMessage.

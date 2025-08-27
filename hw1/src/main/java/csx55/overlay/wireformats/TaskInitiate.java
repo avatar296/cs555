@@ -23,7 +23,7 @@ public class TaskInitiate implements Event {
     private final int type = Protocol.TASK_INITIATE;
     
     /** Number of messaging rounds to execute */
-    private int rounds;
+    private final int rounds;
     
     /**
      * Constructs a new TaskInitiate message.

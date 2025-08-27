@@ -14,11 +14,11 @@ import java.io.IOException;
  * All methods are synchronized to ensure thread-safe access to statistics.
  */
 public class NodeStatisticsService {
-    private int sendTracker = 0;
-    private int receiveTracker = 0;
-    private int relayTracker = 0;
-    private long sendSummation = 0;
-    private long receiveSummation = 0;
+    private int sendTracker;
+    private int receiveTracker;
+    private int relayTracker;
+    private long sendSummation;
+    private long receiveSummation;
     
     /**
      * Increments the send statistics with the given payload.

@@ -27,9 +27,9 @@ public class LoggerUtil {
         }
     }
     
-    private static LogLevel currentLevel = LogLevel.INFO;
+    private static volatile LogLevel currentLevel = LogLevel.INFO;
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
-    private static boolean includeTimestamp = true;
+    private static volatile boolean includeTimestamp = true;
     
     /**
      * Set the minimum log level to display

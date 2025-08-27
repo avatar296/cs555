@@ -26,23 +26,23 @@ public class LinkWeights implements Event {
     private final int type = Protocol.LINK_WEIGHTS;
     
     /** Number of links in the overlay */
-    private int numberOfLinks;
+    private final int numberOfLinks;
     
     /** List of all weighted links in the topology */
-    private List<LinkInfo> links;
+    private final List<LinkInfo> links;
     
     /**
      * Represents a weighted link between two nodes in the overlay.
      */
     public static class LinkInfo {
         /** First node in the link */
-        public String nodeA;
+        public final String nodeA;
         
         /** Second node in the link */
-        public String nodeB;
+        public final String nodeB;
         
         /** Weight/cost of this link */
-        public int weight;
+        public final int weight;
         
         /**
          * Constructs a new LinkInfo.
@@ -96,7 +96,7 @@ public class LinkWeights implements Event {
         this.numberOfLinks = din.readInt();
         this.links = new ArrayList<>();
         
-        for (int e = 0; e < numberOfLinks; e++) {
+        for (int i = 0; i < numberOfLinks; i++) {
             String linkData = din.readUTF();
             String[] parts = linkData.split(" ");
             if (parts.length == 3) {

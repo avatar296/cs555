@@ -24,10 +24,10 @@ public class DeregisterRequest implements Event {
     private final int type = Protocol.DEREGISTER_REQUEST;
     
     /** IP address of the node requesting deregistration */
-    private String ipAddress;
+    private final String ipAddress;
     
     /** Port number of the node requesting deregistration */
-    private int portNumber;
+    private final int portNumber;
     
     /**
      * Constructs a new DeregisterRequest.

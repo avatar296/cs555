@@ -24,10 +24,10 @@ public class RegisterResponse implements Event {
     private final int type = Protocol.REGISTER_RESPONSE;
     
     /** Status code: 1 for success, 0 for failure */
-    private byte statusCode;
+    private final byte statusCode;
     
     /** Additional information or error message */
-    private String additionalInfo;
+    private final String additionalInfo;
     
     /**
      * Constructs a new RegisterResponse.

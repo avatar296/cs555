@@ -75,8 +75,8 @@ public class TaskExecutionService {
      */
     private void performMessagingTask(int rounds, List<String> allNodes) {
         Random rand = new Random();
-        for (int e = 0; e < rounds; e++) {
-            for (int e2 = 0; e2 < 5; e2++) {
+        for (int round = 0; round < rounds; round++) {
+            for (int messageIndex = 0; messageIndex < 5; messageIndex++) {
                 String sink = allNodes.get(rand.nextInt(allNodes.size()));
                 while (sink.equals(nodeId)) {
                     sink = allNodes.get(rand.nextInt(allNodes.size()));

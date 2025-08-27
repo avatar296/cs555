@@ -23,8 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * the synchronized access to the registered nodes collection.
  */
 public class NodeRegistrationService {
-    private final Map<String, TCPConnection> registeredNodes = new ConcurrentHashMap<>();
     private final TCPConnectionsCache connectionsCache;
+    private final Map<String, TCPConnection> registeredNodes = new ConcurrentHashMap<>();
     private TaskOrchestrationService taskService;
     
     /**

@@ -14,7 +14,7 @@ import csx55.overlay.wireformats.TrafficSummary;
  * and handles the complete statistics lifecycle.
  */
 public class StatisticsCollectionService {
-    private StatisticsCollector statsCollector = null;
+    private volatile StatisticsCollector statsCollector;
     
     /**
      * Resets the statistics collector with the expected number of nodes.

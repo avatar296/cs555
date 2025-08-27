@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TCPConnectionsCache {
     
     /** Thread-safe map of node IDs to their TCP connections */
-    private Map<String, TCPConnection> connections;
+    private final Map<String, TCPConnection> connections;
     
     /**
      * Constructs a new TCPConnectionsCache.

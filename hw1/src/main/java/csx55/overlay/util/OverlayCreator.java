@@ -15,10 +15,10 @@ public class OverlayCreator {
      */
     public static class ConnectionPlan {
         /** Map of node IDs to their connected peers */
-        private Map<String, Set<String>> nodeConnections;
+        private final Map<String, Set<String>> nodeConnections;
 
         /** List of all links in the overlay with weights */
-        private List<Link> allLinks;
+        private final List<Link> allLinks;
 
         /**
          * Constructs an empty ConnectionPlan.
@@ -53,7 +53,7 @@ public class OverlayCreator {
     public static class Link {
         public final String nodeA;
         public final String nodeB;
-        public int weight;
+        private int weight;
 
         /**
          * Constructs a link with zero weight.
@@ -80,6 +80,24 @@ public class OverlayCreator {
             this.weight = weight;
         }
 
+        /**
+         * Gets the weight of this link.
+         * 
+         * @return the weight
+         */
+        public int getWeight() {
+            return weight;
+        }
+        
+        /**
+         * Sets the weight of this link.
+         * 
+         * @param weight the new weight
+         */
+        public void setWeight(int weight) {
+            this.weight = weight;
+        }
+        
         @Override
         public String toString() {
             return nodeA + ", " + nodeB + ", " + weight;

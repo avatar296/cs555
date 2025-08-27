@@ -18,29 +18,29 @@ import java.util.concurrent.Executors;
 
 /**
  * Represents a messaging node in the overlay network.
- * Handles message routing, peer connections, and communication with the registry.
+ * Handles message routing, peer connections, and communication with the
+ * registry.
  * Implements the TCPConnectionListener interface to handle network events.
  * 
  * This node can send, receive, and relay messages through the overlay network
  * using shortest path routing based on link weights.
  */
 public class MessagingNode implements TCPConnection.TCPConnectionListener {
-    private String nodeId;
-    private String ipAddress;
-    private int portNumber;
-    private TCPConnection registryConnection;
     private final TCPConnectionsCache peerConnections = new TCPConnectionsCache();
     private final ExecutorService executorService = Executors.newCachedThreadPool();
-    private volatile boolean running = true;
-    private ServerSocket serverSocket;
-
     private final NodeStatisticsService statisticsService;
     private final MessageRoutingService routingService;
     private final ProtocolHandlerService protocolHandler;
     private final TaskExecutionService taskService;
     private final MessagingNodeCommandHandler commandHandler;
+    private final List<String> allNodes = new ArrayList<>();
 
-    private List<String> allNodes = new ArrayList<>();
+    private volatile boolean running = true;
+    private String nodeId;
+    private String ipAddress;
+    private int portNumber;
+    private TCPConnection registryConnection;
+    private ServerSocket serverSocket;
 
     /**
      * Constructs a new MessagingNode and initializes all services.
@@ -55,7 +55,8 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
 
     /**
      * Starts the messaging node and connects to the registry.
-     * Initializes server socket, registers with the registry, and starts listening for peer connections.
+     * Initializes server socket, registers with the registry, and starts listening
+     * for peer connections.
      * 
      * @param registryHost the hostname of the registry
      * @param registryPort the port number of the registry
@@ -82,6 +83,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                 while (running) {
                     try {
                         Socket peerSocket = serverSocket.accept();
+                        @SuppressWarnings("unused")
                         TCPConnection peerConnection = new TCPConnection(peerSocket, this);
                     } catch (IOException e) {
                         if (running) {
@@ -92,7 +94,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
             });
 
             new Thread(commandHandler::startCommandLoop).start();
-            
+
             Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
 
         } catch (IOException e) {
@@ -100,7 +102,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
             cleanup();
         }
     }
-    
+
     /**
      * Performs cleanup operations when the node is shutting down.
      * Closes all connections, stops services, and releases resources.
@@ -132,7 +134,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
      * Handles incoming events from the network.
      * Processes various protocol messages and delegates to appropriate services.
      * 
-     * @param event the event received from the network
+     * @param event      the event received from the network
      * @param connection the TCP connection that received the event
      */
     @Override
@@ -153,7 +155,8 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
                     break;
                 case Protocol.LINK_WEIGHTS:
                     protocolHandler.handleLinkWeights((LinkWeights) event);
-                    this.allNodes = protocolHandler.getAllNodes();
+                    this.allNodes.clear();
+                    this.allNodes.addAll(protocolHandler.getAllNodes());
                     break;
                 case Protocol.TASK_INITIATE:
                     taskService.handleTaskInitiate((TaskInitiate) event, allNodes);
@@ -186,7 +189,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
             cleanup();
             System.exit(1);
         }
-        
+
         synchronized (peerConnections) {
             for (String nodeId : peerConnections.getAllConnections().keySet()) {
                 if (peerConnections.getConnection(nodeId) == connection) {

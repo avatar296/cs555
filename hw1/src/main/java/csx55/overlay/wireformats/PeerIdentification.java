@@ -23,7 +23,7 @@ public class PeerIdentification implements Event {
     private final int type = Protocol.PEER_IDENTIFICATION;
     
     /** Identifier of the sending node (IP:port format) */
-    private String nodeId;
+    private final String nodeId;
     
     /**
      * Constructs a new PeerIdentification message.

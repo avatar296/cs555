@@ -12,10 +12,10 @@ import java.util.*;
 public class StatisticsCollector {
     
     /** Map of node IDs to their traffic summaries */
-    private Map<String, TrafficSummary> summaries;
+    private final Map<String, TrafficSummary> summaries;
     
     /** Number of nodes expected to report statistics */
-    private int expectedNodes;
+    private final int expectedNodes;
     
     /**
      * Constructs a StatisticsCollector for the specified number of nodes.

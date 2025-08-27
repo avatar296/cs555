@@ -16,18 +16,19 @@ import java.net.SocketException;
  * and connection lifecycle management.
  * 
  * This class provides thread-safe sending operations and uses a dedicated
- * receiver thread for handling incoming events. Connection loss is automatically
+ * receiver thread for handling incoming events. Connection loss is
+ * automatically
  * detected and reported to the listener.
  */
 public class TCPConnection {
-    
-    private Socket socket;
-    private DataOutputStream dout;
-    private DataInputStream din;
-    private String remoteNodeId;
-    private Thread receiverThread;
-    private TCPConnectionListener listener;
-    
+
+    private final Socket socket;
+    private final DataOutputStream dout;
+    private final DataInputStream din;
+    private final TCPConnectionListener listener;
+    private volatile Thread receiverThread;
+    private volatile String remoteNodeId;
+
     /**
      * Interface for handling TCP connection events.
      * Implementations receive callbacks for incoming events and connection loss.
@@ -36,11 +37,11 @@ public class TCPConnection {
         /**
          * Called when an event is received on this connection.
          * 
-         * @param event the received event
+         * @param event      the received event
          * @param connection the connection that received the event
          */
         void onEvent(Event event, TCPConnection connection);
-        
+
         /**
          * Called when this connection is lost.
          * 
@@ -48,45 +49,57 @@ public class TCPConnection {
          */
         void onConnectionLost(TCPConnection connection);
     }
-    
+
     /**
      * Creates a new TCP connection using an existing socket.
      * Initializes streams and starts the receiver thread.
      * The remote node ID will be set later when identification is received.
      * 
-     * @param socket the socket for this connection
+     * @param socket   the socket for this connection
      * @param listener the listener for connection events
      * @throws IOException if stream initialization fails
      */
     public TCPConnection(Socket socket, TCPConnectionListener listener) throws IOException {
         this.socket = socket;
         this.listener = listener;
+        DataOutputStream tempDout = null;
+        DataInputStream tempDin = null;
         try {
-            this.dout = new DataOutputStream(socket.getOutputStream());
-            this.din = new DataInputStream(socket.getInputStream());
+            tempDout = new DataOutputStream(socket.getOutputStream());
+            tempDin = new DataInputStream(socket.getInputStream());
         } catch (IOException e) {
             LoggerUtil.error("TCPConnection", "Failed to create streams for connection", e);
-            closeQuietly();
+            if (tempDout != null) {
+                try {
+                    tempDout.close();
+                } catch (IOException ignored) {
+                }
+            }
+            try {
+                socket.close();
+            } catch (IOException ignored) {
+            }
             throw e;
         }
-        
+        this.dout = tempDout;
+        this.din = tempDin;
         this.remoteNodeId = null;
-        
+
         startReceiver();
     }
-    
+
     /**
      * Creates a new TCP connection to the specified host and port.
      * 
-     * @param host the hostname to connect to
-     * @param port the port number to connect to
+     * @param host     the hostname to connect to
+     * @param port     the port number to connect to
      * @param listener the listener for connection events
      * @throws IOException if connection fails
      */
     public TCPConnection(String host, int port, TCPConnectionListener listener) throws IOException {
         this(new Socket(host, port), listener);
     }
-    
+
     /**
      * Starts the receiver thread that continuously reads incoming events.
      * The thread runs until the connection is closed or an error occurs.
@@ -94,15 +107,15 @@ public class TCPConnection {
     private void startReceiver() {
         receiverThread = new Thread(() -> {
             EventFactory factory = EventFactory.getInstance();
-            
+
             try {
                 while (!socket.isClosed()) {
                     int dataLength = din.readInt();
                     byte[] data = new byte[dataLength];
                     din.readFully(data, 0, dataLength);
-                    
+
                     Event event = factory.createEvent(data);
-                    
+
                     if (listener != null) {
                         listener.onEvent(event, this);
                     }
@@ -120,7 +133,7 @@ public class TCPConnection {
         });
         receiverThread.start();
     }
-    
+
     /**
      * Sends an event through this connection.
      * This method is synchronized to ensure thread-safe sending.
@@ -143,7 +156,7 @@ public class TCPConnection {
             throw e;
         }
     }
-    
+
     /**
      * Gets the identifier of the remote node.
      * 
@@ -152,7 +165,7 @@ public class TCPConnection {
     public String getRemoteNodeId() {
         return remoteNodeId;
     }
-    
+
     /**
      * Sets the identifier of the remote node.
      * 
@@ -161,14 +174,14 @@ public class TCPConnection {
     public void setRemoteNodeId(String remoteNodeId) {
         this.remoteNodeId = remoteNodeId;
     }
-    
+
     /**
      * Closes this connection and releases all resources.
      */
     public synchronized void close() {
         closeQuietly();
     }
-    
+
     /**
      * Closes all resources quietly, suppressing any exceptions.
      * Used for cleanup in error conditions.
@@ -181,7 +194,7 @@ public class TCPConnection {
         } catch (IOException e) {
             LoggerUtil.debug("TCPConnection", "Error closing input stream: " + e.getMessage());
         }
-        
+
         try {
             if (dout != null) {
                 dout.close();
@@ -189,7 +202,7 @@ public class TCPConnection {
         } catch (IOException e) {
             LoggerUtil.debug("TCPConnection", "Error closing output stream: " + e.getMessage());
         }
-        
+
         try {
             if (socket != null && !socket.isClosed()) {
                 socket.close();
@@ -198,7 +211,7 @@ public class TCPConnection {
             LoggerUtil.debug("TCPConnection", "Error closing socket: " + e.getMessage());
         }
     }
-    
+
     /**
      * Checks if this connection is active.
      * 
@@ -207,7 +220,7 @@ public class TCPConnection {
     public boolean isConnected() {
         return socket != null && socket.isConnected() && !socket.isClosed();
     }
-    
+
     /**
      * Gets the underlying socket for this connection.
      * 

@@ -26,10 +26,10 @@ public class MessagingNodesList implements Event {
     private final int type = Protocol.MESSAGING_NODES_LIST;
     
     /** Number of peer nodes to connect to */
-    private int numberOfPeerNodes;
+    private final int numberOfPeerNodes;
     
     /** List of peer node identifiers (IP:port format) */
-    private List<String> peerNodes;
+    private final List<String> peerNodes;
     
     /**
      * Constructs a new MessagingNodesList.
@@ -59,7 +59,7 @@ public class MessagingNodesList implements Event {
         this.numberOfPeerNodes = din.readInt();
         this.peerNodes = new ArrayList<>();
         
-        for (int e = 0; e < numberOfPeerNodes; e++) {
+        for (int i = 0; i < numberOfPeerNodes; i++) {
             String nodeInfo = din.readUTF();
             peerNodes.add(nodeInfo);
         }

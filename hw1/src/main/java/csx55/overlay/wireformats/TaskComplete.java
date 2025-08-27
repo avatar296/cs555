@@ -24,10 +24,10 @@ public class TaskComplete implements Event {
     private final int type = Protocol.TASK_COMPLETE;
     
     /** IP address of the node that completed the task */
-    private String nodeIpAddress;
+    private final String nodeIpAddress;
     
     /** Port number of the node that completed the task */
-    private int nodePortNumber;
+    private final int nodePortNumber;
     
     /**
      * Constructs a new TaskComplete message.

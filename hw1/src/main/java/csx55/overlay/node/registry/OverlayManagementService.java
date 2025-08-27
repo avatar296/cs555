@@ -20,9 +20,9 @@ import java.util.Map;
  * proper connectivity between nodes based on the connection requirement.
  */
 public class OverlayManagementService {
-    private OverlayCreator.ConnectionPlan currentOverlay = null;
-    private int connectionRequirement = 0;
     private final NodeRegistrationService registrationService;
+    private volatile OverlayCreator.ConnectionPlan currentOverlay;
+    private volatile int connectionRequirement;
     
     /**
      * Constructs a new OverlayManagementService.
