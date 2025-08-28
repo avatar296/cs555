@@ -1,171 +1,152 @@
 package csx55.overlay.routing;
 
 import csx55.overlay.wireformats.LinkWeights;
-
 import java.util.*;
 
-/**
- * Manages routing information for a node in the overlay network.
- * Uses Prim's algorithm to calculate a Minimum Spanning Tree (MST) from link
- * weights,
- * enabling efficient shortest-path routing between nodes.
- * 
- * This class is thread-safe, with all public methods synchronized to ensure
- * consistent state when accessed from multiple threads.
- */
 public class RoutingTable {
 
-    /** The identifier of the local node that owns this routing table */
-    private final String localNodeId;
+  /** The identifier of the local node that owns this routing table */
+  private final String localNodeId;
 
-    /**
-     * Graph representation as adjacency list for all nodes and their connections
-     */
-    private final Map<String, List<Edge>> graph;
+  /** Graph representation as adjacency list for all nodes and their connections */
+  private final Map<String, List<Edge>> graph;
 
-    /** Minimum Spanning Tree calculator and storage */
-    private MinimumSpanningTree mst;
+  /** Minimum Spanning Tree calculator and storage */
+  private MinimumSpanningTree mst;
 
-    /** Cache for next hop lookups to improve performance */
-    private final Map<String, String> nextHopCache;
+  /** Cache for next hop lookups to improve performance */
+  private final Map<String, String> nextHopCache;
 
-    /**
-     * Constructs a new RoutingTable for the specified local node.
-     * 
-     * @param localNodeId the identifier of the local node
-     */
-    public RoutingTable(String localNodeId) {
-        this.localNodeId = localNodeId;
-        this.graph = new HashMap<>();
-        this.mst = null;
-        this.nextHopCache = new HashMap<>();
+  /**
+   * Constructs a new RoutingTable for the specified local node.
+   *
+   * @param localNodeId the identifier of the local node
+   */
+  public RoutingTable(String localNodeId) {
+    this.localNodeId = localNodeId;
+    this.graph = new HashMap<>();
+    this.mst = null;
+    this.nextHopCache = new HashMap<>();
+  }
+
+  /**
+   * Updates the routing table with new link weight information. Rebuilds the graph representation
+   * and recalculates the MST.
+   *
+   * @param linkWeights the new link weight information for the overlay
+   */
+  public synchronized void updateLinkWeights(LinkWeights linkWeights) {
+    clearAllData();
+    for (LinkWeights.LinkInfo link : linkWeights.getLinks()) {
+      addBidirectionalEdge(link.nodeA, link.nodeB, link.weight);
     }
 
-    /**
-     * Updates the routing table with new link weight information.
-     * Rebuilds the graph representation and recalculates the MST.
-     * 
-     * @param linkWeights the new link weight information for the overlay
-     */
-    public synchronized void updateLinkWeights(LinkWeights linkWeights) {
-        clearAllData();
-        for (LinkWeights.LinkInfo link : linkWeights.getLinks()) {
-            addBidirectionalEdge(link.nodeA, link.nodeB, link.weight);
-        }
+    calculateMST();
+  }
 
-        calculateMST();
+  /** Clears all internal data structures. */
+  private void clearAllData() {
+    graph.clear();
+    if (mst != null) {
+      mst.clear();
+    }
+    mst = null;
+    nextHopCache.clear();
+  }
+
+  /**
+   * Adds a bidirectional edge between two nodes in the graph.
+   *
+   * @param nodeA the first node
+   * @param nodeB the second node
+   * @param weight the weight of the edge
+   */
+  private void addBidirectionalEdge(String nodeA, String nodeB, int weight) {
+    graph.computeIfAbsent(nodeA, k -> new ArrayList<>()).add(new Edge(nodeB, weight));
+    graph.computeIfAbsent(nodeB, k -> new ArrayList<>()).add(new Edge(nodeA, weight));
+  }
+
+  /**
+   * Calculates the Minimum Spanning Tree using Prim's algorithm. Delegates to the
+   * MinimumSpanningTree class for the actual calculation.
+   */
+  private void calculateMST() {
+    mst = new MinimumSpanningTree(localNodeId, graph);
+    mst.calculate();
+  }
+
+  /**
+   * Finds the next hop to reach the specified destination node. Uses the MST to determine the
+   * shortest path and returns the immediate next node. Results are cached for improved performance
+   * on repeated lookups.
+   *
+   * @param destination the target node to reach
+   * @return the next hop node identifier, or null if no path exists
+   */
+  public synchronized String findNextHop(String destination) {
+    if (destination.equals(localNodeId)) {
+      return localNodeId;
     }
 
-    /**
-     * Clears all internal data structures.
-     */
-    private void clearAllData() {
-        graph.clear();
-        if (mst != null) {
-            mst.clear();
-        }
-        mst = null;
-        nextHopCache.clear();
+    String cachedNextHop = nextHopCache.get(destination);
+    if (cachedNextHop != null) {
+      return cachedNextHop;
     }
 
-    /**
-     * Adds a bidirectional edge between two nodes in the graph.
-     * 
-     * @param nodeA  the first node
-     * @param nodeB  the second node
-     * @param weight the weight of the edge
-     */
-    private void addBidirectionalEdge(String nodeA, String nodeB, int weight) {
-        graph.computeIfAbsent(nodeA, k -> new ArrayList<>())
-                .add(new Edge(nodeB, weight));
-        graph.computeIfAbsent(nodeB, k -> new ArrayList<>())
-                .add(new Edge(nodeA, weight));
+    if (mst == null) {
+      return null;
     }
 
-    /**
-     * Calculates the Minimum Spanning Tree using Prim's algorithm.
-     * Delegates to the MinimumSpanningTree class for the actual calculation.
-     */
-    private void calculateMST() {
-        mst = new MinimumSpanningTree(localNodeId, graph);
-        mst.calculate();
+    List<String> path = mst.findPathToRoot(destination);
+    if (path == null || path.isEmpty()) {
+      return null;
     }
 
-    /**
-     * Finds the next hop to reach the specified destination node.
-     * Uses the MST to determine the shortest path and returns the immediate next
-     * node.
-     * Results are cached for improved performance on repeated lookups.
-     * 
-     * @param destination the target node to reach
-     * @return the next hop node identifier, or null if no path exists
-     */
-    public synchronized String findNextHop(String destination) {
-        if (destination.equals(localNodeId)) {
-            return localNodeId;
-        }
+    String nextHop = path.get(path.size() - 1);
+    nextHopCache.put(destination, nextHop);
 
-        String cachedNextHop = nextHopCache.get(destination);
-        if (cachedNextHop != null) {
-            return cachedNextHop;
-        }
+    return nextHop;
+  }
 
-        if (mst == null) {
-            return null;
-        }
-
-        List<String> path = mst.findPathToRoot(destination);
-        if (path == null || path.isEmpty()) {
-            return null;
-        }
-
-        String nextHop = path.get(path.size() - 1);
-        nextHopCache.put(destination, nextHop);
-
-        return nextHop;
+  /**
+   * Prints the Minimum Spanning Tree in breadth-first order. Displays each edge as: parent, child,
+   * weight. Output starts from the local node as root.
+   */
+  public synchronized void printMST() {
+    if (mst == null || mst.isEmpty()) {
+      System.out.println("MST has not been calculated yet.");
+      return;
     }
+    mst.print();
+  }
 
-    /**
-     * Prints the Minimum Spanning Tree in breadth-first order.
-     * Displays each edge as: parent, child, weight.
-     * Output starts from the local node as root.
-     */
-    public synchronized void printMST() {
-        if (mst == null || mst.isEmpty()) {
-            System.out.println("MST has not been calculated yet.");
-            return;
-        }
-        mst.print();
+  /**
+   * Gets all edges in the Minimum Spanning Tree.
+   *
+   * @return a list of strings representing edges in format "parent, child, weight"
+   */
+  public synchronized List<String> getMSTEdges() {
+    if (mst == null) {
+      return new ArrayList<>();
     }
+    return mst.getFormattedEdges();
+  }
 
-    /**
-     * Gets all edges in the Minimum Spanning Tree.
-     * 
-     * @return a list of strings representing edges in format "parent, child,
-     *         weight"
-     */
-    public synchronized List<String> getMSTEdges() {
-        if (mst == null) {
-            return new ArrayList<>();
-        }
-        return mst.getFormattedEdges();
-    }
+  /**
+   * Clears the next hop cache. Useful when the network topology changes but link weights remain the
+   * same.
+   */
+  public synchronized void clearCache() {
+    nextHopCache.clear();
+  }
 
-    /**
-     * Clears the next hop cache.
-     * Useful when the network topology changes but link weights remain the same.
-     */
-    public synchronized void clearCache() {
-        nextHopCache.clear();
-    }
-
-    /**
-     * Checks if a path exists to the specified destination.
-     * 
-     * @param destination the target node to check
-     * @return true if a path exists, false otherwise
-     */
-    public synchronized boolean hasPath(String destination) {
-        return findNextHop(destination) != null;
-    }
+  /**
+   * Checks if a path exists to the specified destination.
+   *
+   * @param destination the target node to check
+   * @return true if a path exists, false otherwise
+   */
+  public synchronized boolean hasPath(String destination) {
+    return findNextHop(destination) != null;
+  }
 }

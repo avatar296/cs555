@@ -1,6 +1,7 @@
 plugins {
     id 'application'
     id 'java'
+    id 'com.diffplug.spotless' version '6.25.0'
 }
 
 // Set the Java version for the project to Java 11
@@ -25,6 +26,23 @@ test {
     testLogging {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
+    }
+}
+
+// Configure google-java-format via Spotless
+spotless {
+    java {
+        // Use Google Java Format version 1.19.2
+        googleJavaFormat('1.19.2')
+        
+        // Target all Java files in src directory
+        target 'src/**/*.java'
+        
+        // Remove unused imports
+        removeUnusedImports()
+        
+        // Format imports order
+        importOrder()
     }
 }
 
