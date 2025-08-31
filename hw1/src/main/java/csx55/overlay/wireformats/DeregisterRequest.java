@@ -5,11 +5,14 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /**
- * Request message sent by a node to deregister from the overlay network. Contains the node's IP
- * address and port number for identification. The registry validates this information before
+ * Request message sent by a node to deregister from the overlay network.
+ * Contains the node's IP
+ * address and port number for identification. The registry validates this
+ * information before
  * removing the node.
  *
- * <p>Wire format: - int: message type (DEREGISTER_REQUEST) - String: IP address of the node - int:
+ * Wire format: - int: message type (DEREGISTER_REQUEST) - String: IP address of
+ * the node - int:
  * port number of the node
  */
 public class DeregisterRequest extends AbstractEvent {
@@ -26,7 +29,7 @@ public class DeregisterRequest extends AbstractEvent {
   /**
    * Constructs a new DeregisterRequest.
    *
-   * @param ipAddress the IP address of the node
+   * @param ipAddress  the IP address of the node
    * @param portNumber the port number of the node
    */
   public DeregisterRequest(String ipAddress, int portNumber) {

@@ -10,11 +10,15 @@ import java.net.Socket;
 import java.net.SocketException;
 
 /**
- * Manages a TCP connection between nodes in the overlay network. Handles bidirectional
- * communication with automatic event deserialization and connection lifecycle management.
+ * Manages a TCP connection between nodes in the overlay network. Handles
+ * bidirectional
+ * communication with automatic event deserialization and connection lifecycle
+ * management.
  *
- * <p>This class provides thread-safe sending operations and uses a dedicated receiver thread for
- * handling incoming events. Connection loss is automatically detected and reported to the listener.
+ * This class provides thread-safe sending operations and uses a dedicated
+ * receiver thread for
+ * handling incoming events. Connection loss is automatically detected and
+ * reported to the listener.
  */
 public class TCPConnection {
 
@@ -26,14 +30,15 @@ public class TCPConnection {
   private volatile String remoteNodeId;
 
   /**
-   * Interface for handling TCP connection events. Implementations receive callbacks for incoming
+   * Interface for handling TCP connection events. Implementations receive
+   * callbacks for incoming
    * events and connection loss.
    */
   public interface TCPConnectionListener {
     /**
      * Called when an event is received on this connection.
      *
-     * @param event the received event
+     * @param event      the received event
      * @param connection the connection that received the event
      */
     void onEvent(Event event, TCPConnection connection);
@@ -47,10 +52,12 @@ public class TCPConnection {
   }
 
   /**
-   * Creates a new TCP connection using an existing socket. Initializes streams and starts the
-   * receiver thread. The remote node ID will be set later when identification is received.
+   * Creates a new TCP connection using an existing socket. Initializes streams
+   * and starts the
+   * receiver thread. The remote node ID will be set later when identification is
+   * received.
    *
-   * @param socket the socket for this connection
+   * @param socket   the socket for this connection
    * @param listener the listener for connection events
    * @throws IOException if stream initialization fails
    */
@@ -86,8 +93,8 @@ public class TCPConnection {
   /**
    * Creates a new TCP connection to the specified host and port.
    *
-   * @param host the hostname to connect to
-   * @param port the port number to connect to
+   * @param host     the hostname to connect to
+   * @param port     the port number to connect to
    * @param listener the listener for connection events
    * @throws IOException if connection fails
    */
@@ -96,43 +103,44 @@ public class TCPConnection {
   }
 
   /**
-   * Starts the receiver thread that continuously reads incoming events. The thread runs until the
+   * Starts the receiver thread that continuously reads incoming events. The
+   * thread runs until the
    * connection is closed or an error occurs.
    */
   private void startReceiver() {
-    receiverThread =
-        new Thread(
-            () -> {
-              EventFactory factory = EventFactory.getInstance();
+    receiverThread = new Thread(
+        () -> {
+          EventFactory factory = EventFactory.getInstance();
 
-              try {
-                while (!socket.isClosed()) {
-                  int dataLength = din.readInt();
-                  byte[] data = new byte[dataLength];
-                  din.readFully(data, 0, dataLength);
+          try {
+            while (!socket.isClosed()) {
+              int dataLength = din.readInt();
+              byte[] data = new byte[dataLength];
+              din.readFully(data, 0, dataLength);
 
-                  Event event = factory.createEvent(data);
+              Event event = factory.createEvent(data);
 
-                  if (listener != null) {
-                    listener.onEvent(event, this);
-                  }
-                }
-              } catch (SocketException e) {
-                LoggerUtil.debug("TCPConnection", "Socket closed for " + remoteNodeId);
-              } catch (IOException e) {
-                LoggerUtil.error("TCPConnection", "Error reading from " + remoteNodeId, e);
-              } finally {
-                if (listener != null) {
-                  listener.onConnectionLost(this);
-                }
-                closeQuietly();
+              if (listener != null) {
+                listener.onEvent(event, this);
               }
-            });
+            }
+          } catch (SocketException e) {
+            LoggerUtil.debug("TCPConnection", "Socket closed for " + remoteNodeId);
+          } catch (IOException e) {
+            LoggerUtil.error("TCPConnection", "Error reading from " + remoteNodeId, e);
+          } finally {
+            if (listener != null) {
+              listener.onConnectionLost(this);
+            }
+            closeQuietly();
+          }
+        });
     receiverThread.start();
   }
 
   /**
-   * Sends an event through this connection. This method is synchronized to ensure thread-safe
+   * Sends an event through this connection. This method is synchronized to ensure
+   * thread-safe
    * sending.
    *
    * @param event the event to send
@@ -178,7 +186,8 @@ public class TCPConnection {
   }
 
   /**
-   * Closes all resources quietly, suppressing any exceptions. Used for cleanup in error conditions.
+   * Closes all resources quietly, suppressing any exceptions. Used for cleanup in
+   * error conditions.
    */
   private synchronized void closeQuietly() {
     try {

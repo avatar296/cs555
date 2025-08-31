@@ -6,18 +6,22 @@ import csx55.overlay.util.StatisticsCollector;
 import csx55.overlay.wireformats.TrafficSummary;
 
 /**
- * Service responsible for collecting and displaying traffic statistics from messaging nodes.
- * Aggregates traffic summaries from all nodes and presents consolidated statistics after all nodes
+ * Service responsible for collecting and displaying traffic statistics from
+ * messaging nodes.
+ * Aggregates traffic summaries from all nodes and presents consolidated
+ * statistics after all nodes
  * have reported.
  *
- * <p>This service maintains thread-safe access to the statistics collector and handles the complete
+ * This service maintains thread-safe access to the statistics collector and
+ * handles the complete
  * statistics lifecycle.
  */
 public class StatisticsCollectionService {
   private volatile StatisticsCollector statsCollector;
 
   /**
-   * Resets the statistics collector with the expected number of nodes. Prepares the collector to
+   * Resets the statistics collector with the expected number of nodes. Prepares
+   * the collector to
    * receive summaries from all nodes.
    *
    * @param nodeCount the number of nodes expected to report statistics
@@ -27,10 +31,11 @@ public class StatisticsCollectionService {
   }
 
   /**
-   * Handles a traffic summary report from a messaging node. Adds the summary to the collector and
+   * Handles a traffic summary report from a messaging node. Adds the summary to
+   * the collector and
    * prints statistics when all nodes have reported.
    *
-   * @param summary the traffic summary from a node
+   * @param summary    the traffic summary from a node
    * @param connection the TCP connection from the reporting node
    */
   public synchronized void handleTrafficSummary(TrafficSummary summary, TCPConnection connection) {
@@ -49,7 +54,8 @@ public class StatisticsCollectionService {
   }
 
   /**
-   * Prints the final aggregated statistics to the console. Displays the summary after all nodes
+   * Prints the final aggregated statistics to the console. Displays the summary
+   * after all nodes
    * have reported their traffic.
    */
   private void printFinalStatistics() {

@@ -5,11 +5,14 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /**
- * Represents a data message routed through the overlay network. Contains a payload that is
- * transmitted from a source node to a destination (sink) node, potentially through intermediate
+ * Represents a data message routed through the overlay network. Contains a
+ * payload that is
+ * transmitted from a source node to a destination (sink) node, potentially
+ * through intermediate
  * relay nodes.
  *
- * <p>Wire format: - int: message type (DATA_MESSAGE) - String: source node ID - String: sink node
+ * Wire format: - int: message type (DATA_MESSAGE) - String: source node ID -
+ * String: sink node
  * ID - int: payload value
  */
 public class DataMessage extends AbstractEvent {
@@ -30,8 +33,8 @@ public class DataMessage extends AbstractEvent {
    * Constructs a new DataMessage.
    *
    * @param sourceNodeId the identifier of the source node
-   * @param sinkNodeId the identifier of the destination node
-   * @param payload the data payload to transmit
+   * @param sinkNodeId   the identifier of the destination node
+   * @param payload      the data payload to transmit
    */
   public DataMessage(String sourceNodeId, String sinkNodeId, int payload) {
     this.sourceNodeId = sourceNodeId;

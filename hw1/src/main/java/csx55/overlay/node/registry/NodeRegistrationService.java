@@ -12,11 +12,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Service responsible for managing node registration and deregistration in the overlay network.
- * Maintains a registry of all active nodes, validates registration requests, and handles connection
+ * Service responsible for managing node registration and deregistration in the
+ * overlay network.
+ * Maintains a registry of all active nodes, validates registration requests,
+ * and handles connection
  * lifecycle events.
  *
- * <p>This service ensures proper validation of node identities and manages the synchronized access
+ * This service ensures proper validation of node identities and manages the
+ * synchronized access
  * to the registered nodes collection.
  */
 public class NodeRegistrationService {
@@ -44,18 +47,20 @@ public class NodeRegistrationService {
   }
 
   /**
-   * Handles a node registration request. Validates the request parameters including IP address and
-   * port, verifies the actual connection source, and adds the node to the registry.
+   * Handles a node registration request. Validates the request parameters
+   * including IP address and
+   * port, verifies the actual connection source, and adds the node to the
+   * registry.
    *
-   * @param request the registration request containing node information
+   * @param request    the registration request containing node information
    * @param connection the TCP connection from the requesting node
    * @throws IOException if an error occurs while sending the response
    */
   public void handleRegisterRequest(RegisterRequest request, TCPConnection connection)
       throws IOException {
     // Validate IP format
-    NodeValidationHelper.ValidationResult ipFormatResult =
-        NodeValidationHelper.validateIpFormat(request.getIpAddress());
+    NodeValidationHelper.ValidationResult ipFormatResult = NodeValidationHelper
+        .validateIpFormat(request.getIpAddress());
     if (!ipFormatResult.isSuccess()) {
       RegistrationResponseHelper.sendRegistrationFailure(
           connection, ipFormatResult.getErrorMessage());
@@ -63,29 +68,27 @@ public class NodeRegistrationService {
     }
 
     // Validate port
-    NodeValidationHelper.ValidationResult portResult =
-        NodeValidationHelper.validatePort(request.getPortNumber());
+    NodeValidationHelper.ValidationResult portResult = NodeValidationHelper.validatePort(request.getPortNumber());
     if (!portResult.isSuccess()) {
       RegistrationResponseHelper.sendRegistrationFailure(connection, portResult.getErrorMessage());
       return;
     }
 
     // Validate IP match
-    NodeValidationHelper.ValidationResult ipMatchResult =
-        NodeValidationHelper.validateIpMatch(request.getIpAddress(), connection.getSocket());
+    NodeValidationHelper.ValidationResult ipMatchResult = NodeValidationHelper.validateIpMatch(request.getIpAddress(),
+        connection.getSocket());
     if (!ipMatchResult.isSuccess()) {
       RegistrationResponseHelper.sendRegistrationFailure(
           connection, ipMatchResult.getErrorMessage());
       return;
     }
 
-    String nodeId =
-        NodeValidationHelper.createNodeId(request.getIpAddress(), request.getPortNumber());
+    String nodeId = NodeValidationHelper.createNodeId(request.getIpAddress(), request.getPortNumber());
 
     synchronized (registrationLock) {
       // Check if node already exists
-      NodeValidationHelper.ValidationResult existsResult =
-          NodeValidationHelper.validateNodeDoesNotExist(nodeId, registeredNodes);
+      NodeValidationHelper.ValidationResult existsResult = NodeValidationHelper.validateNodeDoesNotExist(nodeId,
+          registeredNodes);
       if (!existsResult.isSuccess()) {
         RegistrationResponseHelper.sendRegistrationFailure(
             connection, existsResult.getErrorMessage());
@@ -104,21 +107,21 @@ public class NodeRegistrationService {
   }
 
   /**
-   * Handles a node deregistration request. Validates the request, ensures no task is in progress,
+   * Handles a node deregistration request. Validates the request, ensures no task
+   * is in progress,
    * and removes the node from the registry.
    *
-   * @param request the deregistration request containing node information
+   * @param request    the deregistration request containing node information
    * @param connection the TCP connection from the requesting node
    * @throws IOException if an error occurs while sending the response
    */
   public void handleDeregisterRequest(DeregisterRequest request, TCPConnection connection)
       throws IOException {
-    String nodeId =
-        NodeValidationHelper.createNodeId(request.getIpAddress(), request.getPortNumber());
+    String nodeId = NodeValidationHelper.createNodeId(request.getIpAddress(), request.getPortNumber());
 
     // Validate IP match
-    NodeValidationHelper.ValidationResult ipMatchResult =
-        NodeValidationHelper.validateIpMatch(request.getIpAddress(), connection.getSocket());
+    NodeValidationHelper.ValidationResult ipMatchResult = NodeValidationHelper.validateIpMatch(request.getIpAddress(),
+        connection.getSocket());
     if (!ipMatchResult.isSuccess()) {
       RegistrationResponseHelper.sendDeregistrationFailure(connection, "IP mismatch");
       return;
@@ -132,8 +135,8 @@ public class NodeRegistrationService {
 
     synchronized (registrationLock) {
       // Check if node exists
-      NodeValidationHelper.ValidationResult existsResult =
-          NodeValidationHelper.validateNodeExists(nodeId, registeredNodes);
+      NodeValidationHelper.ValidationResult existsResult = NodeValidationHelper.validateNodeExists(nodeId,
+          registeredNodes);
       if (!existsResult.isSuccess()) {
         RegistrationResponseHelper.sendDeregistrationFailure(
             connection, existsResult.getErrorMessage());
@@ -159,7 +162,8 @@ public class NodeRegistrationService {
   }
 
   /**
-   * Lists all registered messaging nodes to the console. Displays each node's identifier (IP:port)
+   * Lists all registered messaging nodes to the console. Displays each node's
+   * identifier (IP:port)
    * or a message if no nodes are registered.
    */
   public void listMessagingNodes() {
@@ -198,7 +202,8 @@ public class NodeRegistrationService {
   }
 
   /**
-   * Handles the loss of a connection to a registered node. Removes the disconnected node from the
+   * Handles the loss of a connection to a registered node. Removes the
+   * disconnected node from the
    * registry and connections cache.
    *
    * @param lostConnection the connection that was lost

@@ -14,10 +14,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Service responsible for orchestrating messaging tasks across all nodes in the overlay. Manages
- * task initiation, monitors completion, and triggers statistics collection after task completion.
+ * Service responsible for orchestrating messaging tasks across all nodes in the
+ * overlay. Manages
+ * task initiation, monitors completion, and triggers statistics collection
+ * after task completion.
  *
- * <p>This service ensures coordinated task execution and handles the complete lifecycle from
+ * This service ensures coordinated task execution and handles the complete
+ * lifecycle from
  * initiation through statistics gathering.
  */
 public class TaskOrchestrationService {
@@ -34,9 +37,12 @@ public class TaskOrchestrationService {
   /**
    * Constructs a new TaskOrchestrationService.
    *
-   * @param registrationService the node registration service for accessing registered nodes
-   * @param statisticsService the statistics collection service for handling traffic summaries
-   * @param overlayService the overlay management service for checking overlay status
+   * @param registrationService the node registration service for accessing
+   *                            registered nodes
+   * @param statisticsService   the statistics collection service for handling
+   *                            traffic summaries
+   * @param overlayService      the overlay management service for checking
+   *                            overlay status
    */
   public TaskOrchestrationService(
       NodeRegistrationService registrationService,
@@ -48,7 +54,8 @@ public class TaskOrchestrationService {
   }
 
   /**
-   * Starts a messaging task with the specified number of rounds. Sends task initiation messages to
+   * Starts a messaging task with the specified number of rounds. Sends task
+   * initiation messages to
    * all registered nodes.
    *
    * @param numberOfRounds the number of rounds for the messaging task
@@ -98,9 +105,8 @@ public class TaskOrchestrationService {
             + " nodes");
 
     TaskInitiate message = new TaskInitiate(numberOfRounds);
-    int sent =
-        MessageRoutingHelper.broadcastToAllNodes(
-            registeredNodes, message, "initiating task with " + numberOfRounds + " rounds");
+    int sent = MessageRoutingHelper.broadcastToAllNodes(
+        registeredNodes, message, "initiating task with " + numberOfRounds + " rounds");
 
     if (sent > 0) {
       LoggerUtil.info("TaskOrchestration", "Task initiate messages sent to all " + sent + " nodes");
@@ -113,11 +119,12 @@ public class TaskOrchestrationService {
   }
 
   /**
-   * Handles a task completion notification from a node. Schedules statistics collection when all
+   * Handles a task completion notification from a node. Schedules statistics
+   * collection when all
    * nodes have completed.
    *
    * @param taskComplete the task completion message
-   * @param connection the TCP connection from the completing node
+   * @param connection   the TCP connection from the completing node
    */
   public synchronized void handleTaskComplete(TaskComplete taskComplete, TCPConnection connection) {
     String nodeId = taskComplete.getNodeIpAddress() + ":" + taskComplete.getNodePortNumber();
@@ -160,7 +167,8 @@ public class TaskOrchestrationService {
   }
 
   /**
-   * Requests traffic summaries from all registered nodes. Resets the statistics collector and sends
+   * Requests traffic summaries from all registered nodes. Resets the statistics
+   * collector and sends
    * pull requests to all nodes.
    */
   private void requestTrafficSummaries() {
@@ -170,9 +178,8 @@ public class TaskOrchestrationService {
 
     PullTrafficSummary message = new PullTrafficSummary();
 
-    int sent =
-        MessageRoutingHelper.broadcastToAllNodes(
-            registeredNodes, message, "requesting traffic summaries");
+    int sent = MessageRoutingHelper.broadcastToAllNodes(
+        registeredNodes, message, "requesting traffic summaries");
 
     if (sent == 0) {
       LoggerUtil.error("TaskOrchestration", "Failed to request traffic summaries from nodes");
@@ -180,7 +187,8 @@ public class TaskOrchestrationService {
   }
 
   /**
-   * Handles when a participant node disconnects during a task. Updates the participant list and
+   * Handles when a participant node disconnects during a task. Updates the
+   * participant list and
    * checks if task can still complete.
    *
    * @param nodeId the ID of the disconnected node
@@ -227,7 +235,10 @@ public class TaskOrchestrationService {
     return taskInProgress;
   }
 
-  /** Shuts down the task orchestration service. Properly terminates the scheduler thread pool. */
+  /**
+   * Shuts down the task orchestration service. Properly terminates the scheduler
+   * thread pool.
+   */
   public void shutdown() {
     scheduler.shutdown();
     try {

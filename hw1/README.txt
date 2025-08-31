@@ -23,7 +23,7 @@ File Structure:
 - csx55.overlay.node: Main components (Registry, MessagingNode)
 - csx55.overlay.wireformats: Message types and protocol definitions
 - csx55.overlay.transport: TCP connection management
-- csx55.overlay.routing: MST routing implementation
+- csx55.overlay.spanning: MST routing implementation
 - csx55.overlay.util: Utility classes for overlay creation and statistics
 
 Implementation Notes:

@@ -5,11 +5,14 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /**
- * Response message sent by the registry after processing a deregistration request. Contains a
- * status code indicating success or failure and additional information about the deregistration
+ * Response message sent by the registry after processing a deregistration
+ * request. Contains a
+ * status code indicating success or failure and additional information about
+ * the deregistration
  * result.
  *
- * <p>Wire format: - int: message type (DEREGISTER_RESPONSE) - byte: status code (1 for success, 0
+ * Wire format: - int: message type (DEREGISTER_RESPONSE) - byte: status code (1
+ * for success, 0
  * for failure) - String: additional information or error message
  */
 public class DeregisterResponse extends AbstractEvent {
@@ -26,7 +29,7 @@ public class DeregisterResponse extends AbstractEvent {
   /**
    * Constructs a new DeregisterResponse.
    *
-   * @param statusCode the status code (1 for success, 0 for failure)
+   * @param statusCode     the status code (1 for success, 0 for failure)
    * @param additionalInfo additional information or error message
    */
   public DeregisterResponse(byte statusCode, String additionalInfo) {

@@ -1,4 +1,4 @@
-package csx55.overlay.routing;
+package csx55.overlay.spanning;
 
 import csx55.overlay.util.LoggerUtil;
 import java.util.*;

@@ -4,10 +4,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Thread-safe cache for managing multiple TCP connections. Provides centralized storage and
+ * Thread-safe cache for managing multiple TCP connections. Provides centralized
+ * storage and
  * management of connections to various nodes in the overlay network.
  *
- * <p>This class uses a ConcurrentHashMap for thread-safe operations and provides utilities for
+ * This class uses a ConcurrentHashMap for thread-safe operations and provides
+ * utilities for
  * connection lifecycle management including cleanup of dead connections.
  */
 public class TCPConnectionsCache {
@@ -15,7 +17,10 @@ public class TCPConnectionsCache {
   /** Thread-safe map of node IDs to their TCP connections */
   private final Map<String, TCPConnection> connections;
 
-  /** Constructs a new TCPConnectionsCache. Initializes with an empty concurrent hash map. */
+  /**
+   * Constructs a new TCPConnectionsCache. Initializes with an empty concurrent
+   * hash map.
+   */
   public TCPConnectionsCache() {
     this.connections = new ConcurrentHashMap<>();
   }
@@ -23,7 +28,7 @@ public class TCPConnectionsCache {
   /**
    * Adds a connection to the cache.
    *
-   * @param nodeId the identifier of the remote node
+   * @param nodeId     the identifier of the remote node
    * @param connection the TCP connection to cache
    */
   public void addConnection(String nodeId, TCPConnection connection) {
@@ -82,7 +87,8 @@ public class TCPConnectionsCache {
   }
 
   /**
-   * Closes all connections and clears the cache. This method is synchronized to ensure proper
+   * Closes all connections and clears the cache. This method is synchronized to
+   * ensure proper
    * cleanup.
    */
   public synchronized void closeAll() {
@@ -93,7 +99,8 @@ public class TCPConnectionsCache {
   }
 
   /**
-   * Removes all inactive connections from the cache. Useful for periodic maintenance to prevent
+   * Removes all inactive connections from the cache. Useful for periodic
+   * maintenance to prevent
    * memory leaks.
    */
   public void cleanupDeadConnections() {

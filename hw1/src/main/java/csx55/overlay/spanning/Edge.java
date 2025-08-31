@@ -1,4 +1,4 @@
-package csx55.overlay.routing;
+package csx55.overlay.spanning;
 
 /**
  * Represents an edge in the overlay network graph. An edge consists of a destination node and the

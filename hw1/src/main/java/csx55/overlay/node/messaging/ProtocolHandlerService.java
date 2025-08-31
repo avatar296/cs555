@@ -1,6 +1,6 @@
 package csx55.overlay.node.messaging;
 
-import csx55.overlay.routing.RoutingTable;
+import csx55.overlay.spanning.RoutingTable;
 import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
 import csx55.overlay.util.LoggerUtil;

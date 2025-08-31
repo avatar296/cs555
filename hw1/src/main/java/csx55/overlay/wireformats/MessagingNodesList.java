@@ -8,11 +8,15 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Message containing a list of peer nodes that a messaging node should connect to. Sent by the
- * registry after overlay setup to instruct each node which peers to establish connections with
+ * Message containing a list of peer nodes that a messaging node should connect
+ * to. Sent by the
+ * registry after overlay setup to instruct each node which peers to establish
+ * connections with
  * based on the overlay topology.
  *
- * <p>Wire format: - int: message type (MESSAGING_NODES_LIST) - int: number of peer nodes - For each
+ *
+ * Wire format: - int: message type (MESSAGING_NODES_LIST) - int: number of peer
+ * nodes - For each
  * peer: String containing node identifier (IP:port)
  */
 public class MessagingNodesList extends AbstractEvent {
@@ -91,7 +95,8 @@ public class MessagingNodesList extends AbstractEvent {
   }
 
   /**
-   * Gets the list of peer node identifiers. Each identifier is in the format "IP:port".
+   * Gets the list of peer node identifiers. Each identifier is in the format
+   * "IP:port".
    *
    * @return the list of peer node identifiers
    */

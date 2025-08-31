@@ -1,4 +1,4 @@
-package csx55.overlay.routing;
+package csx55.overlay.spanning;
 
 import csx55.overlay.wireformats.LinkWeights;
 import java.util.*;
