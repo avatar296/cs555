@@ -3,13 +3,16 @@ package csx55.overlay.util;
 import java.util.*;
 
 /**
- * Utility class for creating overlay network topologies. Generates k-regular graphs where each node
- * has exactly k connections, ensuring network connectivity and balanced load distribution.
+ * Utility class for creating overlay network topologies. Generates k-regular
+ * graphs where each node
+ * has exactly k connections, ensuring network connectivity and balanced load
+ * distribution.
  */
 public class OverlayCreator {
 
   /**
-   * Represents a complete connection plan for the overlay network. Contains both the adjacency
+   * Represents a complete connection plan for the overlay network. Contains both
+   * the adjacency
    * information and the weighted links.
    */
   public static class ConnectionPlan {
@@ -65,8 +68,8 @@ public class OverlayCreator {
     /**
      * Constructs a link with specified weight.
      *
-     * @param nodeA first node identifier
-     * @param nodeB second node identifier
+     * @param nodeA  first node identifier
+     * @param nodeB  second node identifier
      * @param weight the weight of the link
      */
     public Link(String nodeA, String nodeB, int weight) {
@@ -100,14 +103,18 @@ public class OverlayCreator {
   }
 
   /**
-   * Creates an overlay network with the specified connection requirement. Builds a k-regular graph
-   * where each node has exactly k connections. Uses a ring-based approach with nearest neighbor
+   * Creates an overlay network with the specified connection requirement. Builds
+   * a k-regular graph
+   * where each node has exactly k connections. Uses a ring-based approach with
+   * nearest neighbor
    * connections.
    *
-   * @param nodeIds list of node identifiers to include in the overlay
+   * @param nodeIds               list of node identifiers to include in the
+   *                              overlay
    * @param connectionRequirement number of connections each node should have
    * @return a ConnectionPlan containing the overlay topology
-   * @throws IllegalArgumentException if parameters make overlay creation impossible
+   * @throws IllegalArgumentException if parameters make overlay creation
+   *                                  impossible
    */
   public static ConnectionPlan createOverlay(List<String> nodeIds, int connectionRequirement) {
     if (nodeIds.size() <= connectionRequirement) {
@@ -128,17 +135,6 @@ public class OverlayCreator {
 
     if (totalEdgesNeeded > maxPossibleEdges) {
       throw new IllegalArgumentException("Impossible to create overlay with given parameters");
-    }
-
-    if ((nodeIds.size() * connectionRequirement) % 2 != 0) {
-      LoggerUtil.warn(
-          "OverlayCreator",
-          "Configuration ("
-              + nodeIds.size()
-              + " nodes, CR="
-              + connectionRequirement
-              + ") is not ideal. "
-              + "A perfect regular graph cannot be formed.");
     }
 
     ConnectionPlan plan = new ConnectionPlan();
@@ -162,27 +158,25 @@ public class OverlayCreator {
     }
 
     if (connectionRequirement % 2 != 0) {
-      if (n % 2 == 0) {
-        for (int i = 0; i < n / 2; i++) {
-          String nodeA = nodeIds.get(i);
-          String nodeB = nodeIds.get(i + n / 2);
+      for (int i = 0; i < n / 2; i++) {
+        String nodeA = nodeIds.get(i);
+        String nodeB = nodeIds.get(i + n / 2);
 
-          if (!plan.nodeConnections.get(nodeA).contains(nodeB)) {
-            plan.nodeConnections.get(nodeA).add(nodeB);
-            plan.nodeConnections.get(nodeB).add(nodeA);
-            plan.allLinks.add(new Link(nodeA, nodeB));
-          }
+        if (!plan.nodeConnections.get(nodeA).contains(nodeB)) {
+          plan.nodeConnections.get(nodeA).add(nodeB);
+          plan.nodeConnections.get(nodeB).add(nodeA);
+          plan.allLinks.add(new Link(nodeA, nodeB));
         }
-      } else {
-        for (int i = 0; i < n; i++) {
-          String nodeA = nodeIds.get(i);
-          String nodeB = nodeIds.get((i + 1) % n);
+      }
 
-          if (!plan.nodeConnections.get(nodeA).contains(nodeB)) {
-            plan.nodeConnections.get(nodeA).add(nodeB);
-            plan.nodeConnections.get(nodeB).add(nodeA);
-            plan.allLinks.add(new Link(nodeA, nodeB));
-          }
+      if (n % 2 != 0) {
+        String lastNode = nodeIds.get(n - 1);
+        String pairNode = nodeIds.get(1);
+
+        if (!plan.nodeConnections.get(lastNode).contains(pairNode)) {
+          plan.nodeConnections.get(lastNode).add(pairNode);
+          plan.nodeConnections.get(pairNode).add(lastNode);
+          plan.allLinks.add(new Link(lastNode, pairNode));
         }
       }
     }
@@ -198,7 +192,8 @@ public class OverlayCreator {
   }
 
   /**
-   * Determines which nodes should initiate connections to avoid duplicates. For each link,
+   * Determines which nodes should initiate connections to avoid duplicates. For
+   * each link,
    * arbitrarily selects one node as the initiator.
    *
    * @param plan the connection plan to process
