@@ -4,200 +4,200 @@ import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.util.MessageRoutingHelper;
 import csx55.overlay.util.OverlayCreator;
+import csx55.overlay.util.OverlayCreator.Link;
 import csx55.overlay.wireformats.LinkWeights;
 import csx55.overlay.wireformats.MessagingNodesList;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * Service responsible for managing the overlay network topology and link weights. Handles overlay
- * setup with specified connection requirements, distributes peer lists to nodes, and manages link
- * weight assignments.
- *
- * <p>This service coordinates the creation of the overlay structure and ensures proper connectivity
- * between nodes based on the connection requirement.
+ * Registry-side overlay management service. Handles overlay construction, link weight assignment,
+ * and topology management. Integrates with OverlayCreator for topology construction and handles
+ * message broadcasting to all registered nodes.
  */
 public class OverlayManagementService {
-  private final NodeRegistrationService registrationService;
-  private volatile OverlayCreator.ConnectionPlan currentOverlay;
-  private volatile int connectionRequirement;
 
-  /**
-   * Constructs a new OverlayManagementService.
-   *
-   * @param registrationService the node registration service to use
-   */
+  private final NodeRegistrationService registrationService;
+  private OverlayCreator.ConnectionPlan currentOverlay;
+  private final Object overlayLock = new Object();
+
   public OverlayManagementService(NodeRegistrationService registrationService) {
     this.registrationService = registrationService;
   }
 
   /**
-   * Sets up the overlay network with the specified connection requirement. Creates the overlay
-   * topology and sends peer lists to all nodes.
+   * Sets up the overlay network with the specified connection requirement.
    *
-   * @param cr the connection requirement (number of connections per node)
+   * @param connectionRequirement number of connections per node
    */
-  public void setupOverlay(int cr) {
-    if (cr <= 0) {
+  public void setupOverlay(int connectionRequirement) {
+    Map<String, TCPConnection> nodes = registrationService.getRegisteredNodes();
+
+    if (nodes.size() < connectionRequirement + 1) {
       LoggerUtil.error(
-          "OverlayManagement", "Connection requirement must be greater than 0, received: " + cr);
+          "OverlayManagement",
+          "Insufficient nodes for overlay. Need at least "
+              + (connectionRequirement + 1)
+              + ", have "
+              + nodes.size());
+      System.out.println("Error: Not enough nodes registered for overlay");
       return;
     }
 
-    Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
+    List<String> nodeIds = new ArrayList<>(nodes.keySet());
 
-    synchronized (registeredNodes) {
-      if (registeredNodes.size() <= cr) {
-        LoggerUtil.error(
-            "OverlayManagement",
-            "Not enough nodes for CR="
-                + cr
-                + ". Need more than "
-                + cr
-                + " nodes, have "
-                + registeredNodes.size());
+    synchronized (overlayLock) {
+      currentOverlay = OverlayCreator.buildOverlay(nodeIds, connectionRequirement);
+    }
+
+    // Send peer lists to each node
+    Map<String, Set<String>> adjacency = currentOverlay.getAdjacency();
+    int totalConnections = 0;
+
+    for (Map.Entry<String, Set<String>> entry : adjacency.entrySet()) {
+      String nodeId = entry.getKey();
+      List<String> peers = new ArrayList<>(entry.getValue());
+      totalConnections += peers.size();
+
+      TCPConnection connection = nodes.get(nodeId);
+      if (connection != null) {
+        MessagingNodesList peerList = new MessagingNodesList(peers);
+        try {
+          connection.sendEvent(peerList);
+          LoggerUtil.debug("OverlayManagement", "Sent peer list to " + nodeId + ": " + peers);
+        } catch (IOException e) {
+          LoggerUtil.error("OverlayManagement", "Failed to send peer list to " + nodeId, e);
+        }
+      }
+    }
+
+    // Total connections in overlay (each connection counted from both ends, so divide by 2)
+    totalConnections /= 2;
+    LoggerUtil.info(
+        "OverlayManagement", "Overlay setup completed with " + totalConnections + " links");
+    System.out.println("Registry now has " + totalConnections + " links");
+  }
+
+  /** Sends link weights to all registered nodes (parameterless version called by Registry). */
+  public void sendOverlayLinkWeights() {
+    synchronized (overlayLock) {
+      if (currentOverlay == null) {
+        LoggerUtil.error("OverlayManagement", "Overlay has not been set up. Cannot send weights.");
+        System.out.println("Error: Overlay must be setup before sending weights");
+        return;
+      }
+      sendOverlayLinkWeights(currentOverlay);
+    }
+  }
+
+  /** Lists all link weights in the current overlay. */
+  public void listWeights() {
+    synchronized (overlayLock) {
+      if (currentOverlay == null || currentOverlay.getUniqueLinks().isEmpty()) {
+        System.out.println("No weights available - overlay not setup or no links exist");
         return;
       }
 
-      connectionRequirement = cr;
-
-      List<String> nodeIds = new ArrayList<>(registeredNodes.keySet());
-      LoggerUtil.info("OverlayManagement", "Creating overlay with nodes: " + nodeIds);
-      currentOverlay = OverlayCreator.createOverlay(nodeIds, cr);
-      LoggerUtil.info(
-          "OverlayManagement",
-          "Created overlay with " + currentOverlay.getAllLinks().size() + " links");
-
-      Map<String, List<String>> initiators =
-          OverlayCreator.determineConnectionInitiators(currentOverlay);
-
-      for (String nodeId : nodeIds) {
-        List<String> peers = initiators.getOrDefault(nodeId, new ArrayList<>());
-        TCPConnection connection = registeredNodes.get(nodeId);
-        if (connection != null) {
-          MessagingNodesList message = new MessagingNodesList(peers);
-          MessageRoutingHelper.sendEventSafely(
-              connection, message, String.format("sending peer list to %s", nodeId));
-        }
+      // Print weights in same format as when broadcasting
+      List<LinkWeights.LinkInfo> linkInfos = convertToLinkInfos(currentOverlay.getUniqueLinks());
+      for (LinkWeights.LinkInfo linkInfo : linkInfos) {
+        System.out.println(linkInfo.nodeA + " , " + linkInfo.nodeB + ",  " + linkInfo.weight);
       }
+    }
+  }
 
+  /**
+   * Accept a ConnectionPlan (from OverlayCreator) and send Link_Weights to all registered nodes.
+   * This method will deduplicate undirected edges and ensure weights are in 1..10.
+   */
+  public void sendOverlayLinkWeights(OverlayCreator.ConnectionPlan plan) {
+    if (plan == null) throw new IllegalArgumentException("plan null");
+
+    // Convert Links to LinkInfos
+    List<LinkWeights.LinkInfo> linkInfos = convertToLinkInfos(plan.getUniqueLinks());
+
+    LoggerUtil.info("OverlayManagement", "Broadcasting " + linkInfos.size() + " link weights");
+
+    // Broadcast to all nodes
+    broadcastLinkWeightsToNodes(linkInfos);
+
+    System.out.println("link weights sent");
+  }
+
+  /** Converts OverlayCreator.Link objects to LinkWeights.LinkInfo objects. */
+  private List<LinkWeights.LinkInfo> convertToLinkInfos(Set<Link> links) {
+    return links.stream()
+        .map(link -> new LinkWeights.LinkInfo(link.getNodeA(), link.getNodeB(), link.getWeight()))
+        .collect(Collectors.toList());
+  }
+
+  /** Broadcasts link weights to all registered nodes. */
+  private void broadcastLinkWeightsToNodes(List<LinkWeights.LinkInfo> linkInfos) {
+    Map<String, TCPConnection> nodes = registrationService.getRegisteredNodes();
+    LinkWeights linkWeights = new LinkWeights(linkInfos);
+
+    int successfulSends =
+        MessageRoutingHelper.broadcastToAllNodes(nodes, linkWeights, "broadcasting link weights");
+
+    if (successfulSends > 0) {
       LoggerUtil.info(
-          "OverlayManagement",
-          "Overlay setup completed with CR=" + connectionRequirement + " connections per node");
-      System.out.println("setup completed with " + connectionRequirement + " connections");
+          "OverlayManagement", "Successfully sent link weights to " + successfulSends + " nodes");
+    } else {
+      LoggerUtil.error("OverlayManagement", "Failed to send link weights to any nodes");
     }
   }
 
   /**
-   * Sends overlay link weights to all registered nodes. Distributes the weighted link information
-   * needed for routing decisions.
-   */
-  public void sendOverlayLinkWeights() {
-    if (currentOverlay == null || currentOverlay.getAllLinks().isEmpty()) {
-      LoggerUtil.error("OverlayManagement", "Overlay has not been set up. Cannot send weights.");
-      return;
-    }
-
-    Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
-
-    List<LinkWeights.LinkInfo> linkInfos = new ArrayList<>();
-
-    for (OverlayCreator.Link link : currentOverlay.getAllLinks()) {
-      LinkWeights.LinkInfo linkInfo =
-          new LinkWeights.LinkInfo(link.nodeA, link.nodeB, link.getWeight());
-      linkInfos.add(linkInfo);
-    }
-
-    LinkWeights message = new LinkWeights(linkInfos);
-    int sent =
-        MessageRoutingHelper.broadcastToAllNodes(registeredNodes, message, "sending link weights");
-    if (sent > 0) {
-      LoggerUtil.info("OverlayManagement", "Link weights successfully assigned to all nodes");
-      System.out.println("link weights assigned");
-    }
-  }
-
-  /**
-   * Lists all link weights in the current overlay to the console. Displays each link with its
-   * associated weight. After dynamic reconstruction, all links in currentOverlay are valid.
-   */
-  public void listWeights() {
-    if (currentOverlay == null || currentOverlay.getAllLinks().isEmpty()) {
-      LoggerUtil.warn("OverlayManagement", "No overlay has been configured to list weights");
-      System.out.println("ERROR: No overlay configured");
-      return;
-    }
-
-    LoggerUtil.info(
-        "OverlayManagement", "Listing " + currentOverlay.getAllLinks().size() + " overlay links");
-
-    for (OverlayCreator.Link link : currentOverlay.getAllLinks()) {
-      String output = link.toString();
-      LoggerUtil.info("OverlayManagement", "Link output: '" + output + "'");
-      System.out.println(output);
-    }
-  }
-
-  /**
-   * Checks if the overlay has been set up.
+   * Gets the current overlay plan.
    *
-   * @return true if overlay is configured, false otherwise
-   */
-  public boolean isOverlaySetup() {
-    return currentOverlay != null && !currentOverlay.getAllLinks().isEmpty();
-  }
-
-  /**
-   * Gets the current overlay connection plan.
-   *
-   * @return the current overlay structure, or null if not configured
+   * @return the current overlay connection plan, or null if not setup
    */
   public OverlayCreator.ConnectionPlan getCurrentOverlay() {
-    return currentOverlay;
+    synchronized (overlayLock) {
+      return currentOverlay;
+    }
   }
 
   /**
-   * Gets the connection requirement for the overlay.
+   * Checks if the overlay network is currently set up.
    *
-   * @return the number of connections per node
+   * @return true if overlay is setup, false otherwise
    */
-  public int getConnectionRequirement() {
-    return connectionRequirement;
+  public boolean isOverlaySetup() {
+    synchronized (overlayLock) {
+      return currentOverlay != null;
+    }
   }
 
   /**
-   * Rebuilds the overlay network for the current set of registered nodes. This method is called
-   * when nodes disconnect to maintain the proper overlay topology and connection requirements.
+   * Rebuilds the overlay network with the same connection requirement as before. This is used when
+   * nodes disconnect and the overlay needs to be reconstructed.
    */
   public void rebuildOverlay() {
-    Map<String, TCPConnection> currentNodes = registrationService.getRegisteredNodes();
+    synchronized (overlayLock) {
+      if (currentOverlay == null) {
+        LoggerUtil.warn(
+            "OverlayManagement", "Cannot rebuild overlay - no overlay was previously setup");
+        return;
+      }
 
-    if (currentNodes.size() <= connectionRequirement) {
-      LoggerUtil.warn(
-          "OverlayManagement",
-          "Too few nodes remaining for CR="
-              + connectionRequirement
-              + ". Need more than "
-              + connectionRequirement
-              + " nodes, have "
-              + currentNodes.size());
-      return;
+      // Extract the connection requirement from current overlay
+      Map<String, Set<String>> adjacency = currentOverlay.getAdjacency();
+      if (adjacency.isEmpty()) {
+        LoggerUtil.warn("OverlayManagement", "Cannot rebuild overlay - no adjacency data");
+        return;
+      }
+
+      // Calculate average connection requirement (should be consistent)
+      int connectionRequirement =
+          adjacency.values().stream()
+              .mapToInt(Set::size)
+              .max()
+              .orElse(4); // fallback to 4 if no data
+
+      LoggerUtil.info("OverlayManagement", "Rebuilding overlay with CR=" + connectionRequirement);
+      setupOverlay(connectionRequirement);
     }
-
-    // Rebuild overlay with remaining nodes
-    List<String> remainingNodeIds = new ArrayList<>(currentNodes.keySet());
-    LoggerUtil.info(
-        "OverlayManagement", "Rebuilding overlay for remaining nodes: " + remainingNodeIds);
-
-    currentOverlay = OverlayCreator.createOverlay(remainingNodeIds, connectionRequirement);
-
-    LoggerUtil.info(
-        "OverlayManagement",
-        "Rebuilt overlay: "
-            + remainingNodeIds.size()
-            + " nodes, "
-            + currentOverlay.getAllLinks().size()
-            + " links");
   }
 }
