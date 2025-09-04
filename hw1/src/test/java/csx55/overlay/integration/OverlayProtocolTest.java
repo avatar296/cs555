@@ -110,7 +110,6 @@ public class OverlayProtocolTest {
           .as("Node " + nodeId + " should output 'All connections are established' message")
           .isTrue();
 
-      // Verify connection count is reasonable
       if (connectionCount >= 0) {
         assertThat(connectionCount)
             .as("Node " + nodeId + " should have between 0 and CR connections")
@@ -118,15 +117,10 @@ public class OverlayProtocolTest {
       }
     }
 
-    // Verify all nodes reported connections
     assertThat(nodesWithConnections)
         .as("All nodes should report their connection status")
         .isEqualTo(NODE_COUNT);
 
-    // Verify total connections make sense
-    // In a directed graph, total edges = N * CR, but some nodes may have fewer if
-    // they receive connections
-    // The sum of all connection counts should equal the total number of edges
     assertThat(totalConnectionCount)
         .as(
             "Total connection count across all nodes should be reasonable for CR="
@@ -413,22 +407,20 @@ public class OverlayProtocolTest {
   }
 
   /**
-   * Tests link weight uniqueness requirement (Section 2.4). Verifies that each link has a unique
-   * weight value as specified in the PDF.
+   * Tests link weight assignment validity (Section 2.4). Verifies that weights are properly
+   * assigned in the 1-10 range as specified in the PDF.
    *
    * @throws Exception if test execution fails
    */
   @Test
   @Order(8)
-  @DisplayName("Test link weight uniqueness requirement (Section 2.4)")
-  void testLinkWeightUniqueness() throws Exception {
+  @DisplayName("Test link weight assignment validity (Section 2.4)")
+  void testLinkWeightAssignmentValidity() throws Exception {
     orchestrator.clearOutputs();
 
-    // Setup overlay
     orchestrator.sendRegistryCommand("setup-overlay " + CONNECTION_REQUIREMENT);
     Thread.sleep(3000);
 
-    // Send and list weights
     orchestrator.sendRegistryCommand("send-overlay-link-weights");
     Thread.sleep(2000);
 
@@ -437,8 +429,6 @@ public class OverlayProtocolTest {
 
     List<String> output = orchestrator.getRegistryOutput();
 
-    // Collect all weights
-    Set<Integer> uniqueWeights = new HashSet<>();
     List<Integer> allWeights = new ArrayList<>();
 
     Pattern weightPattern =
@@ -450,14 +440,14 @@ public class OverlayProtocolTest {
       if (matcher.find()) {
         int weight = Integer.parseInt(matcher.group(1));
         allWeights.add(weight);
-        uniqueWeights.add(weight);
+
+        // Verify each weight is in valid range (1-10 as per PDF)
+        assertThat(weight).as("Link weight should be between 1 and 10").isBetween(1, 10);
       }
     }
 
-    // PDF specifies that each link should have a unique weight
-    assertThat(uniqueWeights.size())
-        .as("All link weights should be unique")
-        .isEqualTo(allWeights.size());
+    // PDF specifies random weights 1-10, no uniqueness requirement
+    assertThat(allWeights).as("Should have weights assigned to all links").isNotEmpty();
   }
 
   /**
@@ -526,11 +516,9 @@ public class OverlayProtocolTest {
 
     orchestrator.clearOutputs();
 
-    // Try to send weights without overlay setup
     orchestrator.sendRegistryCommand("send-overlay-link-weights");
     Thread.sleep(2000);
 
-    // Should get an error or no weights sent
     List<String> output = orchestrator.getRegistryOutput();
 
     boolean errorFound = false;

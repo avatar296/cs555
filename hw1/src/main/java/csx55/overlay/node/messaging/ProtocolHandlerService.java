@@ -112,7 +112,8 @@ public class ProtocolHandlerService {
         try {
           socket.close();
         } catch (IOException closeException) {
-          LoggerUtil.warn("ProtocolHandler", "Failed to close socket after connection error", closeException);
+          LoggerUtil.warn(
+              "ProtocolHandler", "Failed to close socket after connection error", closeException);
         }
         throw e;
       }

@@ -27,15 +27,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Represents a messaging node in the overlay network. Handles message routing,
- * peer connections,
- * and communication with the registry. Implements the TCPConnectionListener
- * interface to handle
+ * Represents a messaging node in the overlay network. Handles message routing, peer connections,
+ * and communication with the registry. Implements the TCPConnectionListener interface to handle
  * network events.
  *
- * <p>
- * This node can send, receive, and relay messages through the overlay network
- * using shortest
+ * <p>This node can send, receive, and relay messages through the overlay network using shortest
  * path routing based on link weights.
  */
 public class MessagingNode implements TCPConnection.TCPConnectionListener {
@@ -65,8 +61,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
   }
 
   /**
-   * Starts the messaging node and connects to the registry. Initializes server
-   * socket, registers
+   * Starts the messaging node and connects to the registry. Initializes server socket, registers
    * with the registry, and starts listening for peer connections.
    *
    * @param registryHost the hostname of the registry
@@ -90,7 +85,8 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
         try {
           socket.close();
         } catch (IOException closeException) {
-          LoggerUtil.warn("MessagingNode", "Failed to close socket after connection error", closeException);
+          LoggerUtil.warn(
+              "MessagingNode", "Failed to close socket after connection error", closeException);
         }
         throw e;
       }
@@ -125,8 +121,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
   }
 
   /**
-   * Performs cleanup operations when the node is shutting down. Closes all
-   * connections, stops
+   * Performs cleanup operations when the node is shutting down. Closes all connections, stops
    * services, and releases resources.
    */
   private void cleanup() {
@@ -153,11 +148,10 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
   }
 
   /**
-   * Handles incoming events from the network. Processes various protocol messages
-   * and delegates to
+   * Handles incoming events from the network. Processes various protocol messages and delegates to
    * appropriate services.
    *
-   * @param event      the event received from the network
+   * @param event the event received from the network
    * @param connection the TCP connection that received the event
    */
   @Override
@@ -205,8 +199,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
   }
 
   /**
-   * Handles lost connections to the registry or peer nodes. Shuts down if
-   * registry connection is
+   * Handles lost connections to the registry or peer nodes. Shuts down if registry connection is
    * lost, otherwise removes peer from cache.
    *
    * @param connection the TCP connection that was lost
@@ -231,8 +224,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
   }
 
   /**
-   * Deregisters this node from the overlay network. Sends a deregistration
-   * request to the registry.
+   * Deregisters this node from the overlay network. Sends a deregistration request to the registry.
    */
   public void deregister() {
     try {
@@ -244,8 +236,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
   }
 
   /**
-   * Prints the minimum spanning tree from this node's perspective. Shows the
-   * shortest paths to all
+   * Prints the minimum spanning tree from this node's perspective. Shows the shortest paths to all
    * other nodes in the overlay.
    */
   public void printMinimumSpanningTree() {

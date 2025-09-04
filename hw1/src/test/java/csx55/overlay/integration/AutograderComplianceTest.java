@@ -1,11 +1,11 @@
 package csx55.overlay.integration;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import csx55.overlay.node.registry.NodeRegistrationService;
 import csx55.overlay.node.registry.OverlayManagementService;
 import csx55.overlay.transport.TCPConnection;
-import csx55.overlay.transport.TCPConnectionsCache;
 import csx55.overlay.util.OverlayCreator;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -16,11 +16,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import static org.mockito.Mockito.*;
 
 /**
- * Integration tests that specifically target autograder compliance issues.
- * These tests replicate the exact scenarios that caused the 4/10 score.
+ * Integration tests that specifically target autograder compliance issues. These tests replicate
+ * the exact scenarios that caused the 4/10 score.
  */
 public class AutograderComplianceTest {
 
@@ -34,9 +33,9 @@ public class AutograderComplianceTest {
   @BeforeEach
   public void setUp() {
     MockitoAnnotations.openMocks(this);
-    
+
     overlayService = new OverlayManagementService(mockRegistrationService);
-    
+
     // Capture System.out for output verification
     originalOut = System.out;
     outputCapture = new ByteArrayOutputStream();
@@ -49,15 +48,15 @@ public class AutograderComplianceTest {
   }
 
   /**
-   * Test the exact autograder scenario: 12 nodes dropping to 10.
-   * This addresses the critical connection stability issue.
+   * Test the exact autograder scenario: 12 nodes dropping to 10. This addresses the critical
+   * connection stability issue.
    */
   @Test
   public void testTwelveNodeStabilityScenario() {
     // Simulate the exact node list from autograder feedback
     String[] autograderNodes = {
       "129.82.44.145:37701", "129.82.44.164:46595", "129.82.44.135:37421",
-      "129.82.44.131:34907", "129.82.44.133:46237", "129.82.44.136:33073", 
+      "129.82.44.131:34907", "129.82.44.133:46237", "129.82.44.136:33073",
       "129.82.44.138:43253", "129.82.44.134:46555", "129.82.44.171:39117",
       "129.82.44.168:44715", "129.82.44.160:33373", "129.82.44.140:38255"
     };
@@ -85,14 +84,14 @@ public class AutograderComplianceTest {
   }
 
   /**
-   * Test the exact list-weights output format that autograder expects.
-   * This addresses the "Missing ip address in list-weights output" error.
+   * Test the exact list-weights output format that autograder expects. This addresses the "Missing
+   * ip address in list-weights output" error.
    */
   @Test
   public void testListWeightsAutograderFormat() {
     // Use subset of autograder nodes for cleaner test
     String[] testNodes = {
-      "129.82.44.145:37701", "129.82.44.164:46595", 
+      "129.82.44.145:37701", "129.82.44.164:46595",
       "129.82.44.135:37421", "129.82.44.131:34907"
     };
 
@@ -105,7 +104,7 @@ public class AutograderComplianceTest {
 
     // Setup and test list-weights
     overlayService.setupOverlay(2);
-    
+
     // Clear previous output
     outputCapture.reset();
     overlayService.listWeights();
@@ -117,12 +116,13 @@ public class AutograderComplianceTest {
     assertThat(output).contains("129.82.44.145");
     assertThat(output).contains("129.82.44.164");
 
-    // 2. Must contain port numbers  
+    // 2. Must contain port numbers
     assertThat(output).contains("37701");
     assertThat(output).contains("46595");
 
     // 3. Must have proper format: "nodeA, nodeB, weight"
-    assertThat(output).containsPattern("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+");
+    assertThat(output)
+        .containsPattern("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+");
 
     // 4. Must not be empty or error
     assertThat(output).doesNotContain("ERROR");
@@ -130,19 +130,19 @@ public class AutograderComplianceTest {
   }
 
   /**
-   * Test OverlayCreator Link toString() method directly.
-   * This verifies the root cause fix for output formatting.
+   * Test OverlayCreator Link toString() method directly. This verifies the root cause fix for
+   * output formatting.
    */
   @Test
   public void testLinkToStringDirectly() {
     String nodeA = "129.82.44.145:37701";
     String nodeB = "129.82.44.164:46595";
-    
+
     OverlayCreator.Link link = new OverlayCreator.Link(nodeA, nodeB);
     link.setWeight(3);
 
     String output = link.toString();
-    
+
     // Must match exact autograder expectation
     assertThat(output).isEqualTo("129.82.44.145:37701, 129.82.44.164:46595, 3");
 
@@ -153,13 +153,13 @@ public class AutograderComplianceTest {
   }
 
   /**
-   * Test overlay creation with various connection requirements.
-   * Ensures CR parameter handling works correctly.
+   * Test overlay creation with various connection requirements. Ensures CR parameter handling works
+   * correctly.
    */
   @Test
   public void testConnectionRequirementVariations() {
     String[] nodes = {
-      "10.0.0.1:8001", "10.0.0.2:8002", "10.0.0.3:8003", 
+      "10.0.0.1:8001", "10.0.0.2:8002", "10.0.0.3:8003",
       "10.0.0.4:8004", "10.0.0.5:8005", "10.0.0.6:8006"
     };
 
@@ -172,47 +172,49 @@ public class AutograderComplianceTest {
 
     // Test different CR values
     int[] connectionRequirements = {1, 2, 3, 4};
-    
+
     for (int cr : connectionRequirements) {
       outputCapture.reset();
       overlayService.setupOverlay(cr);
-      
+
       String output = outputCapture.toString();
       assertThat(output).contains("setup completed with " + cr + " connections");
-      
+
       assertThat(overlayService.isOverlaySetup()).isTrue();
     }
   }
 
   /**
-   * Test that weight assignment is deterministic and starts from 1.
-   * This ensures consistent autograder results.
+   * Test that weight assignment follows PDF requirements. Validates random weight assignment in the
+   * 1-10 range as specified in the PDF.
    */
   @Test
-  public void testWeightAssignmentConsistency() {
+  public void testWeightAssignmentValidity() {
     String[] nodes = {"A:1", "B:2", "C:3", "D:4"};
-    
-    OverlayCreator.ConnectionPlan plan1 = OverlayCreator.createOverlay(
-        java.util.Arrays.asList(nodes), 2);
-    OverlayCreator.ConnectionPlan plan2 = OverlayCreator.createOverlay(
-        java.util.Arrays.asList(nodes), 2);
 
-    // Both plans should have same structure and weights
+    OverlayCreator.ConnectionPlan plan1 =
+        OverlayCreator.createOverlay(java.util.Arrays.asList(nodes), 2);
+    OverlayCreator.ConnectionPlan plan2 =
+        OverlayCreator.createOverlay(java.util.Arrays.asList(nodes), 2);
+
+    // Both plans should have same structure
     assertThat(plan1.getAllLinks()).hasSameSizeAs(plan2.getAllLinks());
 
-    // Verify weight 1 exists in both plans
-    boolean plan1HasWeight1 = plan1.getAllLinks().stream()
-        .anyMatch(link -> link.getWeight() == 1);
-    boolean plan2HasWeight1 = plan2.getAllLinks().stream()
-        .anyMatch(link -> link.getWeight() == 1);
+    // Verify all weights are in valid range (1-10 as per PDF)
+    for (OverlayCreator.Link link : plan1.getAllLinks()) {
+      assertThat(link.getWeight()).isBetween(1, 10);
+    }
 
-    assertThat(plan1HasWeight1).isTrue();
-    assertThat(plan2HasWeight1).isTrue();
+    for (OverlayCreator.Link link : plan2.getAllLinks()) {
+      assertThat(link.getWeight()).isBetween(1, 10);
+    }
+
+    // Verify links exist (not empty)
+    assertThat(plan1.getAllLinks()).isNotEmpty();
+    assertThat(plan2.getAllLinks()).isNotEmpty();
   }
 
-  /**
-   * Test error handling doesn't interfere with autograder expectations.
-   */
+  /** Test error handling doesn't interfere with autograder expectations. */
   @Test
   public void testErrorHandlingDoesNotBreakOutput() {
     // Test with insufficient nodes
@@ -224,21 +226,21 @@ public class AutograderComplianceTest {
 
     // Try to setup with more connections than possible
     overlayService.setupOverlay(5);
-    
+
     // Should fail gracefully without breaking subsequent operations
     assertThat(overlayService.isOverlaySetup()).isFalse();
 
     // Test list-weights with no overlay
     outputCapture.reset();
     overlayService.listWeights();
-    
+
     String output = outputCapture.toString();
     assertThat(output).contains("ERROR: No overlay configured");
   }
 
   /**
-   * Performance test to ensure operations complete within reasonable time.
-   * Autograder has timing constraints.
+   * Performance test to ensure operations complete within reasonable time. Autograder has timing
+   * constraints.
    */
   @Test
   public void testPerformanceWithLargeNodeSet() {
@@ -251,22 +253,22 @@ public class AutograderComplianceTest {
     when(mockRegistrationService.getRegisteredNodes()).thenReturn(largeNodeSet);
 
     long startTime = System.currentTimeMillis();
-    
+
     // Setup overlay
     overlayService.setupOverlay(4);
-    
+
     // List weights
     overlayService.listWeights();
-    
+
     long endTime = System.currentTimeMillis();
     long duration = endTime - startTime;
 
     // Should complete within reasonable time (autograder timeout prevention)
     assertThat(duration).isLessThan(5000); // 5 seconds max
-    
+
     // Verify operations succeeded
     assertThat(overlayService.isOverlaySetup()).isTrue();
-    
+
     String output = outputCapture.toString();
     assertThat(output).isNotEmpty();
   }

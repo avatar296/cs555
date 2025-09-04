@@ -173,12 +173,25 @@ public class OverlayCreator {
             plan.allLinks.add(new Link(nodeA, nodeB));
           }
         }
+      } else {
+        for (int i = 0; i < n; i++) {
+          String nodeA = nodeIds.get(i);
+          String nodeB = nodeIds.get((i + 1) % n);
+
+          if (!plan.nodeConnections.get(nodeA).contains(nodeB)) {
+            plan.nodeConnections.get(nodeA).add(nodeB);
+            plan.nodeConnections.get(nodeB).add(nodeA);
+            plan.allLinks.add(new Link(nodeA, nodeB));
+          }
+        }
       }
     }
 
-    int weight = 1;
+    java.util.Random random = new java.util.Random();
+
     for (Link link : plan.allLinks) {
-      link.setWeight(weight++);
+      int weight = random.nextInt(10) + 1;
+      link.setWeight(weight);
     }
 
     return plan;

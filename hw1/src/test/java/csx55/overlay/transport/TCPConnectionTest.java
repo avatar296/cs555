@@ -15,14 +15,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Tests for TCPConnection focusing on connection stability and resource management.
- * These tests address the critical autograder issues with node disconnections.
+ * Tests for TCPConnection focusing on connection stability and resource management. These tests
+ * address the critical autograder issues with node disconnections.
  */
 public class TCPConnectionTest {
 
   /**
-   * Test that socket resources are properly cleaned up when connection creation fails.
-   * This addresses the resource leak issue that caused nodes to disappear during testing.
+   * Test that socket resources are properly cleaned up when connection creation fails. This
+   * addresses the resource leak issue that caused nodes to disappear during testing.
    */
   @Test
   @Timeout(5)
@@ -57,8 +57,8 @@ public class TCPConnectionTest {
   }
 
   /**
-   * Test successful connection establishment and proper cleanup.
-   * Verifies connections can be established and closed without resource leaks.
+   * Test successful connection establishment and proper cleanup. Verifies connections can be
+   * established and closed without resource leaks.
    */
   @Test
   @Timeout(10)
@@ -116,14 +116,14 @@ public class TCPConnectionTest {
   }
 
   /**
-   * Test multiple connection attempts to verify stability.
-   * This addresses the issue where nodes would disappear after multiple connection cycles.
+   * Test multiple connection attempts to verify stability. This addresses the issue where nodes
+   * would disappear after multiple connection cycles.
    */
   @Test
   @Timeout(15)
   public void testMultipleConnectionCycles() throws Exception {
     final int connectionCycles = 5;
-    
+
     for (int i = 0; i < connectionCycles; i++) {
       ServerSocket serverSocket = new ServerSocket(0);
       int port = serverSocket.getLocalPort();
@@ -165,8 +165,8 @@ public class TCPConnectionTest {
   }
 
   /**
-   * Test that connection state is correctly maintained.
-   * Verifies isConnected() method accuracy for connection stability.
+   * Test that connection state is correctly maintained. Verifies isConnected() method accuracy for
+   * connection stability.
    */
   @Test
   @Timeout(5)
@@ -202,7 +202,7 @@ public class TCPConnectionTest {
     // Verify initial state
     assertThat(connection.isConnected()).isTrue();
 
-    // Close and verify state change  
+    // Close and verify state change
     connection.close();
     assertThat(connection.isConnected()).isFalse();
 

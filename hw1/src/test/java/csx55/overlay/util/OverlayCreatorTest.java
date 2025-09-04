@@ -11,14 +11,14 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for OverlayCreator focusing on output formatting and weight assignment.
- * These tests address the critical autograder issue with missing IP addresses in list-weights output.
+ * Tests for OverlayCreator focusing on output formatting and weight assignment. These tests address
+ * the critical autograder issue with missing IP addresses in list-weights output.
  */
 public class OverlayCreatorTest {
 
   /**
-   * Test that Link.toString() produces correctly formatted output with IP addresses.
-   * This addresses the "Missing ip address in list-weights output" autograder error.
+   * Test that Link.toString() produces correctly formatted output with IP addresses. This addresses
+   * the "Missing ip address in list-weights output" autograder error.
    */
   @Test
   public void testLinkToStringFormat() {
@@ -42,8 +42,8 @@ public class OverlayCreatorTest {
   }
 
   /**
-   * Test that Link uses getWeight() method instead of direct field access.
-   * This addresses the root cause of the output formatting issue.
+   * Test that Link uses getWeight() method instead of direct field access. This addresses the root
+   * cause of the output formatting issue.
    */
   @Test
   public void testLinkWeightAccessMethod() {
@@ -62,57 +62,52 @@ public class OverlayCreatorTest {
   }
 
   /**
-   * Test weight assignment in createOverlay method.
-   * Verifies weights are assigned sequentially starting from 1.
+   * Test weight assignment in createOverlay method. Verifies weights are assigned randomly within
+   * valid range 1-10.
    */
   @Test
   public void testOverlayWeightAssignment() {
-    List<String> nodes = Arrays.asList(
-        "129.82.44.145:37701",
-        "129.82.44.164:46595", 
-        "129.82.44.135:37421",
-        "129.82.44.131:34907"
-    );
+    List<String> nodes =
+        Arrays.asList(
+            "129.82.44.145:37701",
+            "129.82.44.164:46595",
+            "129.82.44.135:37421",
+            "129.82.44.131:34907");
     int connectionRequirement = 2;
 
     ConnectionPlan plan = OverlayCreator.createOverlay(nodes, connectionRequirement);
 
-    // Verify links have sequential weights starting from 1
+    // Verify links have weights in valid range 1-10
     List<Link> links = plan.getAllLinks();
     assertThat(links).isNotEmpty();
 
-    // Check that weights start from 1 and are sequential
-    boolean foundWeight1 = false;
+    // Check that all weights are in range 1-10
     for (Link link : links) {
-      assertThat(link.getWeight()).isGreaterThan(0);
-      if (link.getWeight() == 1) {
-        foundWeight1 = true;
-      }
+      assertThat(link.getWeight()).isBetween(1, 10);
     }
-    assertThat(foundWeight1).isTrue();
   }
 
   /**
-   * Test overlay creation with realistic node list matching autograder scenario.
-   * Verifies proper connection plan generation and weight assignment.
+   * Test overlay creation with realistic node list matching autograder scenario. Verifies proper
+   * connection plan generation and weight assignment.
    */
   @Test
   public void testOverlayCreationWithRealisticNodes() {
     // Use node list similar to autograder test case
-    List<String> nodes = Arrays.asList(
-        "129.82.44.145:37701",
-        "129.82.44.164:46595",
-        "129.82.44.135:37421", 
-        "129.82.44.131:34907",
-        "129.82.44.133:46237",
-        "129.82.44.136:33073",
-        "129.82.44.138:43253",
-        "129.82.44.134:46555",
-        "129.82.44.171:39117",
-        "129.82.44.168:44715",
-        "129.82.44.160:33373",
-        "129.82.44.140:38255"
-    );
+    List<String> nodes =
+        Arrays.asList(
+            "129.82.44.145:37701",
+            "129.82.44.164:46595",
+            "129.82.44.135:37421",
+            "129.82.44.131:34907",
+            "129.82.44.133:46237",
+            "129.82.44.136:33073",
+            "129.82.44.138:43253",
+            "129.82.44.134:46555",
+            "129.82.44.171:39117",
+            "129.82.44.168:44715",
+            "129.82.44.160:33373",
+            "129.82.44.140:38255");
     int connectionRequirement = 4; // Default CR value
 
     ConnectionPlan plan = OverlayCreator.createOverlay(nodes, connectionRequirement);
@@ -136,28 +131,23 @@ public class OverlayCreatorTest {
       assertThat(link.nodeA).matches("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+");
       assertThat(link.nodeB).matches("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+");
       assertThat(link.getWeight()).isGreaterThan(0);
-      
+
       // Verify toString format is correct
       String output = link.toString();
-      assertThat(output).matches("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+");
+      assertThat(output)
+          .matches("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+");
     }
   }
 
-  /**
-   * Test overlay creation edge cases that might cause autograder issues.
-   */
+  /** Test overlay creation edge cases that might cause autograder issues. */
   @Test
   public void testOverlayCreationEdgeCases() {
     // Test minimum viable configuration
-    List<String> minNodes = Arrays.asList(
-        "10.0.0.1:8080",
-        "10.0.0.2:8081", 
-        "10.0.0.3:8082"
-    );
-    
+    List<String> minNodes = Arrays.asList("10.0.0.1:8080", "10.0.0.2:8081", "10.0.0.3:8082");
+
     ConnectionPlan plan = OverlayCreator.createOverlay(minNodes, 1);
     assertThat(plan.getAllLinks()).isNotEmpty();
-    
+
     // Verify all links have correct format
     for (Link link : plan.getAllLinks()) {
       String output = link.toString();
@@ -167,35 +157,30 @@ public class OverlayCreatorTest {
   }
 
   /**
-   * Test that weight assignment is consistent and deterministic.
-   * This ensures reproducible output for autograder testing.
+   * Test that weight assignment uses valid range. Since weights are now random, we test range
+   * validity rather than consistency.
    */
   @Test
-  public void testWeightAssignmentConsistency() {
-    List<String> nodes = Arrays.asList(
-        "192.168.1.1:8001",
-        "192.168.1.2:8002",
-        "192.168.1.3:8003", 
-        "192.168.1.4:8004"
-    );
-    
-    // Create overlay multiple times
-    ConnectionPlan plan1 = OverlayCreator.createOverlay(nodes, 2);
-    ConnectionPlan plan2 = OverlayCreator.createOverlay(nodes, 2);
-    
-    // Weight assignment should be consistent
-    List<Link> links1 = plan1.getAllLinks();
-    List<Link> links2 = plan2.getAllLinks();
-    
-    assertThat(links1).hasSameSizeAs(links2);
-    
-    // Compare link weights for same node pairs
-    for (int i = 0; i < links1.size(); i++) {
-      Link link1 = links1.get(i);
-      Link link2 = links2.get(i);
-      
-      assertThat(link1.getWeight()).isEqualTo(link2.getWeight());
-      assertThat(link1.toString()).isEqualTo(link2.toString());
+  public void testWeightAssignmentValidity() {
+    List<String> nodes =
+        Arrays.asList(
+            "192.168.1.1:8001", "192.168.1.2:8002", "192.168.1.3:8003", "192.168.1.4:8004");
+
+    // Create overlay multiple times to test randomness
+    for (int run = 0; run < 5; run++) {
+      ConnectionPlan plan = OverlayCreator.createOverlay(nodes, 2);
+      List<Link> links = plan.getAllLinks();
+
+      assertThat(links).isNotEmpty();
+
+      // Verify all weights are in valid range
+      for (Link link : links) {
+        assertThat(link.getWeight()).isBetween(1, 10);
+
+        // Verify toString format is correct
+        String output = link.toString();
+        assertThat(output).containsPattern(", \\d+$");
+      }
     }
   }
 }

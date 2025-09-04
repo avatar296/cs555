@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import csx55.overlay.transport.TCPConnection;
-import csx55.overlay.util.OverlayCreator;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.HashMap;
@@ -16,8 +15,8 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 /**
- * Integration tests for OverlayManagementService focusing on list-weights command output.
- * These tests address the critical autograder issue with missing IP addresses in output.
+ * Integration tests for OverlayManagementService focusing on list-weights command output. These
+ * tests address the critical autograder issue with missing IP addresses in output.
  */
 public class OverlayManagementServiceTest {
 
@@ -33,7 +32,7 @@ public class OverlayManagementServiceTest {
   public void setUp() {
     MockitoAnnotations.openMocks(this);
     overlayService = new OverlayManagementService(mockRegistrationService);
-    
+
     // Capture System.out for testing console output
     originalOut = System.out;
     outputCapture = new ByteArrayOutputStream();
@@ -46,8 +45,8 @@ public class OverlayManagementServiceTest {
   }
 
   /**
-   * Test list-weights command output format matches autograder expectations.
-   * This directly addresses the "Missing ip address in list-weights output" error.
+   * Test list-weights command output format matches autograder expectations. This directly
+   * addresses the "Missing ip address in list-weights output" error.
    */
   @Test
   public void testListWeightsOutputFormat() {
@@ -62,39 +61,38 @@ public class OverlayManagementServiceTest {
 
     // Setup overlay with connection requirement 2
     overlayService.setupOverlay(2);
-    
+
     // Execute list-weights command
     overlayService.listWeights();
-    
+
     String output = outputCapture.toString();
-    
+
     // Verify output contains IP addresses
     assertThat(output).contains("129.82.44.145");
     assertThat(output).contains("129.82.44.164");
     assertThat(output).contains("37701");
     assertThat(output).contains("46595");
-    
+
     // Verify output contains weights
     assertThat(output).containsPattern("\\d+$"); // Ends with number (weight)
-    
+
     // Verify proper format: "IP:PORT, IP:PORT, WEIGHT"
-    assertThat(output).containsPattern("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+");
+    assertThat(output)
+        .containsPattern("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+");
   }
 
-  /**
-   * Test that list-weights handles empty overlay gracefully.
-   */
-  @Test 
+  /** Test that list-weights handles empty overlay gracefully. */
+  @Test
   public void testListWeightsWithNoOverlay() {
     overlayService.listWeights();
-    
+
     String output = outputCapture.toString();
     assertThat(output).contains("ERROR: No overlay configured");
   }
 
   /**
-   * Test overlay setup with realistic autograder node count.
-   * Verifies proper overlay creation and weight assignment.
+   * Test overlay setup with realistic autograder node count. Verifies proper overlay creation and
+   * weight assignment.
    */
   @Test
   public void testOverlaySetupWithRealisticNodeCount() {
@@ -103,38 +101,42 @@ public class OverlayManagementServiceTest {
     String[] nodeIds = {
       "129.82.44.145:37701", "129.82.44.164:46595", "129.82.44.135:37421",
       "129.82.44.131:34907", "129.82.44.133:46237", "129.82.44.136:33073",
-      "129.82.44.138:43253", "129.82.44.134:46555", "129.82.44.171:39117", 
+      "129.82.44.138:43253", "129.82.44.134:46555", "129.82.44.171:39117",
       "129.82.44.168:44715", "129.82.44.160:33373", "129.82.44.140:38255"
     };
-    
+
     for (String nodeId : nodeIds) {
       registeredNodes.put(nodeId, mockConnection1);
     }
-    
+
     when(mockRegistrationService.getRegisteredNodes()).thenReturn(registeredNodes);
 
     // Setup overlay with CR=4 (default connection requirement)
     overlayService.setupOverlay(4);
-    
+
     // Verify overlay was created
     assertThat(overlayService.isOverlaySetup()).isTrue();
-    
+
     // Test list-weights output
     overlayService.listWeights();
     String output = outputCapture.toString();
-    
+
     // Verify output contains multiple links
     String[] lines = output.split("\n");
-    long linkLines = java.util.Arrays.stream(lines)
-        .filter(line -> line.matches("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+"))
-        .count();
-    
+    long linkLines =
+        java.util.Arrays.stream(lines)
+            .filter(
+                line ->
+                    line.matches(
+                        "\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+"))
+            .count();
+
     assertThat(linkLines).isGreaterThan(0);
   }
 
   /**
-   * Test that overlay setup creates correct number of connections.
-   * Verifies the connection plan generation is working properly.
+   * Test that overlay setup creates correct number of connections. Verifies the connection plan
+   * generation is working properly.
    */
   @Test
   public void testOverlayConnectionCount() {
@@ -148,15 +150,13 @@ public class OverlayManagementServiceTest {
     when(mockRegistrationService.getRegisteredNodes()).thenReturn(registeredNodes);
 
     overlayService.setupOverlay(2);
-    
+
     // Verify setup completion message
     String output = outputCapture.toString();
     assertThat(output).contains("setup completed with 2 connections");
   }
 
-  /**
-   * Test error handling for insufficient nodes.
-   */
+  /** Test error handling for insufficient nodes. */
   @Test
   public void testOverlaySetupInsufficientNodes() {
     Map<String, TCPConnection> registeredNodes = new HashMap<>();
@@ -166,14 +166,14 @@ public class OverlayManagementServiceTest {
     when(mockRegistrationService.getRegisteredNodes()).thenReturn(registeredNodes);
 
     overlayService.setupOverlay(4); // More than available nodes
-    
+
     // Should not create overlay
     assertThat(overlayService.isOverlaySetup()).isFalse();
   }
 
   /**
-   * Test that weight assignment produces sequential weights starting from 1.
-   * This verifies the fix for the weight assignment issue.
+   * Test that weight assignment produces sequential weights starting from 1. This verifies the fix
+   * for the weight assignment issue.
    */
   @Test
   public void testSequentialWeightAssignment() {
@@ -186,19 +186,19 @@ public class OverlayManagementServiceTest {
 
     overlayService.setupOverlay(2);
     overlayService.listWeights();
-    
+
     String output = outputCapture.toString();
-    
-    // Should contain weight 1 
-    assertThat(output).containsPattern(", 1$");
-    
+
+    // Should contain weights (now random 1-10, not necessarily 1)
+    assertThat(output).containsPattern(", \\d+$");
+
     // Verify weights are positive integers
     assertThat(output).containsPattern(", \\d+$");
   }
 
   /**
-   * Test debugging output includes proper logging information.
-   * Verifies enhanced logging we added for troubleshooting.
+   * Test debugging output includes proper logging information. Verifies enhanced logging we added
+   * for troubleshooting.
    */
   @Test
   public void testDebuggingOutput() {
@@ -210,9 +210,9 @@ public class OverlayManagementServiceTest {
 
     overlayService.setupOverlay(1);
     overlayService.listWeights();
-    
+
     String output = outputCapture.toString();
-    
+
     // Verify contains link output (may be in debug logs or console output)
     assertThat(output).isNotEmpty();
     assertThat(output).containsPattern("test1:1001|test2:1002");

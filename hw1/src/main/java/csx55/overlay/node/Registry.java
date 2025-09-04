@@ -65,7 +65,8 @@ public class Registry implements TCPConnection.TCPConnectionListener {
             try {
               clientSocket.close();
             } catch (IOException closeException) {
-              LoggerUtil.warn("Registry", "Failed to close socket after connection error", closeException);
+              LoggerUtil.warn(
+                  "Registry", "Failed to close socket after connection error", closeException);
             }
             throw e;
           }

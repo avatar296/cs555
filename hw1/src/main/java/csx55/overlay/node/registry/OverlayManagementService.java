@@ -65,7 +65,9 @@ public class OverlayManagementService {
       List<String> nodeIds = new ArrayList<>(registeredNodes.keySet());
       LoggerUtil.info("OverlayManagement", "Creating overlay with nodes: " + nodeIds);
       currentOverlay = OverlayCreator.createOverlay(nodeIds, cr);
-      LoggerUtil.info("OverlayManagement", "Created overlay with " + currentOverlay.getAllLinks().size() + " links");
+      LoggerUtil.info(
+          "OverlayManagement",
+          "Created overlay with " + currentOverlay.getAllLinks().size() + " links");
 
       Map<String, List<String>> initiators =
           OverlayCreator.determineConnectionInitiators(currentOverlay);
@@ -127,7 +129,8 @@ public class OverlayManagementService {
       return;
     }
 
-    LoggerUtil.info("OverlayManagement", "Listing " + currentOverlay.getAllLinks().size() + " links");
+    LoggerUtil.info(
+        "OverlayManagement", "Listing " + currentOverlay.getAllLinks().size() + " links");
     for (OverlayCreator.Link link : currentOverlay.getAllLinks()) {
       String output = link.toString();
       LoggerUtil.info("OverlayManagement", "Link output: '" + output + "'");

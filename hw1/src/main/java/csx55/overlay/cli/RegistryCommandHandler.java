@@ -3,17 +3,12 @@ package csx55.overlay.cli;
 import csx55.overlay.node.Registry;
 
 /**
- * Handles command-line interface for the Registry. Provides an interactive
- * command loop for
+ * Handles command-line interface for the Registry. Provides an interactive command loop for
  * managing the overlay network.
  *
- * <p>
- * Available commands: - list-messaging-nodes: displays all registered nodes -
- * list-weights:
- * shows all link weights in the overlay - setup-overlay <number>: configures
- * the overlay with
- * specified connections - send-overlay-link-weights: distributes link weights
- * to all nodes - start
+ * <p>Available commands: - list-messaging-nodes: displays all registered nodes - list-weights:
+ * shows all link weights in the overlay - setup-overlay <number>: configures the overlay with
+ * specified connections - send-overlay-link-weights: distributes link weights to all nodes - start
  * <number>: initiates a messaging task with specified rounds
  */
 public class RegistryCommandHandler extends AbstractCommandHandler {
@@ -29,8 +24,7 @@ public class RegistryCommandHandler extends AbstractCommandHandler {
   }
 
   /**
-   * Processes commands specific to Registry. Handles command parsing and
-   * delegates to appropriate
+   * Processes commands specific to Registry. Handles command parsing and delegates to appropriate
    * registry methods.
    *
    * @param input the raw command input from the user
@@ -55,7 +49,8 @@ public class RegistryCommandHandler extends AbstractCommandHandler {
 
       case "setup-overlay":
         if (parts.length == 2) {
-          int connections = parseIntArgument(parts[1], "Invalid number argument for setup-overlay command.");
+          int connections =
+              parseIntArgument(parts[1], "Invalid number argument for setup-overlay command.");
           if (connections == -1) {
             return;
           } else if (connections <= 0) {
