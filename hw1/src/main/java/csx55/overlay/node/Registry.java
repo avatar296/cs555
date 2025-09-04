@@ -54,7 +54,16 @@ public class Registry implements TCPConnection.TCPConnectionListener {
       while (running) {
         try {
           Socket clientSocket = serverSocket.accept();
-          new TCPConnection(clientSocket, this);
+          try {
+            new TCPConnection(clientSocket, this);
+          } catch (Exception e) {
+            try {
+              clientSocket.close();
+            } catch (IOException closeException) {
+              LoggerUtil.warn("Registry", "Failed to close socket after connection error", closeException);
+            }
+            throw e;
+          }
         } catch (IOException e) {
           if (running) {
             LoggerUtil.error("Registry", "Failed to create connection: " + e.getMessage());

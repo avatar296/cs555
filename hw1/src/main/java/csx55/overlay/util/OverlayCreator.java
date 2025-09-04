@@ -95,7 +95,7 @@ public class OverlayCreator {
 
     @Override
     public String toString() {
-      return nodeA + ", " + nodeB + ", " + weight;
+      return nodeA + ", " + nodeB + ", " + getWeight();
     }
   }
 
