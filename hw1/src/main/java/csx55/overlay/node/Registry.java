@@ -10,13 +10,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 /**
- * The central registry node for the overlay network. Manages node registration,
- * overlay topology
- * setup, task orchestration, and statistics collection from all messaging
- * nodes.
+ * The central registry node for the overlay network. Manages node registration, overlay topology
+ * setup, task orchestration, and statistics collection from all messaging nodes.
  *
- * This registry acts as the control plane for the distributed system,
- * coordinating overlay
+ * <p>This registry acts as the control plane for the distributed system, coordinating overlay
  * construction and messaging tasks.
  */
 public class Registry implements TCPConnection.TCPConnectionListener {
@@ -34,14 +31,14 @@ public class Registry implements TCPConnection.TCPConnectionListener {
     this.registrationService = new NodeRegistrationService(connectionsCache);
     this.overlayService = new OverlayManagementService(registrationService);
     this.statisticsService = new StatisticsCollectionService();
-    this.taskService = new TaskOrchestrationService(registrationService, statisticsService, overlayService);
+    this.taskService =
+        new TaskOrchestrationService(registrationService, statisticsService, overlayService);
     this.registrationService.setTaskService(taskService);
     this.commandHandler = new csx55.overlay.cli.RegistryCommandHandler(this);
   }
 
   /**
-   * Starts the registry server on the specified port. Begins accepting
-   * connections from messaging
+   * Starts the registry server on the specified port. Begins accepting connections from messaging
    * nodes.
    *
    * @param port the port number to listen on
@@ -71,8 +68,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
   }
 
   /**
-   * Performs cleanup operations when the registry is shutting down. Closes the
-   * server socket and
+   * Performs cleanup operations when the registry is shutting down. Closes the server socket and
    * releases resources.
    */
   private void cleanup() {
@@ -87,11 +83,10 @@ public class Registry implements TCPConnection.TCPConnectionListener {
   }
 
   /**
-   * Handles incoming events from messaging nodes. Processes registration
-   * requests, task
+   * Handles incoming events from messaging nodes. Processes registration requests, task
    * completions, and traffic summaries.
    *
-   * @param event      the event received from a messaging node
+   * @param event the event received from a messaging node
    * @param connection the TCP connection that received the event
    */
   @Override
@@ -119,8 +114,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
   }
 
   /**
-   * Handles lost connections to messaging nodes. Removes the disconnected node
-   * from the registry.
+   * Handles lost connections to messaging nodes. Removes the disconnected node from the registry.
    *
    * @param connection the TCP connection that was lost
    */
@@ -130,17 +124,12 @@ public class Registry implements TCPConnection.TCPConnectionListener {
     registrationService.handleConnectionLost(connection);
   }
 
-  /**
-   * Lists all registered messaging nodes. Delegates to the registration service.
-   */
+  /** Lists all registered messaging nodes. Delegates to the registration service. */
   public void listMessagingNodes() {
     registrationService.listMessagingNodes();
   }
 
-  /**
-   * Lists all link weights in the overlay. Delegates to the overlay management
-   * service.
-   */
+  /** Lists all link weights in the overlay. Delegates to the overlay management service. */
   public void listWeights() {
     overlayService.listWeights();
   }
@@ -154,10 +143,7 @@ public class Registry implements TCPConnection.TCPConnectionListener {
     overlayService.setupOverlay(cr);
   }
 
-  /**
-   * Sends link weights to all messaging nodes. Delegates to the overlay
-   * management service.
-   */
+  /** Sends link weights to all messaging nodes. Delegates to the overlay management service. */
   public void sendOverlayLinkWeights() {
     overlayService.sendOverlayLinkWeights();
   }

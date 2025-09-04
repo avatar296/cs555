@@ -6,13 +6,10 @@ import java.io.DataInputStream;
 import java.io.IOException;
 
 /**
- * Singleton factory for creating Event objects from marshalled byte arrays.
- * Deserializes incoming
- * network data into appropriate Event implementations based on the protocol
- * message type.
+ * Singleton factory for creating Event objects from marshalled byte arrays. Deserializes incoming
+ * network data into appropriate Event implementations based on the protocol message type.
  *
- * This factory maintains a single instance to ensure consistent event creation
- * throughout the
+ * <p>This factory maintains a single instance to ensure consistent event creation throughout the
  * application.
  */
 public class EventFactory {
@@ -21,12 +18,10 @@ public class EventFactory {
   private static EventFactory instance = null;
 
   /** Private constructor to enforce singleton pattern. */
-  private EventFactory() {
-  }
+  private EventFactory() {}
 
   /**
-   * Gets the singleton instance of the EventFactory. Creates the instance on
-   * first access (lazy
+   * Gets the singleton instance of the EventFactory. Creates the instance on first access (lazy
    * initialization).
    *
    * @return the EventFactory instance
@@ -39,8 +34,7 @@ public class EventFactory {
   }
 
   /**
-   * Creates an Event object from marshalled bytes. Reads the message type from
-   * the byte array and
+   * Creates an Event object from marshalled bytes. Reads the message type from the byte array and
    * instantiates the appropriate Event implementation.
    *
    * @param marshalledBytes the serialized event data

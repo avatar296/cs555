@@ -11,14 +11,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Service responsible for managing the overlay network topology and link
- * weights. Handles overlay
- * setup with specified connection requirements, distributes peer lists to
- * nodes, and manages link
+ * Service responsible for managing the overlay network topology and link weights. Handles overlay
+ * setup with specified connection requirements, distributes peer lists to nodes, and manages link
  * weight assignments.
  *
- * This service coordinates the creation of the overlay structure and ensures
- * proper connectivity
+ * <p>This service coordinates the creation of the overlay structure and ensures proper connectivity
  * between nodes based on the connection requirement.
  */
 public class OverlayManagementService {
@@ -36,8 +33,7 @@ public class OverlayManagementService {
   }
 
   /**
-   * Sets up the overlay network with the specified connection requirement.
-   * Creates the overlay
+   * Sets up the overlay network with the specified connection requirement. Creates the overlay
    * topology and sends peer lists to all nodes.
    *
    * @param cr the connection requirement (number of connections per node)
@@ -69,7 +65,8 @@ public class OverlayManagementService {
       List<String> nodeIds = new ArrayList<>(registeredNodes.keySet());
       currentOverlay = OverlayCreator.createOverlay(nodeIds, cr);
 
-      Map<String, List<String>> initiators = OverlayCreator.determineConnectionInitiators(currentOverlay);
+      Map<String, List<String>> initiators =
+          OverlayCreator.determineConnectionInitiators(currentOverlay);
 
       for (String nodeId : nodeIds) {
         List<String> peers = initiators.getOrDefault(nodeId, new ArrayList<>());
@@ -89,8 +86,7 @@ public class OverlayManagementService {
   }
 
   /**
-   * Sends overlay link weights to all registered nodes. Distributes the weighted
-   * link information
+   * Sends overlay link weights to all registered nodes. Distributes the weighted link information
    * needed for routing decisions.
    */
   public void sendOverlayLinkWeights() {
@@ -104,12 +100,14 @@ public class OverlayManagementService {
     List<LinkWeights.LinkInfo> linkInfos = new ArrayList<>();
 
     for (OverlayCreator.Link link : currentOverlay.getAllLinks()) {
-      LinkWeights.LinkInfo linkInfo = new LinkWeights.LinkInfo(link.nodeA, link.nodeB, link.getWeight());
+      LinkWeights.LinkInfo linkInfo =
+          new LinkWeights.LinkInfo(link.nodeA, link.nodeB, link.getWeight());
       linkInfos.add(linkInfo);
     }
 
     LinkWeights message = new LinkWeights(linkInfos);
-    int sent = MessageRoutingHelper.broadcastToAllNodes(registeredNodes, message, "sending link weights");
+    int sent =
+        MessageRoutingHelper.broadcastToAllNodes(registeredNodes, message, "sending link weights");
     if (sent > 0) {
       LoggerUtil.info("OverlayManagement", "Link weights successfully assigned to all nodes");
       System.out.println("link weights assigned");
@@ -117,8 +115,7 @@ public class OverlayManagementService {
   }
 
   /**
-   * Lists all link weights in the current overlay to the console. Displays each
-   * link with its
+   * Lists all link weights in the current overlay to the console. Displays each link with its
    * associated weight.
    */
   public void listWeights() {

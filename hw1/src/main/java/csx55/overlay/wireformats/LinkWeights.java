@@ -7,12 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Message containing the weighted links of the overlay network topology. Sent
- * by the registry to
+ * Message containing the weighted links of the overlay network topology. Sent by the registry to
  * all nodes after overlay setup to enable shortest path routing calculations.
  *
- * Wire format: - int: message type (LINK_WEIGHTS) - int: number of links - For
- * each link: String
+ * <p>Wire format: - int: message type (LINK_WEIGHTS) - int: number of links - For each link: String
  * containing "nodeA nodeB weight"
  */
 public class LinkWeights extends AbstractEvent {
@@ -40,8 +38,8 @@ public class LinkWeights extends AbstractEvent {
     /**
      * Constructs a new LinkInfo.
      *
-     * @param nodeA  first node identifier
-     * @param nodeB  second node identifier
+     * @param nodeA first node identifier
+     * @param nodeB second node identifier
      * @param weight the link weight
      */
     public LinkInfo(String nodeA, String nodeB, int weight) {

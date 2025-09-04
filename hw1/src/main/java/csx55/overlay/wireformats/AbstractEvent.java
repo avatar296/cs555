@@ -9,21 +9,17 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /**
- * Abstract base class for all Event implementations. Provides common
- * serialization/deserialization
- * framework using the Template Method pattern. Handles stream creation,
- * resource management, and
+ * Abstract base class for all Event implementations. Provides common serialization/deserialization
+ * framework using the Template Method pattern. Handles stream creation, resource management, and
  * common operations.
  *
- * Subclasses must implement: - writeData() to serialize their specific fields -
- * readData() to
+ * <p>Subclasses must implement: - writeData() to serialize their specific fields - readData() to
  * deserialize their specific fields - getType() to return their message type
  */
 public abstract class AbstractEvent implements Event {
 
   /**
-   * Template method for serializing the event to bytes. Creates streams, writes
-   * message type,
+   * Template method for serializing the event to bytes. Creates streams, writes message type,
    * delegates to subclass for data, and ensures proper resource cleanup.
    *
    * @return the serialized message as a byte array
@@ -53,8 +49,7 @@ public abstract class AbstractEvent implements Event {
   }
 
   /**
-   * Template method for deserializing from bytes. Creates streams, validates
-   * message type,
+   * Template method for deserializing from bytes. Creates streams, validates message type,
    * delegates to subclass for data, and ensures proper resource cleanup.
    *
    * @param marshalledBytes the serialized message data
@@ -82,8 +77,7 @@ public abstract class AbstractEvent implements Event {
   }
 
   /**
-   * Write the event-specific data to the output stream. Subclasses must implement
-   * this to serialize
+   * Write the event-specific data to the output stream. Subclasses must implement this to serialize
    * their fields.
    *
    * @param dout the data output stream
@@ -92,8 +86,7 @@ public abstract class AbstractEvent implements Event {
   protected abstract void writeData(DataOutputStream dout) throws IOException;
 
   /**
-   * Read the event-specific data from the input stream. Subclasses must implement
-   * this to
+   * Read the event-specific data from the input stream. Subclasses must implement this to
    * deserialize their fields.
    *
    * @param din the data input stream
@@ -102,11 +95,10 @@ public abstract class AbstractEvent implements Event {
   protected abstract void readData(DataInputStream din) throws IOException;
 
   /**
-   * Utility method to write a string array to the output stream. Common pattern
-   * used by multiple
+   * Utility method to write a string array to the output stream. Common pattern used by multiple
    * event types.
    *
-   * @param dout  the output stream
+   * @param dout the output stream
    * @param array the string array to write
    * @throws IOException if writing fails
    */
@@ -118,8 +110,7 @@ public abstract class AbstractEvent implements Event {
   }
 
   /**
-   * Utility method to read a string array from the input stream. Common pattern
-   * used by multiple
+   * Utility method to read a string array from the input stream. Common pattern used by multiple
    * event types.
    *
    * @param din the input stream
@@ -136,8 +127,7 @@ public abstract class AbstractEvent implements Event {
   }
 
   /**
-   * Closes a resource quietly, suppressing any exceptions. Used for cleanup in
-   * finally blocks.
+   * Closes a resource quietly, suppressing any exceptions. Used for cleanup in finally blocks.
    *
    * @param closeable the resource to close
    */

@@ -4,7 +4,6 @@ plugins {
     id 'com.diffplug.spotless' version '6.25.0'
 }
 
-// Set the Java version for the project to Java 11
 java {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
@@ -15,7 +14,6 @@ repositories {
 }
 
 dependencies {
-    // Testing dependencies
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
     testImplementation 'org.assertj:assertj-core:3.24.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -29,30 +27,19 @@ test {
     }
 }
 
-// Configure google-java-format via Spotless
 spotless {
     java {
-        // Use Google Java Format version 1.19.2
         googleJavaFormat('1.19.2')
-        
-        // Target all Java files in src directory
         target 'src/**/*.java'
-        
-        // Remove unused imports
         removeUnusedImports()
-        
-        // Format imports order
         importOrder()
     }
 }
 
-// Define your main classes for easier execution
 application {
     mainClass = 'csx55.overlay.node.Registry'
 }
 
-// Custom task to run the Registry server
-// The error occurs if this section is missing
 task runRegistry(type: JavaExec) {
     group = "Execution"
     description = "Starts the Registry server"
@@ -63,8 +50,6 @@ task runRegistry(type: JavaExec) {
     }
 }
 
-// Custom task to run the MessagingNode client
-// The error occurs if this section is missing
 task runMessagingNode(type: JavaExec) {
     group = "Execution"
     description = "Starts a Messaging Node client"
@@ -75,15 +60,21 @@ task runMessagingNode(type: JavaExec) {
     }
 }
 
-// Custom task to create the final .tar submission file
 task createTar(type: Tar) {
     archiveBaseName.set('Christopher_Cowart_HW1')
     archiveExtension.set('tar')
     
-    // Include all required files for submission
     from('.') {
         include 'build.gradle'
         include 'README.txt'
         include 'src/main/java/**/*.java'
+        
+        exclude '**/._*'       
+        exclude '**/.DS_Store'
+        
+        exclude 'src/test/**'          
+        exclude '**/test/**'           
+        exclude '**/*Test.java'        
+        exclude '**/*Tests.java'       
     }
 }
