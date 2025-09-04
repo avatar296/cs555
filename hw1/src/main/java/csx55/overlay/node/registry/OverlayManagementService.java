@@ -72,7 +72,7 @@ public class OverlayManagementService {
       }
     }
 
-    System.out.println("setup completed with " + connectionRequirement + " connections");
+    System.out.println("setup completed with " + (totalConnections / 2) + " connections");
   }
 
   /** Sends link weights to all registered nodes (parameterless version called by Registry). */
