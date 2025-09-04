@@ -120,7 +120,7 @@ public class OverlayManagementService {
 
   /**
    * Lists all link weights in the current overlay to the console. Displays each link with its
-   * associated weight.
+   * associated weight. After dynamic reconstruction, all links in currentOverlay are valid.
    */
   public void listWeights() {
     if (currentOverlay == null || currentOverlay.getAllLinks().isEmpty()) {
@@ -130,7 +130,8 @@ public class OverlayManagementService {
     }
 
     LoggerUtil.info(
-        "OverlayManagement", "Listing " + currentOverlay.getAllLinks().size() + " links");
+        "OverlayManagement", "Listing " + currentOverlay.getAllLinks().size() + " overlay links");
+
     for (OverlayCreator.Link link : currentOverlay.getAllLinks()) {
       String output = link.toString();
       LoggerUtil.info("OverlayManagement", "Link output: '" + output + "'");
@@ -163,5 +164,40 @@ public class OverlayManagementService {
    */
   public int getConnectionRequirement() {
     return connectionRequirement;
+  }
+
+  /**
+   * Rebuilds the overlay network for the current set of registered nodes. This method is called
+   * when nodes disconnect to maintain the proper overlay topology and connection requirements.
+   */
+  public void rebuildOverlay() {
+    Map<String, TCPConnection> currentNodes = registrationService.getRegisteredNodes();
+
+    if (currentNodes.size() <= connectionRequirement) {
+      LoggerUtil.warn(
+          "OverlayManagement",
+          "Too few nodes remaining for CR="
+              + connectionRequirement
+              + ". Need more than "
+              + connectionRequirement
+              + " nodes, have "
+              + currentNodes.size());
+      return;
+    }
+
+    // Rebuild overlay with remaining nodes
+    List<String> remainingNodeIds = new ArrayList<>(currentNodes.keySet());
+    LoggerUtil.info(
+        "OverlayManagement", "Rebuilding overlay for remaining nodes: " + remainingNodeIds);
+
+    currentOverlay = OverlayCreator.createOverlay(remainingNodeIds, connectionRequirement);
+
+    LoggerUtil.info(
+        "OverlayManagement",
+        "Rebuilt overlay: "
+            + remainingNodeIds.size()
+            + " nodes, "
+            + currentOverlay.getAllLinks().size()
+            + " links");
   }
 }

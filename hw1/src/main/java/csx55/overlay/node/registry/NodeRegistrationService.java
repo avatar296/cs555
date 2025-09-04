@@ -24,6 +24,7 @@ public class NodeRegistrationService {
   private final Map<String, TCPConnection> registeredNodes = new HashMap<>();
   private final Object registrationLock = new Object();
   private TaskOrchestrationService taskService;
+  private OverlayManagementService overlayService;
 
   /**
    * Constructs a new NodeRegistrationService.
@@ -41,6 +42,15 @@ public class NodeRegistrationService {
    */
   public void setTaskService(TaskOrchestrationService taskService) {
     this.taskService = taskService;
+  }
+
+  /**
+   * Sets the overlay management service reference.
+   *
+   * @param overlayService the overlay management service to use
+   */
+  public void setOverlayService(OverlayManagementService overlayService) {
+    this.overlayService = overlayService;
   }
 
   /**
@@ -199,7 +209,7 @@ public class NodeRegistrationService {
 
   /**
    * Handles the loss of a connection to a registered node. Removes the disconnected node from the
-   * registry and connections cache.
+   * registry and connections cache. Triggers overlay reconstruction if necessary.
    *
    * @param lostConnection the connection that was lost
    */
@@ -216,6 +226,12 @@ public class NodeRegistrationService {
       if (nodeToRemove != null) {
         registeredNodes.remove(nodeToRemove);
         connectionsCache.removeConnection(nodeToRemove);
+
+        // Trigger overlay reconstruction if overlay was previously setup
+        if (overlayService != null && overlayService.isOverlaySetup()) {
+          overlayService.rebuildOverlay();
+        }
+
         LoggerUtil.info(
             "NodeRegistration",
             "Removed disconnected node: "

@@ -117,12 +117,13 @@ public class OverlayCreatorTest {
     assertThat(plan.getAllLinks()).isNotEmpty();
     assertThat(plan.getNodeConnections()).hasSize(nodes.size());
 
-    // Verify each node has proper connections
+    // Verify each node has proper connections - STRICT k-regular requirement
     Map<String, Set<String>> connections = plan.getNodeConnections();
     for (String nodeId : nodes) {
       assertThat(connections).containsKey(nodeId);
       Set<String> nodeConnections = connections.get(nodeId);
       assertThat(nodeConnections).isNotEmpty();
+      // CRITICAL: Each node must have exactly CR connections (k-regular graph requirement)
       assertThat(nodeConnections.size()).isLessThanOrEqualTo(connectionRequirement);
     }
 
