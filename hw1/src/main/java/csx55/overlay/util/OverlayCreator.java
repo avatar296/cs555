@@ -38,6 +38,10 @@ public final class OverlayCreator {
       setWeight(weight);
     }
 
+    public Link(String a, String b) {
+      this(a, b, 1); // Default weight
+    }
+
     public String getNodeA() {
       return nodeA;
     }
@@ -94,6 +98,14 @@ public final class OverlayCreator {
       return adjacency;
     }
 
+    public Map<String, Set<String>> getNodeConnections() {
+      return adjacency;
+    }
+
+    public List<Link> getAllLinks() {
+      return new ArrayList<>(uniqueLinks);
+    }
+
     public Set<Link> getUniqueLinks() {
       return uniqueLinks;
     }
@@ -108,6 +120,10 @@ public final class OverlayCreator {
    * @param connectionRequirement CR (k)
    * @return ConnectionPlan with adjacency + canonical unique links (with weights 1..10)
    */
+  public static ConnectionPlan createOverlay(List<String> nodeIds, int connectionRequirement) {
+    return buildOverlay(nodeIds, connectionRequirement);
+  }
+
   public static ConnectionPlan buildOverlay(List<String> nodeIds, int connectionRequirement) {
     if (nodeIds == null) throw new IllegalArgumentException("nodeIds null");
     if (nodeIds.size() < 2) throw new IllegalArgumentException("need at least 2 nodes");
@@ -176,11 +192,12 @@ public final class OverlayCreator {
     for (Map.Entry<String, Set<String>> e : adj.entrySet()) {
       String a = e.getKey();
       for (String b : e.getValue()) {
-        if (a.equals(b)) continue;
-        // create normalized link; assign a random weight in 1..10
-        int weight = 1 + rnd.nextInt(10);
-        Link link = new Link(a, b, weight);
-        links.add(link); // Set<Link> prevents duplicates thanks to equals/hashCode
+        if (a.compareTo(b) < 0) { // Only add link if a is "less than" b
+          // create normalized link; assign a random weight in 1..10
+          int weight = 1 + rnd.nextInt(10);
+          Link link = new Link(a, b, weight);
+          links.add(link); // Set<Link> prevents duplicates thanks to equals/hashCode
+        }
       }
     }
 
