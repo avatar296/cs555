@@ -63,7 +63,9 @@ public class OverlayManagementService {
       connectionRequirement = cr;
 
       List<String> nodeIds = new ArrayList<>(registeredNodes.keySet());
+      LoggerUtil.info("OverlayManagement", "Creating overlay with nodes: " + nodeIds);
       currentOverlay = OverlayCreator.createOverlay(nodeIds, cr);
+      LoggerUtil.info("OverlayManagement", "Created overlay with " + currentOverlay.getAllLinks().size() + " links");
 
       Map<String, List<String>> initiators =
           OverlayCreator.determineConnectionInitiators(currentOverlay);
@@ -121,11 +123,15 @@ public class OverlayManagementService {
   public void listWeights() {
     if (currentOverlay == null || currentOverlay.getAllLinks().isEmpty()) {
       LoggerUtil.warn("OverlayManagement", "No overlay has been configured to list weights");
+      System.out.println("ERROR: No overlay configured");
       return;
     }
 
+    LoggerUtil.info("OverlayManagement", "Listing " + currentOverlay.getAllLinks().size() + " links");
     for (OverlayCreator.Link link : currentOverlay.getAllLinks()) {
-      System.out.println(link.toString());
+      String output = link.toString();
+      LoggerUtil.info("OverlayManagement", "Link output: '" + output + "'");
+      System.out.println(output);
     }
   }
 

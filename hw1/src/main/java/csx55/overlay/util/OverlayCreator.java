@@ -178,7 +178,7 @@ public class OverlayCreator {
 
     int weight = 1;
     for (Link link : plan.allLinks) {
-      link.weight = weight++;
+      link.setWeight(weight++);
     }
 
     return plan;

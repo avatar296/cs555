@@ -5,7 +5,11 @@ import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
 import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.util.MessageRoutingHelper;
-import csx55.overlay.wireformats.*;
+import csx55.overlay.wireformats.DeregisterResponse;
+import csx55.overlay.wireformats.LinkWeights;
+import csx55.overlay.wireformats.MessagingNodesList;
+import csx55.overlay.wireformats.PeerIdentification;
+import csx55.overlay.wireformats.RegisterResponse;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.List;
@@ -96,13 +100,22 @@ public class ProtocolHandlerService {
     for (String peer : peerList.getPeerNodes()) {
       String[] parts = peer.split(":");
       Socket socket = new Socket(parts[0], Integer.parseInt(parts[1]));
-      TCPConnection connection = new TCPConnection(socket, listener);
-      connection.setRemoteNodeId(peer);
-      peerConnections.addConnection(peer, connection);
+      try {
+        TCPConnection connection = new TCPConnection(socket, listener);
+        connection.setRemoteNodeId(peer);
+        peerConnections.addConnection(peer, connection);
 
-      PeerIdentification identification = new PeerIdentification(nodeId);
-      MessageRoutingHelper.sendEventSafely(
-          connection, identification, String.format("sending peer identification to %s", peer));
+        PeerIdentification identification = new PeerIdentification(nodeId);
+        MessageRoutingHelper.sendEventSafely(
+            connection, identification, String.format("sending peer identification to %s", peer));
+      } catch (Exception e) {
+        try {
+          socket.close();
+        } catch (IOException closeException) {
+          LoggerUtil.warn("ProtocolHandler", "Failed to close socket after connection error", closeException);
+        }
+        throw e;
+      }
     }
 
     if (!connectionStatusPrinted) {

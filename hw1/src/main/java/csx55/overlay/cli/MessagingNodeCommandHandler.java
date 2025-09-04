@@ -27,7 +27,7 @@ public class MessagingNodeCommandHandler extends AbstractCommandHandler {
    */
   @Override
   protected void processCommand(String input) {
-    String command = input.trim().toLowerCase();
+    String command = input.trim().toLowerCase(java.util.Locale.ROOT);
 
     if ("print-mst".equals(command)) {
       node.printMinimumSpanningTree();
