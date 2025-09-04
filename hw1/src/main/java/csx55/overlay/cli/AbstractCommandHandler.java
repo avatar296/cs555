@@ -19,17 +19,22 @@ public abstract class AbstractCommandHandler {
    */
   public void startCommandLoop() {
     scanner = new Scanner(System.in);
-    try {
-      while (running) {
+    // NOTE: We do not use a try-with-resources or a finally block to close the
+    // scanner,
+    // because closing a scanner wrapped around System.in will close System.in
+    // itself,
+    // making it impossible to read any further input for the lifetime of the
+    // application.
+    while (running) {
+      if (scanner.hasNextLine()) {
         String input = scanner.nextLine();
         if (!running) {
           break;
         }
         processCommand(input);
-      }
-    } finally {
-      if (scanner != null) {
-        scanner.close();
+      } else {
+        // If the input stream is closed (e.g., container is stopping), exit the loop.
+        stop();
       }
     }
   }
