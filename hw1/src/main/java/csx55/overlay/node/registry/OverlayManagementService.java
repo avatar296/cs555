@@ -72,11 +72,7 @@ public class OverlayManagementService {
       }
     }
 
-    // Total connections in overlay (each connection counted from both ends, so divide by 2)
-    totalConnections /= 2;
-    LoggerUtil.info(
-        "OverlayManagement", "Overlay setup completed with " + totalConnections + " links");
-    System.out.println("Registry now has " + totalConnections + " links");
+    System.out.println("setup completed with " + connectionRequirement + " connections");
   }
 
   /** Sends link weights to all registered nodes (parameterless version called by Registry). */
@@ -102,7 +98,7 @@ public class OverlayManagementService {
       // Print weights in same format as when broadcasting
       List<LinkWeights.LinkInfo> linkInfos = convertToLinkInfos(currentOverlay.getUniqueLinks());
       for (LinkWeights.LinkInfo linkInfo : linkInfos) {
-        System.out.println(linkInfo.nodeA + " , " + linkInfo.nodeB + ",  " + linkInfo.weight);
+        System.out.println(linkInfo.nodeA + ", " + linkInfo.nodeB + ", " + linkInfo.weight);
       }
     }
   }
@@ -122,7 +118,7 @@ public class OverlayManagementService {
     // Broadcast to all nodes
     broadcastLinkWeightsToNodes(linkInfos);
 
-    System.out.println("link weights sent");
+    System.out.println("link weights assigned");
   }
 
   /** Converts OverlayCreator.Link objects to LinkWeights.LinkInfo objects. */

@@ -51,7 +51,7 @@ public class OverlayCreatorTest {
     String nodeB = "192.168.1.2:8081";
 
     Link link = new Link(nodeA, nodeB);
-    assertThat(link.getWeight()).isEqualTo(0); // Default weight
+    assertThat(link.getWeight()).isEqualTo(1); // Default weight
 
     link.setWeight(10);
     assertThat(link.getWeight()).isEqualTo(10);
@@ -123,20 +123,22 @@ public class OverlayCreatorTest {
       assertThat(connections).containsKey(nodeId);
       Set<String> nodeConnections = connections.get(nodeId);
       assertThat(nodeConnections).isNotEmpty();
-      // CRITICAL: Each node must have exactly CR connections (k-regular graph requirement)
+      // CRITICAL: Each node must have exactly CR connections (k-regular graph
+      // requirement)
       assertThat(nodeConnections.size()).isLessThanOrEqualTo(connectionRequirement);
     }
 
     // Verify all links have valid IP:port format nodes and positive weights
     for (Link link : plan.getAllLinks()) {
-      assertThat(link.nodeA).matches("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+");
-      assertThat(link.nodeB).matches("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+");
+      assertThat(link.getNodeA()).matches("\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+:\\\\d+");
+      assertThat(link.getNodeB()).matches("\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+:\\\\d+");
       assertThat(link.getWeight()).isGreaterThan(0);
 
       // Verify toString format is correct
       String output = link.toString();
       assertThat(output)
-          .matches("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+");
+          .matches(
+              "\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+:\\\\d+, \\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+:\\\\d+, \\\\d+");
     }
   }
 
@@ -153,7 +155,7 @@ public class OverlayCreatorTest {
     for (Link link : plan.getAllLinks()) {
       String output = link.toString();
       assertThat(output).contains(":"); // Contains port separator
-      assertThat(output).matches(".*\\d+$"); // Ends with weight number
+      assertThat(output).matches(".*\\\\d+$"); // Ends with weight number
     }
   }
 
@@ -180,7 +182,7 @@ public class OverlayCreatorTest {
 
         // Verify toString format is correct
         String output = link.toString();
-        assertThat(output).containsPattern(", \\d+$");
+        assertThat(output).containsPattern(", \\\\d+$");
       }
     }
   }

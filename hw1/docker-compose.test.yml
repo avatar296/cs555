@@ -4,7 +4,7 @@ services:
   registry:
     build: .
     container_name: overlay-registry
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.Registry 8080
+    command: java -cp /app/classes csx55.overlay.node.Registry 8080
     ports:
       - "8080:8080"
     networks:
@@ -18,7 +18,7 @@ services:
   node-1:
     build: .
     container_name: overlay-node-1
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    command: java -cp /app/classes csx55.overlay.node.MessagingNode registry 8080
     depends_on:
       registry:
         condition: service_healthy
@@ -28,7 +28,7 @@ services:
   node-2:
     build: .
     container_name: overlay-node-2
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    command: java -cp /app/classes csx55.overlay.node.MessagingNode registry 8080
     depends_on:
       registry:
         condition: service_healthy
@@ -38,7 +38,7 @@ services:
   node-3:
     build: .
     container_name: overlay-node-3
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    command: java -cp /app/classes csx55.overlay.node.MessagingNode registry 8080
     depends_on:
       registry:
         condition: service_healthy
@@ -48,7 +48,7 @@ services:
   node-4:
     build: .
     container_name: overlay-node-4
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    command: java -cp /app/classes csx55.overlay.node.MessagingNode registry 8080
     depends_on:
       registry:
         condition: service_healthy
@@ -58,7 +58,7 @@ services:
   node-5:
     build: .
     container_name: overlay-node-5
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    command: java -cp /app/classes csx55.overlay.node.MessagingNode registry 8080
     depends_on:
       registry:
         condition: service_healthy
@@ -68,7 +68,7 @@ services:
   node-6:
     build: .
     container_name: overlay-node-6
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    command: java -cp /app/classes csx55.overlay.node.MessagingNode registry 8080
     depends_on:
       registry:
         condition: service_healthy
@@ -78,7 +78,7 @@ services:
   node-7:
     build: .
     container_name: overlay-node-7
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    command: java -cp /app/classes csx55.overlay.node.MessagingNode registry 8080
     depends_on:
       registry:
         condition: service_healthy
@@ -88,7 +88,7 @@ services:
   node-8:
     build: .
     container_name: overlay-node-8
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    command: java -cp /app/classes csx55.overlay.node.MessagingNode registry 8080
     depends_on:
       registry:
         condition: service_healthy
@@ -98,7 +98,7 @@ services:
   node-9:
     build: .
     container_name: overlay-node-9
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    command: java -cp /app/classes csx55.overlay.node.MessagingNode registry 8080
     depends_on:
       registry:
         condition: service_healthy
@@ -108,7 +108,7 @@ services:
   node-10:
     build: .
     container_name: overlay-node-10
-    command: java -cp /app/build/classes/java/main csx55.overlay.node.MessagingNode registry 8080
+    command: java -cp /app/classes csx55.overlay.node.MessagingNode registry 8080
     depends_on:
       registry:
         condition: service_healthy

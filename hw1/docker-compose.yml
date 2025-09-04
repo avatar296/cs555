@@ -1,215 +1,81 @@
+version: '3.8'
+
 services:
   registry:
     build: .
     container_name: overlay-registry
-    command: ["java", "csx55.overlay.node.Registry", "8080"]
+    # command: ... <--- THIS LINE IS REMOVED
     ports:
       - "8080:8080"
     networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms256m -Xmx512m
-      - NODE_TYPE=REGISTRY
-    volumes:
-      - ./logs/registry:/app/logs
+      - overlay-net
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "8080"]
-      interval: 10s
-      timeout: 5s
+      interval: 5s
+      timeout: 3s
       retries: 5
-    restart: unless-stopped
 
-  messaging-node:
-    build: .
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
-    depends_on:
-      registry:
-        condition: service_healthy
-    networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-    volumes:
-      - ./logs/nodes:/app/logs
-    deploy:
-      replicas: 10
-    restart: unless-stopped
-
-  # Alternative: Individual messaging node definitions for better control
-  messaging-node-1:
+  node-1:
     build: .
     container_name: overlay-node-1
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
+    # command: ... <--- THIS LINE IS REMOVED
     depends_on:
       registry:
         condition: service_healthy
     networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-      - NODE_ID=1
-    volumes:
-      - ./logs/node1:/app/logs
-    restart: unless-stopped
+      - overlay-net
 
-  messaging-node-2:
-    build: .
-    container_name: overlay-node-2
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
-    depends_on:
-      registry:
-        condition: service_healthy
-    networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-      - NODE_ID=2
-    volumes:
-      - ./logs/node2:/app/logs
-    restart: unless-stopped
+  # ... (remove the 'command' line from nodes 2 through 10 as well) ...
 
-  messaging-node-3:
-    build: .
-    container_name: overlay-node-3
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
-    depends_on:
-      registry:
-        condition: service_healthy
-    networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-      - NODE_ID=3
-    volumes:
-      - ./logs/node3:/app/logs
-    restart: unless-stopped
-
-  messaging-node-4:
-    build: .
-    container_name: overlay-node-4
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
-    depends_on:
-      registry:
-        condition: service_healthy
-    networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-      - NODE_ID=4
-    volumes:
-      - ./logs/node4:/app/logs
-    restart: unless-stopped
-
-  messaging-node-5:
-    build: .
-    container_name: overlay-node-5
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
-    depends_on:
-      registry:
-        condition: service_healthy
-    networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-      - NODE_ID=5
-    volumes:
-      - ./logs/node5:/app/logs
-    restart: unless-stopped
-
-  messaging-node-6:
-    build: .
-    container_name: overlay-node-6
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
-    depends_on:
-      registry:
-        condition: service_healthy
-    networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-      - NODE_ID=6
-    volumes:
-      - ./logs/node6:/app/logs
-    restart: unless-stopped
-
-  messaging-node-7:
-    build: .
-    container_name: overlay-node-7
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
-    depends_on:
-      registry:
-        condition: service_healthy
-    networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-      - NODE_ID=7
-    volumes:
-      - ./logs/node7:/app/logs
-    restart: unless-stopped
-
-  messaging-node-8:
-    build: .
-    container_name: overlay-node-8
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
-    depends_on:
-      registry:
-        condition: service_healthy
-    networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-      - NODE_ID=8
-    volumes:
-      - ./logs/node8:/app/logs
-    restart: unless-stopped
-
-  messaging-node-9:
-    build: .
-    container_name: overlay-node-9
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
-    depends_on:
-      registry:
-        condition: service_healthy
-    networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-      - NODE_ID=9
-    volumes:
-      - ./logs/node9:/app/logs
-    restart: unless-stopped
-
-  messaging-node-10:
+  node-10:
     build: .
     container_name: overlay-node-10
-    command: ["java", "csx55.overlay.node.MessagingNode", "registry", "8080"]
+    # command: ... <--- THIS LINE IS REMOVED
     depends_on:
       registry:
         condition: service_healthy
     networks:
-      - overlay-network
-    environment:
-      - JAVA_OPTS=-Xms128m -Xmx256m
-      - NODE_TYPE=MESSAGING_NODE
-      - NODE_ID=10
+      - overlay-net
+
+  test-runner:
+    build: .
+    container_name: overlay-test-runner
     volumes:
-      - ./logs/node10:/app/logs
-    restart: unless-stopped
+      - ./test-scripts:/test-scripts
+      - ./test-results:/test-results
+    command: |
+      bash -c "
+        echo 'Waiting for all nodes to start...'
+        sleep 10
+        
+        echo 'list-messaging-nodes' | nc registry 8080
+        sleep 2
+        
+        echo 'setup-overlay 4' | nc registry 8080
+        sleep 5
+        
+        echo 'send-overlay-link-weights' | nc registry 8080
+        sleep 5
+        
+        echo 'start 100' | nc registry 8080
+        sleep 30
+        
+        echo 'Test execution complete'
+      "
+    depends_on:
+      - node-1
+      - node-2
+      - node-3
+      - node-4
+      - node-5
+      - node-6
+      - node-7
+      - node-8
+      - node-9
+      - node-10
+    networks:
+      - overlay-net
 
 networks:
-  overlay-network:
+  overlay-net:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16

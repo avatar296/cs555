@@ -188,6 +188,7 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
         break;
       case Protocol.PULL_TRAFFIC_SUMMARY:
         statisticsService.sendTrafficSummary(ipAddress, portNumber, registryConnection);
+        statisticsService.resetCounters(); // Reset after sending summary per PDF spec
         break;
       case Protocol.DATA_MESSAGE:
         routingService.handleDataMessage((DataMessage) event);

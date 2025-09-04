@@ -181,10 +181,10 @@ public class MinimumSpanningTree {
    * @param parent the parent node
    * @param child the child node
    * @param weight the edge weight
-   * @return formatted string "parent , child, weight" (matches link-weights format)
+   * @return formatted string "parent, child, weight" (matches link-weights format)
    */
   private String formatEdge(String parent, String child, int weight) {
-    return parent + " , " + child + ",  " + weight;
+    return parent + ", " + child + ", " + weight;
   }
 
   /**

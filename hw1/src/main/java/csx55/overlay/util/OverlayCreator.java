@@ -19,15 +19,14 @@ public final class OverlayCreator {
    * (weight not considered in equality/hash).
    */
   public static final class Link {
-    private final String nodeA; // canonical lower (lexicographically)
-    private final String nodeB; // canonical higher (lexicographically)
+    private final String nodeA;
+    private final String nodeB;
     private int weight;
 
     public Link(String a, String b, int weight) {
       if (a == null || b == null) throw new IllegalArgumentException("node id null");
       if (a.equals(b)) throw new IllegalArgumentException("self-link not allowed");
 
-      // canonicalize ordering so (A,B) == (B,A)
       if (a.compareTo(b) <= 0) {
         this.nodeA = a;
         this.nodeB = b;
@@ -76,8 +75,7 @@ public final class OverlayCreator {
 
     @Override
     public String toString() {
-      // formatting exactly as per spec: "IP:port , IP:port,  weight"
-      return nodeA + " , " + nodeB + ",  " + weight;
+      return nodeA + ", " + nodeB + ", " + weight;
     }
   }
 
@@ -181,22 +179,18 @@ public final class OverlayCreator {
           }
         }
       }
-      // If we made a full scan and can't add more (due to saturated nodes), break to
-      // avoid infinite loop
       break;
     }
 
-    // Build unique link set from adjacency (normalized)
     Set<Link> links = new LinkedHashSet<>();
     Random rnd = new Random();
     for (Map.Entry<String, Set<String>> e : adj.entrySet()) {
       String a = e.getKey();
       for (String b : e.getValue()) {
-        if (a.compareTo(b) < 0) { // Only add link if a is "less than" b
-          // create normalized link; assign a random weight in 1..10
+        if (a.compareTo(b) < 0) {
           int weight = 1 + rnd.nextInt(10);
           Link link = new Link(a, b, weight);
-          links.add(link); // Set<Link> prevents duplicates thanks to equals/hashCode
+          links.add(link);
         }
       }
     }

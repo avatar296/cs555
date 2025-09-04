@@ -53,17 +53,19 @@ public class OverlayReconstructionLogicTest {
 
     // Verify all links are between the provided nodes
     for (OverlayCreator.Link link : rebuiltOverlay.getAllLinks()) {
-      assertThat(remainingNodes).contains(link.nodeA);
-      assertThat(remainingNodes).contains(link.nodeB);
+      assertThat(remainingNodes).contains(link.getNodeA());
+      assertThat(remainingNodes).contains(link.getNodeB());
       assertThat(link.getWeight()).isBetween(1, 10);
 
       // Verify proper format for autograder
       String linkOutput = link.toString();
       assertThat(linkOutput)
-          .matches("\\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+\\.\\d+\\.\\d+\\.\\d+:\\d+, \\d+");
+          .matches(
+              "\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+:\\\\d+, \\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+:\\\\d+, \\\\d+");
     }
 
-    // SUCCESS: Dynamic reconstruction produces correct edge count for autograder compliance
+    // SUCCESS: Dynamic reconstruction produces correct edge count for autograder
+    // compliance
   }
 
   /** Test the original 12-node scenario to ensure we understand the baseline. */
@@ -135,7 +137,7 @@ public class OverlayReconstructionLogicTest {
     // Count how many original links would survive filtering
     int survivingLinks = 0;
     for (OverlayCreator.Link link : originalOverlay.getAllLinks()) {
-      if (remainingNodes.contains(link.nodeA) && remainingNodes.contains(link.nodeB)) {
+      if (remainingNodes.contains(link.getNodeA()) && remainingNodes.contains(link.getNodeB())) {
         survivingLinks++;
       }
     }
