@@ -106,7 +106,7 @@ public class OverlayManagementService {
         // Only print links where both nodes are currently registered
         if (registeredNodes.containsKey(linkInfo.nodeA)
             && registeredNodes.containsKey(linkInfo.nodeB)) {
-          System.out.println(linkInfo.nodeA + ", " + linkInfo.nodeB + ", " + linkInfo.weight);
+          System.out.println(linkInfo.nodeA + " " + linkInfo.nodeB + " " + linkInfo.weight);
         } else {
           LoggerUtil.debug(
               "OverlayManagement",
