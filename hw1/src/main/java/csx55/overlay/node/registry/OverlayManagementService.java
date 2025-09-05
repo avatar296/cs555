@@ -20,6 +20,7 @@ public class OverlayManagementService {
 
   private final NodeRegistrationService registrationService;
   private OverlayCreator.ConnectionPlan currentOverlay;
+  private int lastConnectionRequirement = -1;
   private final Object overlayLock = new Object();
 
   public OverlayManagementService(NodeRegistrationService registrationService) {
@@ -49,6 +50,7 @@ public class OverlayManagementService {
 
     synchronized (overlayLock) {
       currentOverlay = OverlayCreator.buildOverlay(nodeIds, connectionRequirement);
+      lastConnectionRequirement = connectionRequirement;
     }
 
     // Send peer lists to each node
@@ -58,7 +60,11 @@ public class OverlayManagementService {
     for (Map.Entry<String, Set<String>> entry : adjacency.entrySet()) {
       String nodeId = entry.getKey();
       List<String> peers = new ArrayList<>(entry.getValue());
-      totalConnections += peers.size();
+      
+      // Only count connections for nodes that are currently registered
+      if (nodes.containsKey(nodeId)) {
+        totalConnections += peers.size();
+      }
 
       TCPConnection connection = nodes.get(nodeId);
       if (connection != null) {
@@ -69,6 +75,8 @@ public class OverlayManagementService {
         } catch (IOException e) {
           LoggerUtil.error("OverlayManagement", "Failed to send peer list to " + nodeId, e);
         }
+      } else {
+        LoggerUtil.warn("OverlayManagement", "Skipping peer list for unregistered node: " + nodeId);
       }
     }
 
@@ -95,10 +103,18 @@ public class OverlayManagementService {
         return;
       }
 
-      // Print weights in same format as when broadcasting
+      // Get currently registered nodes to filter out stale links
+      Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
+
+      // Print weights in same format as when broadcasting, filtering out stale nodes
       List<LinkWeights.LinkInfo> linkInfos = convertToLinkInfos(currentOverlay.getUniqueLinks());
       for (LinkWeights.LinkInfo linkInfo : linkInfos) {
-        System.out.println(linkInfo.nodeA + ", " + linkInfo.nodeB + ", " + linkInfo.weight);
+        // Only print links where both nodes are currently registered
+        if (registeredNodes.containsKey(linkInfo.nodeA) && registeredNodes.containsKey(linkInfo.nodeB)) {
+          System.out.println(linkInfo.nodeA + ", " + linkInfo.nodeB + ", " + linkInfo.weight);
+        } else {
+          LoggerUtil.debug("OverlayManagement", "Skipping stale link: " + linkInfo.nodeA + " - " + linkInfo.nodeB);
+        }
       }
     }
   }
@@ -172,28 +188,14 @@ public class OverlayManagementService {
    */
   public void rebuildOverlay() {
     synchronized (overlayLock) {
-      if (currentOverlay == null) {
+      if (currentOverlay == null || lastConnectionRequirement == -1) {
         LoggerUtil.warn(
             "OverlayManagement", "Cannot rebuild overlay - no overlay was previously setup");
         return;
       }
 
-      // Extract the connection requirement from current overlay
-      Map<String, Set<String>> adjacency = currentOverlay.getAdjacency();
-      if (adjacency.isEmpty()) {
-        LoggerUtil.warn("OverlayManagement", "Cannot rebuild overlay - no adjacency data");
-        return;
-      }
-
-      // Calculate average connection requirement (should be consistent)
-      int connectionRequirement =
-          adjacency.values().stream()
-              .mapToInt(Set::size)
-              .max()
-              .orElse(4); // fallback to 4 if no data
-
-      LoggerUtil.info("OverlayManagement", "Rebuilding overlay with CR=" + connectionRequirement);
-      setupOverlay(connectionRequirement);
+      LoggerUtil.info("OverlayManagement", "Rebuilding overlay with CR=" + lastConnectionRequirement);
+      setupOverlay(lastConnectionRequirement);
     }
   }
 }

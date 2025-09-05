@@ -398,6 +398,196 @@ Test multiple combinations to ensure formula works:
 
 ---
 
+### Scenario 9: Node Disconnection and Stale Data Testing
+**Purpose**: Test system behavior when nodes disconnect during overlay operations - directly addresses autograder failure patterns
+
+**Background**: The root cause of autograder failures was nodes disconnecting during setup, leaving stale data in overlay structures, causing connection count inflation (24 vs 4 connections) and missing IP addresses in list-weights.
+
+#### Test 9a: Disconnection Before Setup-Overlay
+
+**Purpose**: Verify that disconnected nodes don't inflate connection counts
+
+**Steps**:
+1. **Clean Environment**:
+   ```bash
+   docker-compose down -v
+   docker-compose up -d
+   ```
+
+2. **Start Registry** (Terminal 1):
+   ```bash
+   docker-compose exec registry bash
+   java -cp /app csx55.overlay.node.Registry 8080
+   ```
+
+3. **Register 6 Nodes** (Terminals 2-7):
+   ```bash
+   # Start 6 nodes
+   docker-compose exec node-1 bash; java -cp /app csx55.overlay.node.MessagingNode registry 8080
+   docker-compose exec node-2 bash; java -cp /app csx55.overlay.node.MessagingNode registry 8080
+   docker-compose exec node-3 bash; java -cp /app csx55.overlay.node.MessagingNode registry 8080
+   docker-compose exec node-4 bash; java -cp /app csx55.overlay.node.MessagingNode registry 8080
+   docker-compose exec node-5 bash; java -cp /app csx55.overlay.node.MessagingNode registry 8080
+   docker-compose exec node-6 bash; java -cp /app csx55.overlay.node.MessagingNode registry 8080
+   ```
+
+4. **Verify Initial Registration**:
+   ```bash
+   list-messaging-nodes  # Should show 6 nodes
+   ```
+
+5. **Simulate Node Disconnections**:
+   ```bash
+   # In node-5 and node-6 terminals: Ctrl+C or close terminals
+   # Wait 5-10 seconds for registry to detect disconnections
+   ```
+
+6. **Verify Disconnection Detection**:
+   ```bash
+   list-messaging-nodes  # Should now show 4 nodes (6 - 2 disconnected)
+   ```
+
+7. **Critical Test - Setup Overlay**:
+   ```bash
+   setup-overlay 2
+   ```
+
+**Expected Output**:
+```
+setup completed with 4 connections
+```
+
+**Critical Validation**:
+- [ ] Connection count = 4 (4 remaining nodes × 2 CR ÷ 2)
+- [ ] NOT 12 connections (6 original nodes × 2 CR ÷ 2) 
+- [ ] System uses only currently registered nodes
+
+#### Test 9b: Disconnection After Setup-Overlay
+
+**Purpose**: Test list-weights handling of disconnected nodes
+
+**Steps**:
+1. **Continue from Test 9a** or start fresh with 4 nodes registered
+
+2. **Setup Overlay Successfully**:
+   ```bash
+   setup-overlay 2  # Should show "setup completed with 4 connections"
+   ```
+
+3. **Send Link Weights**:
+   ```bash
+   send-overlay-link-weights  # Should show "link weights assigned"
+   ```
+
+4. **Verify Initial List-Weights**:
+   ```bash
+   list-weights  # Should show exactly 4 edges, all with valid IP addresses
+   ```
+
+5. **Simulate Additional Disconnection**:
+   ```bash
+   # Disconnect 1 more node (e.g., close node-4 terminal)
+   # Wait for registry to detect disconnection
+   ```
+
+6. **Check Updated Registration**:
+   ```bash
+   list-messaging-nodes  # Should show 3 nodes
+   ```
+
+7. **Test List-Weights With Stale Data**:
+   ```bash
+   list-weights  # Should filter out edges involving disconnected nodes
+   ```
+
+**Expected Behavior**:
+- [ ] list-weights shows only edges between currently registered nodes
+- [ ] No "Missing IP address" errors
+- [ ] Disconnected nodes' links are filtered out
+- [ ] No stale or invalid IP:PORT combinations displayed
+
+#### Test 9c: Rebuilding After Disconnections
+
+**Purpose**: Test overlay rebuild functionality after node disconnections
+
+**Steps**:
+1. **Start with established overlay** (from previous tests)
+
+2. **Force Overlay Rebuild** (this happens automatically when nodes disconnect):
+   ```bash
+   # Registry should automatically call rebuildOverlay() when nodes disconnect
+   # Check logs for "Rebuilding overlay" messages
+   ```
+
+3. **Verify Rebuild Uses Correct Parameters**:
+   - Registry should use stored CR value (not derive from stale data)
+   - New overlay should only include currently registered nodes
+
+4. **Test Setup With Remaining Nodes**:
+   ```bash
+   setup-overlay 2  # Should work with remaining nodes
+   ```
+
+**Expected Results**:
+- [ ] Rebuild uses correct connection requirement (2, not inflated value)
+- [ ] New overlay includes only active nodes  
+- [ ] Connection count reflects actual node count
+- [ ] System recovers gracefully from disconnections
+
+#### Test 9d: Stress Test - Multiple Disconnection Waves
+
+**Purpose**: Test system stability under repeated disconnection scenarios
+
+**Steps**:
+1. **Start Large Setup**:
+   ```bash
+   # Register 8 nodes
+   # setup-overlay 3  (should give 12 connections: 8×3÷2)
+   ```
+
+2. **Wave 1 Disconnections**:
+   ```bash
+   # Disconnect 2 nodes → 6 remaining
+   # Verify: list-messaging-nodes shows 6
+   # Test: setup-overlay 2 → should give 6 connections (6×2÷2)
+   ```
+
+3. **Wave 2 Disconnections**:
+   ```bash
+   # Disconnect 2 more → 4 remaining  
+   # Verify: list-messaging-nodes shows 4
+   # Test: setup-overlay 2 → should give 4 connections (4×2÷2)
+   ```
+
+4. **Final Validation**:
+   ```bash
+   send-overlay-link-weights
+   list-weights  # Should show clean edges for remaining 4 nodes
+   ```
+
+**Success Criteria**:
+- [ ] Connection counts always match remaining active nodes
+- [ ] No connection count inflation from disconnected nodes
+- [ ] list-weights never shows "missing IP address" errors
+- [ ] System maintains data integrity through multiple disconnection events
+
+### Critical Validation Points
+
+**This scenario validates our key fixes**:
+
+1. **Stored Connection Requirement**: `rebuildOverlay()` uses stored CR instead of deriving from stale adjacency data
+2. **Active Node Filtering**: Connection counting only includes currently registered nodes
+3. **List-Weights Filtering**: Only shows edges between active nodes
+4. **Stale Data Prevention**: No inflation of connection counts due to disconnected nodes
+
+**Expected Fix Validation**:
+- ✅ **Connection count accuracy**: Always matches (activeNodes × CR ÷ 2)
+- ✅ **No missing IP addresses**: list-weights filters out disconnected nodes
+- ✅ **Graceful recovery**: System handles disconnections without data corruption
+- ✅ **Autograder compliance**: Prevents "24 vs 4 connections" type failures
+
+---
+
 ### Scenario 6: Submission Validation
 **Purpose**: Final validation before submission
 
