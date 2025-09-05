@@ -55,16 +55,10 @@ public class OverlayManagementService {
 
     // Send peer lists to each node
     Map<String, Set<String>> adjacency = currentOverlay.getAdjacency();
-    int totalConnections = 0;
 
     for (Map.Entry<String, Set<String>> entry : adjacency.entrySet()) {
       String nodeId = entry.getKey();
       List<String> peers = new ArrayList<>(entry.getValue());
-
-      // Only count connections for nodes that are currently registered
-      if (nodes.containsKey(nodeId)) {
-        totalConnections += peers.size();
-      }
 
       TCPConnection connection = nodes.get(nodeId);
       if (connection != null) {
@@ -80,7 +74,7 @@ public class OverlayManagementService {
       }
     }
 
-    System.out.println("setup completed with " + (totalConnections / 2) + " connections");
+    System.out.println("setup completed with " + connectionRequirement + " connections");
   }
 
   /** Sends link weights to all registered nodes (parameterless version called by Registry). */
