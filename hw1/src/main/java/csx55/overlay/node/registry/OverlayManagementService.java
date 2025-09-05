@@ -74,7 +74,8 @@ public class OverlayManagementService {
       }
     }
 
-    System.out.println("setup completed with " + connectionRequirement + " connections");
+    int actualConnections = currentOverlay.getUniqueLinks().size();
+    System.out.println("setup completed with " + actualConnections + " connections");
   }
 
   /** Sends link weights to all registered nodes (parameterless version called by Registry). */
@@ -93,25 +94,13 @@ public class OverlayManagementService {
   public void listWeights() {
     synchronized (overlayLock) {
       if (currentOverlay == null || currentOverlay.getUniqueLinks().isEmpty()) {
-        System.out.println("No weights available - overlay not setup or no links exist");
+        System.out.println("ERROR: No overlay configured");
         return;
       }
 
-      // Get currently registered nodes to filter out stale links
-      Map<String, TCPConnection> registeredNodes = registrationService.getRegisteredNodes();
-
-      // Print weights in same format as when broadcasting, filtering out stale nodes
       List<LinkWeights.LinkInfo> linkInfos = convertToLinkInfos(currentOverlay.getUniqueLinks());
       for (LinkWeights.LinkInfo linkInfo : linkInfos) {
-        // Only print links where both nodes are currently registered
-        if (registeredNodes.containsKey(linkInfo.nodeA)
-            && registeredNodes.containsKey(linkInfo.nodeB)) {
-          System.out.println(linkInfo.nodeA + ", " + linkInfo.nodeB + ", " + linkInfo.weight);
-        } else {
-          LoggerUtil.debug(
-              "OverlayManagement",
-              "Skipping stale link: " + linkInfo.nodeA + " - " + linkInfo.nodeB);
-        }
+        System.out.println(linkInfo.nodeA + ", " + linkInfo.nodeB + ", " + linkInfo.weight);
       }
     }
   }
@@ -123,12 +112,10 @@ public class OverlayManagementService {
   public void sendOverlayLinkWeights(OverlayCreator.ConnectionPlan plan) {
     if (plan == null) throw new IllegalArgumentException("plan null");
 
-    // Convert Links to LinkInfos
     List<LinkWeights.LinkInfo> linkInfos = convertToLinkInfos(plan.getUniqueLinks());
 
     LoggerUtil.info("OverlayManagement", "Broadcasting " + linkInfos.size() + " link weights");
 
-    // Broadcast to all nodes
     broadcastLinkWeightsToNodes(linkInfos);
 
     System.out.println("link weights assigned");
