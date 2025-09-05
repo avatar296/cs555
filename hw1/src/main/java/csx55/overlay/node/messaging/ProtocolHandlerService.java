@@ -164,6 +164,9 @@ public class ProtocolHandlerService {
    */
   public void handleLinkWeights(LinkWeights linkWeights) {
     allNodes.clear();
+    // Always include the local node first
+    allNodes.add(nodeId);
+
     for (LinkWeights.LinkInfo link : linkWeights.getLinks()) {
       String node1 = link.nodeA;
       String node2 = link.nodeB;
