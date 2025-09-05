@@ -60,7 +60,7 @@ public class OverlayManagementService {
     for (Map.Entry<String, Set<String>> entry : adjacency.entrySet()) {
       String nodeId = entry.getKey();
       List<String> peers = new ArrayList<>(entry.getValue());
-      
+
       // Only count connections for nodes that are currently registered
       if (nodes.containsKey(nodeId)) {
         totalConnections += peers.size();
@@ -110,10 +110,13 @@ public class OverlayManagementService {
       List<LinkWeights.LinkInfo> linkInfos = convertToLinkInfos(currentOverlay.getUniqueLinks());
       for (LinkWeights.LinkInfo linkInfo : linkInfos) {
         // Only print links where both nodes are currently registered
-        if (registeredNodes.containsKey(linkInfo.nodeA) && registeredNodes.containsKey(linkInfo.nodeB)) {
+        if (registeredNodes.containsKey(linkInfo.nodeA)
+            && registeredNodes.containsKey(linkInfo.nodeB)) {
           System.out.println(linkInfo.nodeA + ", " + linkInfo.nodeB + ", " + linkInfo.weight);
         } else {
-          LoggerUtil.debug("OverlayManagement", "Skipping stale link: " + linkInfo.nodeA + " - " + linkInfo.nodeB);
+          LoggerUtil.debug(
+              "OverlayManagement",
+              "Skipping stale link: " + linkInfo.nodeA + " - " + linkInfo.nodeB);
         }
       }
     }
@@ -194,7 +197,8 @@ public class OverlayManagementService {
         return;
       }
 
-      LoggerUtil.info("OverlayManagement", "Rebuilding overlay with CR=" + lastConnectionRequirement);
+      LoggerUtil.info(
+          "OverlayManagement", "Rebuilding overlay with CR=" + lastConnectionRequirement);
       setupOverlay(lastConnectionRequirement);
     }
   }
