@@ -36,53 +36,78 @@ public class MinimumSpanningTree {
     }
 
     mstEdges.clear();
-
-    Map<String, String> parent = new HashMap<>();
     Map<String, Integer> minWeight = new HashMap<>();
-    PriorityQueue<Edge> pq = new PriorityQueue<>(Comparator.comparingInt(Edge::getWeight));
+    Map<String, String> parent = new HashMap<>();
     Set<String> inTree = new HashSet<>();
 
-    // Initialize all nodes with infinite weight
+    // Initialize all nodes with infinite weight and null parent
     for (String node : graph.keySet()) {
       minWeight.put(node, Integer.MAX_VALUE);
+      parent.put(node, null);
     }
 
-    // Start from root node with weight 0
+    // Start with the root node
     minWeight.put(rootNodeId, 0);
-    pq.add(new Edge(rootNodeId, 0));
+
+    // The PriorityQueue will store the node IDs (String)
+    // The comparator tells the queue how to order the nodes: by looking up their
+    // current minimum weight in the 'minWeight' map.
+    PriorityQueue<String> pq = new PriorityQueue<>(Comparator.comparingInt(minWeight::get));
+    pq.add(rootNodeId);
 
     while (!pq.isEmpty()) {
-      Edge current = pq.poll();
-      String currentNode = current.getDestination();
+      String u = pq.poll(); // Get the node with the smallest weight
 
-      if (inTree.contains(currentNode)) {
+      // If we've already processed this node, skip it.
+      // This handles the case where we've added a node to the PQ multiple times.
+      if (inTree.contains(u)) {
         continue;
       }
 
-      inTree.add(currentNode);
+      inTree.add(u);
 
-      // Add edge to MST (except for root node)
-      if (!currentNode.equals(rootNodeId) && parent.containsKey(currentNode)) {
-        String parentNode = parent.get(currentNode);
-        int weight = minWeight.get(currentNode);
-        mstEdges.put(currentNode, new Edge(parentNode, weight));
+      // Add the edge to our final MST structure
+      if (parent.get(u) != null) {
+        mstEdges.put(u, new Edge(parent.get(u), minWeight.get(u)));
       }
 
-      // Process neighbors
-      List<Edge> neighbors = graph.get(currentNode);
+      // Look at all neighbors of the node we just added to the tree
+      List<Edge> neighbors = graph.get(u);
       if (neighbors != null) {
-        for (Edge neighborEdge : neighbors) {
-          String neighbor = neighborEdge.getDestination();
-          int weight = neighborEdge.getWeight();
+        for (Edge edgeToNeighbor : neighbors) {
+          String v = edgeToNeighbor.getDestination();
+          int weight = edgeToNeighbor.getWeight();
 
-          if (!inTree.contains(neighbor) && weight < minWeight.get(neighbor)) {
-            minWeight.put(neighbor, weight);
-            parent.put(neighbor, currentNode);
-            pq.add(new Edge(neighbor, weight));
+          // If the neighbor is not yet in the tree and we found a cheaper path
+          if (!inTree.contains(v) && weight < minWeight.get(v)) {
+            // Remove old entry from queue if exists (by recreating queue without it)
+            pq.remove(v);
+
+            // Update the parent and the minimum weight for this neighbor
+            parent.put(v, u);
+            minWeight.put(v, weight);
+
+            // Add the neighbor to the priority queue with updated weight
+            pq.add(v);
           }
         }
       }
     }
+
+    // Calculate and log total MST weight for debugging
+    int totalWeight = 0;
+    for (Edge edge : mstEdges.values()) {
+      totalWeight += edge.getWeight();
+    }
+    LoggerUtil.debug(
+        "MinimumSpanningTree",
+        "MST calculated for root "
+            + rootNodeId
+            + " with total weight: "
+            + totalWeight
+            + " and "
+            + mstEdges.size()
+            + " edges");
 
     return true;
   }
@@ -207,6 +232,19 @@ public class MinimumSpanningTree {
    */
   public boolean isEmpty() {
     return mstEdges.isEmpty();
+  }
+
+  /**
+   * Gets the total weight of the MST.
+   *
+   * @return the sum of all edge weights in the MST
+   */
+  public int getTotalWeight() {
+    int totalWeight = 0;
+    for (Edge edge : mstEdges.values()) {
+      totalWeight += edge.getWeight();
+    }
+    return totalWeight;
   }
 
   /** Clears the calculated MST. */
