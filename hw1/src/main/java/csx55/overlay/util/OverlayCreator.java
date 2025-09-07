@@ -123,85 +123,124 @@ public final class OverlayCreator {
   }
 
   public static ConnectionPlan buildOverlay(List<String> nodeIds, int connectionRequirement) {
-    if (nodeIds == null) throw new IllegalArgumentException("nodeIds null");
-    if (nodeIds.size() < 2) throw new IllegalArgumentException("need at least 2 nodes");
-    if (connectionRequirement < 1) throw new IllegalArgumentException("connectionRequirement < 1");
+    if (nodeIds == null || nodeIds.size() < 2) {
+      throw new IllegalArgumentException("Need at least 2 nodes");
+    }
+    if (connectionRequirement < 1) {
+      throw new IllegalArgumentException("connectionRequirement must be at least 1");
+    }
+
     int n = nodeIds.size();
+
+    // A k-regular graph is impossible if n*k is odd (total degree must be even)
+    if ((n * connectionRequirement) % 2 != 0) {
+      LoggerUtil.warn(
+          "OverlayCreator",
+          "Cannot create perfect "
+              + connectionRequirement
+              + "-regular graph with "
+              + n
+              + " nodes (n*k must be even). Will approximate.");
+    }
+
+    // Clamp k to a realistic maximum
     if (connectionRequirement >= n) {
-      // can't connect to self; maximum meaningful CR is n-1
       connectionRequirement = n - 1;
     }
 
-    // adjacency map (ordered by insertion)
     Map<String, Set<String>> adj = new LinkedHashMap<>();
-    for (String id : nodeIds) adj.put(id, new LinkedHashSet<>());
+    for (String id : nodeIds) {
+      adj.put(id, new LinkedHashSet<>());
+    }
 
-    // ring baseline to guarantee connectivity
+    // This algorithm adds edges symmetrically, connecting each node to its k/2 nearest
+    // neighbors on each side of the ring (circulant graph approach)
     for (int i = 0; i < n; i++) {
-      String a = nodeIds.get(i);
-      String b = nodeIds.get((i + 1) % n);
-      adj.get(a).add(b);
-      adj.get(b).add(a);
-    }
+      for (int j = 1; j <= connectionRequirement / 2; j++) {
+        String nodeA = nodeIds.get(i);
+        String nodeB = nodeIds.get((i + j) % n);
 
-    // add additional nearest neighbors incrementally until each node has CR
-    // neighbors or no more possible
-    // We'll try symmetric additions when possible.
-    for (int dist = 2; dist <= n / 2 && !allHaveDegree(adj, connectionRequirement); dist++) {
-      for (int i = 0; i < n && !allHaveDegree(adj, connectionRequirement); i++) {
-        String a = nodeIds.get(i);
-        String b = nodeIds.get((i + dist) % n);
-
-        if (adj.get(a).size() < connectionRequirement
-            && adj.get(b).size() < connectionRequirement
-            && !adj.get(a).contains(b)) {
-          adj.get(a).add(b);
-          adj.get(b).add(a);
+        // Add the symmetric edge if it doesn't exceed the requirement
+        if (adj.get(nodeA).size() < connectionRequirement
+            && adj.get(nodeB).size() < connectionRequirement
+            && !adj.get(nodeA).contains(nodeB)) {
+          adj.get(nodeA).add(nodeB);
+          adj.get(nodeB).add(nodeA);
         }
       }
     }
 
-    // Final pass: if some nodes still lack degree, greedily connect to any node
-    // with spare capacity
-    outer:
-    while (!allHaveDegree(adj, connectionRequirement)) {
-      for (int i = 0; i < n; i++) {
-        String a = nodeIds.get(i);
-        if (adj.get(a).size() >= connectionRequirement) continue;
-        for (int j = 0; j < n; j++) {
-          if (i == j) continue;
-          String b = nodeIds.get(j);
-          if (adj.get(b).size() >= connectionRequirement) continue;
-          if (!adj.get(a).contains(b)) {
-            adj.get(a).add(b);
-            adj.get(b).add(a);
-            if (allHaveDegree(adj, connectionRequirement)) break outer;
-          }
+    // If k is odd, the logic above leaves one connection missing.
+    // For even n, connect to the node at the opposite side of the ring
+    if (connectionRequirement % 2 != 0 && n % 2 == 0) {
+      int half = n / 2;
+      for (int i = 0; i < half; i++) {
+        String nodeA = nodeIds.get(i);
+        String nodeB = nodeIds.get(i + half);
+        if (adj.get(nodeA).size() < connectionRequirement
+            && adj.get(nodeB).size() < connectionRequirement
+            && !adj.get(nodeA).contains(nodeB)) {
+          adj.get(nodeA).add(nodeB);
+          adj.get(nodeB).add(nodeA);
         }
       }
-      break;
     }
 
+    // For odd k and odd n, or other edge cases, try to complete connections
+    // This is a more controlled approach than the previous aggressive loop
+    for (int i = 0; i < n; i++) {
+      String nodeA = nodeIds.get(i);
+      if (adj.get(nodeA).size() >= connectionRequirement) continue;
+
+      for (int j = i + 1; j < n; j++) {
+        String nodeB = nodeIds.get(j);
+        if (adj.get(nodeA).size() < connectionRequirement
+            && adj.get(nodeB).size() < connectionRequirement
+            && !adj.get(nodeA).contains(nodeB)) {
+          adj.get(nodeA).add(nodeB);
+          adj.get(nodeB).add(nodeA);
+
+          // Check if we've reached the requirement for nodeA
+          if (adj.get(nodeA).size() >= connectionRequirement) break;
+        }
+      }
+    }
+
+    // Verify k-regularity
+    boolean isKRegular = true;
+    for (Map.Entry<String, Set<String>> entry : adj.entrySet()) {
+      if (entry.getValue().size() != connectionRequirement) {
+        isKRegular = false;
+        LoggerUtil.warn(
+            "OverlayCreator",
+            "Node "
+                + entry.getKey()
+                + " has degree "
+                + entry.getValue().size()
+                + " instead of "
+                + connectionRequirement);
+      }
+    }
+
+    if (isKRegular) {
+      LoggerUtil.info(
+          "OverlayCreator",
+          "Successfully created " + connectionRequirement + "-regular graph with " + n + " nodes");
+    }
+
+    // Generate the canonical set of links for the connection plan
     Set<Link> links = new LinkedHashSet<>();
     Random rnd = new Random();
-    for (Map.Entry<String, Set<String>> e : adj.entrySet()) {
-      String a = e.getKey();
-      for (String b : e.getValue()) {
-        if (a.compareTo(b) < 0) {
+    for (String nodeA : nodeIds) {
+      for (String nodeB : adj.get(nodeA)) {
+        // To avoid duplicates, only add the link if nodeA is "smaller"
+        if (nodeA.compareTo(nodeB) < 0) {
           int weight = 1 + rnd.nextInt(10);
-          Link link = new Link(a, b, weight);
-          links.add(link);
+          links.add(new Link(nodeA, nodeB, weight));
         }
       }
     }
 
     return new ConnectionPlan(adj, links);
-  }
-
-  private static boolean allHaveDegree(Map<String, Set<String>> adj, int k) {
-    for (Set<String> peers : adj.values()) {
-      if (peers.size() < k) return false;
-    }
-    return true;
   }
 }
