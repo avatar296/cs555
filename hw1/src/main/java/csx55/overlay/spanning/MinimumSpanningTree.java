@@ -38,6 +38,7 @@ public class MinimumSpanningTree {
     mstEdges.clear();
     Map<String, Integer> minWeight = new HashMap<>();
     Map<String, String> parent = new HashMap<>();
+    Map<String, Integer> edgeWeight = new HashMap<>(); // Track actual edge weights
     Set<String> inTree = new HashSet<>();
 
     // Initialize all nodes with infinite weight and null parent
@@ -68,7 +69,7 @@ public class MinimumSpanningTree {
 
       // Add the edge to our final MST structure
       if (parent.get(u) != null) {
-        mstEdges.put(u, new Edge(parent.get(u), minWeight.get(u)));
+        mstEdges.put(u, new Edge(parent.get(u), edgeWeight.get(u)));
       }
 
       // Look at all neighbors of the node we just added to the tree
@@ -86,6 +87,7 @@ public class MinimumSpanningTree {
             // Update the parent and the minimum weight for this neighbor
             parent.put(v, u);
             minWeight.put(v, weight);
+            edgeWeight.put(v, weight); // Store the actual edge weight
 
             // Add the neighbor to the priority queue with updated weight
             pq.add(v);
