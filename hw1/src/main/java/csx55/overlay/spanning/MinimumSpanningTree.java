@@ -13,7 +13,7 @@ public class MinimumSpanningTree {
    * Constructs a new MinimumSpanningTree calculator.
    *
    * @param rootNodeId the root node for the MST
-   * @param graph      the graph to build the MST from
+   * @param graph the graph to build the MST from
    */
   public MinimumSpanningTree(String rootNodeId, Map<String, List<Edge>> graph) {
     this.rootNodeId = rootNodeId;
@@ -22,8 +22,7 @@ public class MinimumSpanningTree {
   }
 
   /**
-   * Calculates the Minimum Spanning Tree using Prim's algorithm. The resulting
-   * MST provides optimal
+   * Calculates the Minimum Spanning Tree using Prim's algorithm. The resulting MST provides optimal
    * paths from the root node to all other nodes.
    *
    * @return true if MST was calculated successfully, false otherwise
@@ -116,9 +115,8 @@ public class MinimumSpanningTree {
    * Finds the path from a destination node back to the root.
    *
    * @param destination the target node
-   * @return list of nodes in the path from destination to root (exclusive of
-   *         root), or null if no
-   *         path exists
+   * @return list of nodes in the path from destination to root (exclusive of root), or null if no
+   *     path exists
    */
   public List<String> findPathToRoot(String destination) {
     if (destination.equals(rootNodeId)) {
@@ -172,8 +170,7 @@ public class MinimumSpanningTree {
   }
 
   /**
-   * Prints the Minimum Spanning Tree in breadth-first order. Displays each edge
-   * as: parent, child,
+   * Prints the Minimum Spanning Tree in breadth-first order. Displays each edge as: parent, child,
    * weight.
    */
   public void print() {
@@ -206,10 +203,9 @@ public class MinimumSpanningTree {
    * Formats an edge as a string.
    *
    * @param parent the parent node
-   * @param child  the child node
+   * @param child the child node
    * @param weight the edge weight
-   * @return formatted string "parent, child, weight" (matches link-weights
-   *         format)
+   * @return formatted string "parent, child, weight" (matches link-weights format)
    */
   private String formatEdge(String parent, String child, int weight) {
     return parent + ", " + child + ", " + weight;
