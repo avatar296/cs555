@@ -18,7 +18,6 @@ import csx55.overlay.wireformats.RegisterRequest;
 import csx55.overlay.wireformats.RegisterResponse;
 import csx55.overlay.wireformats.TaskInitiate;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -69,15 +68,11 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
    */
   private void start(String registryHost, int registryPort) {
     try {
+      // 1) Start listening socket to get actual server port
       serverSocket = new ServerSocket(0);
       this.portNumber = serverSocket.getLocalPort();
-      this.ipAddress = InetAddress.getLocalHost().getHostAddress();
-      this.nodeId = NodeValidationHelper.createNodeId(ipAddress, portNumber);
 
-      routingService.setNodeId(nodeId);
-      protocolHandler.setNodeInfo(nodeId, allNodes);
-      taskService.setNodeInfo(nodeId, ipAddress, portNumber, null);
-
+      // 2) Connect to registry FIRST to determine our IP
       Socket socket = new Socket(registryHost, registryPort);
       try {
         registryConnection = new TCPConnection(socket, this);
@@ -90,11 +85,22 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
         }
         throw e;
       }
+
+      // 3) Use the SAME IP the OS chose for this connection
+      //    This matches what the registry will see
+      this.ipAddress = socket.getLocalAddress().getHostAddress();
+
+      // 4) Build node ID and configure services
+      this.nodeId = NodeValidationHelper.createNodeId(ipAddress, portNumber);
+      routingService.setNodeId(nodeId);
+      protocolHandler.setNodeInfo(nodeId, allNodes);
       taskService.setNodeInfo(nodeId, ipAddress, portNumber, registryConnection);
 
+      // 5) Register with the canonicalized IP
       RegisterRequest request = new RegisterRequest(ipAddress, portNumber);
       registryConnection.sendEvent(request);
 
+      // 6) Accept peer connections
       executorService.execute(
           () -> {
             while (running) {
@@ -174,12 +180,47 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
         }
         break;
       case Protocol.LINK_WEIGHTS:
-        protocolHandler.handleLinkWeights((LinkWeights) event);
+        LinkWeights lw = (LinkWeights) event;
+        protocolHandler.handleLinkWeights(lw);
+
+        // Canonicalize our node ID to match what's in the graph
+        String canonicalId = findCanonicalIdFromLinkWeights(lw, portNumber);
+        if (canonicalId != null && !canonicalId.equals(nodeId)) {
+          LoggerUtil.info(
+              "MessagingNode", "Canonicalizing node ID from " + nodeId + " to " + canonicalId);
+
+          // Update our node ID to match the Registry's view
+          this.nodeId = canonicalId;
+          this.ipAddress = canonicalId.substring(0, canonicalId.lastIndexOf(':'));
+
+          // Update all services with the canonical node ID
+          routingService.setNodeId(canonicalId);
+          protocolHandler.setNodeInfo(canonicalId, allNodes);
+          taskService.setNodeInfo(canonicalId, ipAddress, portNumber, registryConnection);
+
+          // Recreate routing table with the canonical node ID
+          RoutingTable newTable = new RoutingTable(canonicalId);
+          newTable.updateLinkWeights(lw);
+          routingService.updateRoutingTable(newTable);
+        }
+
         LoggerUtil.info(
             "MessagingNode",
             "Updated allNodes list with "
                 + allNodes.size()
                 + " nodes after receiving link weights");
+        // Add diagnostic output for testing
+        System.out.println(
+            "MSTRootCheck root="
+                + nodeId
+                + " presentInGraph="
+                + routingService.getRoutingTable().graphContains(nodeId)
+                + " graphNodes="
+                + routingService.getRoutingTable().graphSize()
+                + " mstEdges="
+                + routingService.getRoutingTable().mstEdgeCount()
+                + " mstTotal="
+                + routingService.getRoutingTable().mstTotalWeight());
         break;
       case Protocol.TASK_INITIATE:
         LoggerUtil.info(
@@ -221,6 +262,39 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
           break;
         }
       }
+    }
+  }
+
+  /**
+   * Finds the canonical node ID from LinkWeights that matches our port. This ensures we use the
+   * exact ID that appears in the graph.
+   *
+   * @param linkWeights the link weights containing node IDs
+   * @param myPort our listening port
+   * @return the canonical node ID, or null if not found
+   */
+  private String findCanonicalIdFromLinkWeights(LinkWeights linkWeights, int myPort) {
+    for (LinkWeights.LinkInfo link : linkWeights.getLinks()) {
+      if (endsWithPort(link.nodeA, myPort)) return link.nodeA;
+      if (endsWithPort(link.nodeB, myPort)) return link.nodeB;
+    }
+    return null;
+  }
+
+  /**
+   * Checks if a node ID ends with the specified port.
+   *
+   * @param nodeId the node ID to check
+   * @param port the port to match
+   * @return true if the node ID ends with the port
+   */
+  private boolean endsWithPort(String nodeId, int port) {
+    int idx = nodeId.lastIndexOf(':');
+    if (idx < 0) return false;
+    try {
+      return Integer.parseInt(nodeId.substring(idx + 1)) == port;
+    } catch (NumberFormatException e) {
+      return false;
     }
   }
 

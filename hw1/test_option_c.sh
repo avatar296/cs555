@@ -11,7 +11,7 @@ echo "============================================================"
 
 # Configuration
 RUNS=${RUNS:-3}            # Number of test runs
-NODES=${NODES:-10}         # Number of messaging nodes
+NODES=${NODES:-13}         # Number of messaging nodes (13 to match autograder)
 CR=${CR:-4}                 # Connection requirement
 BASE_PORT=5000             # Base port for registry
 JAVA_CP="build/classes/java/main"  # Classpath for Java
@@ -177,6 +177,56 @@ normalize_file_inplace() {
     normalize_edges "$infile" > "$tmp" && mv "$tmp" "$infile"
 }
 
+# Function to verify MST calculation
+verify_mst_calculation() {
+    local run=$1
+    local expected_edges=$((NODES - 1))
+    
+    echo ""
+    echo "Verifying MST calculation for run $run..."
+    
+    local all_good=true
+    local failed_nodes=""
+    
+    for i in $(seq 1 "$NODES"); do
+        local log_file="$TEST_DIR/run_${run}_node_${i}.log"
+        
+        # Look for MSTRootCheck line
+        local mst_check=$(grep -m1 'MSTRootCheck' "$log_file" 2>/dev/null || echo "")
+        
+        if [[ -z "$mst_check" ]]; then
+            echo "  ✗ Node $i: No MSTRootCheck output found"
+            all_good=false
+            failed_nodes="$failed_nodes $i"
+        elif ! echo "$mst_check" | grep -q 'presentInGraph=true'; then
+            echo "  ✗ Node $i: Root not in graph! $mst_check"
+            all_good=false
+            failed_nodes="$failed_nodes $i"
+        elif ! echo "$mst_check" | grep -q "mstEdges=$expected_edges"; then
+            echo "  ✗ Node $i: Wrong edge count! Expected $expected_edges edges. $mst_check"
+            all_good=false
+            failed_nodes="$failed_nodes $i"
+        else
+            # Extract just the key values for clean output
+            local root=$(echo "$mst_check" | sed -n 's/.*root=\([^ ]*\).*/\1/p')
+            local edges=$(echo "$mst_check" | sed -n 's/.*mstEdges=\([^ ]*\).*/\1/p')
+            local weight=$(echo "$mst_check" | sed -n 's/.*mstTotal=\([^ ]*\).*/\1/p')
+            echo "  ✓ Node $i: MST correct (edges=$edges, weight=$weight)"
+        fi
+    done
+    
+    if [[ "$all_good" == "false" ]]; then
+        echo ""
+        echo "  ✗✗✗ MST CALCULATION FAILED - This would cause 'Actual: 0' in autograder!"
+        echo "  Failed nodes:$failed_nodes"
+        return 1
+    else
+        echo ""
+        echo "  ✓✓✓ All nodes have correct MST ($expected_edges edges each)"
+        return 0
+    fi
+}
+
 # Function to run a single test iteration
 run_test() {
     local run=$1
@@ -201,6 +251,13 @@ run_test() {
     
     send_to_registry "send-overlay-link-weights"
     sleep 3
+    
+    # Verify MST was calculated correctly
+    if ! verify_mst_calculation "$run"; then
+        echo "MST calculation failed in run $run - stopping test"
+        cleanup
+        exit 1
+    fi
     
     send_to_registry "list-weights"
     sleep 2
@@ -311,7 +368,7 @@ for run in $(seq 1 "$RUNS"); do
     # Count overlay edges
     if [[ -f "$TEST_DIR/run_${run}_weights.txt" ]]; then
         edge_count=$(wc -l < "$TEST_DIR/run_${run}_weights.txt")
-        total_weight=$(awk -F', ' '{sum += $3} END {print sum}' "$TEST_DIR/run_${run}_weights.txt" 2>/dev/null || echo "0")
+        total_weight=$(awk -F',' '{ gsub(/^ +| +$/, "", $3); sum += $3 } END {print sum}' "$TEST_DIR/run_${run}_weights.txt" 2>/dev/null || echo "0")
         echo "  Overlay edges: $edge_count, Total weight: $total_weight"
     fi
     
@@ -319,7 +376,7 @@ for run in $(seq 1 "$RUNS"); do
     for node in 1 3 5 7 10; do
         if [[ $node -le $NODES ]] && [[ -f "$TEST_DIR/run_${run}_mst_node_${node}.txt" ]]; then
             mst_edges=$(wc -l < "$TEST_DIR/run_${run}_mst_node_${node}.txt")
-            mst_weight=$(awk -F', ' '{sum += $3} END {print sum}' "$TEST_DIR/run_${run}_mst_node_${node}.txt" 2>/dev/null || echo "0")
+            mst_weight=$(awk -F',' '{ gsub(/^ +| +$/, "", $3); sum += $3 } END {print sum}' "$TEST_DIR/run_${run}_mst_node_${node}.txt" 2>/dev/null || echo "0")
             echo "  Node $node MST: edges=$mst_edges, weight=$mst_weight"
         fi
     done

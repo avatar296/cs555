@@ -31,7 +31,10 @@ public class MinimumSpanningTree {
     if (!graph.containsKey(rootNodeId)) {
       LoggerUtil.warn(
           "MinimumSpanningTree",
-          "Root node " + rootNodeId + " not found in graph - cannot calculate MST");
+          "Root node "
+              + rootNodeId
+              + " not found in graph. Graph contains: "
+              + graph.keySet().stream().limit(5).collect(java.util.stream.Collectors.toList()));
       return false;
     }
 

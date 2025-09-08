@@ -156,4 +156,41 @@ public class RoutingTable {
   public synchronized boolean hasPath(String destination) {
     return findNextHop(destination) != null;
   }
+
+  /**
+   * Checks if the graph contains a specific node ID.
+   *
+   * @param id the node ID to check
+   * @return true if the node is in the graph, false otherwise
+   */
+  public synchronized boolean graphContains(String id) {
+    return graph.containsKey(id);
+  }
+
+  /**
+   * Gets the number of nodes in the graph.
+   *
+   * @return the number of nodes in the graph
+   */
+  public synchronized int graphSize() {
+    return graph.size();
+  }
+
+  /**
+   * Gets the number of edges in the calculated MST.
+   *
+   * @return the number of MST edges, or 0 if MST not calculated
+   */
+  public synchronized int mstEdgeCount() {
+    return (mst == null) ? 0 : mst.getMSTEdges().size();
+  }
+
+  /**
+   * Gets the total weight of the calculated MST.
+   *
+   * @return the total MST weight, or 0 if MST not calculated
+   */
+  public synchronized int mstTotalWeight() {
+    return (mst == null) ? 0 : mst.getTotalWeight();
+  }
 }
