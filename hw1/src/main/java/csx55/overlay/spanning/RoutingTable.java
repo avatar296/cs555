@@ -71,8 +71,15 @@ public class RoutingTable {
    * MinimumSpanningTree class for the actual calculation.
    */
   private void calculateMST() {
-    mst = new MinimumSpanningTree(localNodeId, graph);
-    mst.calculate();
+    MinimumSpanningTree newMst = new MinimumSpanningTree(localNodeId, graph);
+    boolean success = newMst.calculate();
+
+    if (success) {
+      mst = newMst;
+    } else {
+      // If calculation fails (e.g., disconnected graph), ensure mst is null
+      mst = null;
+    }
   }
 
   /**

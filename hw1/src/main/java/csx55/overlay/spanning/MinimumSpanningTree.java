@@ -93,6 +93,22 @@ public class MinimumSpanningTree {
       }
     }
 
+    // Verify that the MST spans all nodes in the graph
+    // If not, the graph is disconnected and we cannot create a valid MST
+    if (inTree.size() != graph.keySet().size()) {
+      LoggerUtil.warn(
+          "MinimumSpanningTree",
+          "MST does not span all nodes. Graph is disconnected. "
+              + "Nodes in tree: "
+              + inTree.size()
+              + ", Nodes in graph: "
+              + graph.keySet().size());
+
+      // Clear the partial MST to prevent using an incomplete tree
+      mstEdges.clear();
+      return false;
+    }
+
     // Calculate and log total MST weight for debugging
     int totalWeight = 0;
     for (Edge edge : mstEdges.values()) {

@@ -181,6 +181,9 @@ public class OverlayManagementService {
       LoggerUtil.info(
           "OverlayManagement", "Rebuilding overlay with CR=" + lastConnectionRequirement);
       setupOverlay(lastConnectionRequirement);
+
+      // Send updated link weights after rebuilding so nodes have current topology
+      sendOverlayLinkWeights();
     }
   }
 }
