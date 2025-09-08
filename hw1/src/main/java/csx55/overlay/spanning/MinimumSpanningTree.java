@@ -13,7 +13,7 @@ public class MinimumSpanningTree {
    * Constructs a new MinimumSpanningTree calculator.
    *
    * @param rootNodeId the root node for the MST
-   * @param graph the graph to build the MST from
+   * @param graph      the graph to build the MST from
    */
   public MinimumSpanningTree(String rootNodeId, Map<String, List<Edge>> graph) {
     this.rootNodeId = rootNodeId;
@@ -22,7 +22,8 @@ public class MinimumSpanningTree {
   }
 
   /**
-   * Calculates the Minimum Spanning Tree using Prim's algorithm. The resulting MST provides optimal
+   * Calculates the Minimum Spanning Tree using Prim's algorithm. The resulting
+   * MST provides optimal
    * paths from the root node to all other nodes.
    *
    * @return true if MST was calculated successfully, false otherwise
@@ -38,19 +39,16 @@ public class MinimumSpanningTree {
     mstEdges.clear();
     Map<String, Integer> minWeight = new HashMap<>();
     Map<String, String> parent = new HashMap<>();
-    Map<String, Integer> edgeWeight = new HashMap<>(); // Track actual edge weights
+    Map<String, Integer> edgeWeight = new HashMap<>();
     Set<String> inTree = new HashSet<>();
 
-    // Initialize all nodes with infinite weight and null parent
     for (String node : graph.keySet()) {
       minWeight.put(node, Integer.MAX_VALUE);
       parent.put(node, null);
     }
 
-    // Start with the root node
     minWeight.put(rootNodeId, 0);
 
-    // Inner class to store node with its priority weight at insertion time
     class NodeWeight {
       final String node;
       final int weight;
@@ -61,7 +59,6 @@ public class MinimumSpanningTree {
       }
     }
 
-    // PriorityQueue stores NodeWeight objects with weight captured at insertion
     PriorityQueue<NodeWeight> pq = new PriorityQueue<>(Comparator.comparingInt(nw -> nw.weight));
     pq.add(new NodeWeight(rootNodeId, 0));
 
@@ -69,34 +66,28 @@ public class MinimumSpanningTree {
       NodeWeight current = pq.poll();
       String u = current.node;
 
-      // If we've already processed this node, skip it.
-      // This handles the case where we've added a node to the PQ multiple times.
       if (inTree.contains(u)) {
         continue;
       }
 
       inTree.add(u);
 
-      // Add the edge to our final MST structure
       if (parent.get(u) != null) {
         mstEdges.put(u, new Edge(parent.get(u), edgeWeight.get(u)));
       }
 
-      // Look at all neighbors of the node we just added to the tree
       List<Edge> neighbors = graph.get(u);
       if (neighbors != null) {
         for (Edge edgeToNeighbor : neighbors) {
           String v = edgeToNeighbor.getDestination();
           int weight = edgeToNeighbor.getWeight();
 
-          // If the neighbor is not yet in the tree and we found a cheaper path
           if (!inTree.contains(v) && weight < minWeight.get(v)) {
-            // Update the parent and the minimum weight for this neighbor
+
             parent.put(v, u);
             minWeight.put(v, weight);
-            edgeWeight.put(v, weight); // Store the actual edge weight
+            edgeWeight.put(v, weight);
 
-            // Add the neighbor to the priority queue with its current weight
             pq.add(new NodeWeight(v, weight));
           }
         }
@@ -125,8 +116,9 @@ public class MinimumSpanningTree {
    * Finds the path from a destination node back to the root.
    *
    * @param destination the target node
-   * @return list of nodes in the path from destination to root (exclusive of root), or null if no
-   *     path exists
+   * @return list of nodes in the path from destination to root (exclusive of
+   *         root), or null if no
+   *         path exists
    */
   public List<String> findPathToRoot(String destination) {
     if (destination.equals(rootNodeId)) {
@@ -180,7 +172,8 @@ public class MinimumSpanningTree {
   }
 
   /**
-   * Prints the Minimum Spanning Tree in breadth-first order. Displays each edge as: parent, child,
+   * Prints the Minimum Spanning Tree in breadth-first order. Displays each edge
+   * as: parent, child,
    * weight.
    */
   public void print() {
@@ -213,9 +206,10 @@ public class MinimumSpanningTree {
    * Formats an edge as a string.
    *
    * @param parent the parent node
-   * @param child the child node
+   * @param child  the child node
    * @param weight the edge weight
-   * @return formatted string "parent, child, weight" (matches link-weights format)
+   * @return formatted string "parent, child, weight" (matches link-weights
+   *         format)
    */
   private String formatEdge(String parent, String child, int weight) {
     return parent + ", " + child + ", " + weight;
