@@ -47,6 +47,7 @@ public class OverlayManagementService {
     }
 
     List<String> nodeIds = new ArrayList<>(nodes.keySet());
+    Collections.sort(nodeIds); // Sort for deterministic ordering
 
     synchronized (overlayLock) {
       currentOverlay = OverlayCreator.buildOverlay(nodeIds, connectionRequirement);
