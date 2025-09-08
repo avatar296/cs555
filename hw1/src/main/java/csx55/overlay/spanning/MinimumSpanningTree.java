@@ -3,18 +3,16 @@ package csx55.overlay.spanning;
 import csx55.overlay.util.LoggerUtil;
 import java.util.*;
 
+/**
+ * Implements Prim's algorithm to build a Minimum Spanning Tree (MST) rooted at a given node. Debug
+ * output added to diagnose why edges might be missing.
+ */
 public class MinimumSpanningTree {
 
   private final String rootNodeId;
   private final Map<String, List<Edge>> graph;
   private final Map<String, Edge> mstEdges;
 
-  /**
-   * Constructs a new MinimumSpanningTree calculator.
-   *
-   * @param rootNodeId the root node for the MST
-   * @param graph the graph to build the MST from
-   */
   public MinimumSpanningTree(String rootNodeId, Map<String, List<Edge>> graph) {
     this.rootNodeId = rootNodeId;
     this.graph = graph;
@@ -22,19 +20,15 @@ public class MinimumSpanningTree {
   }
 
   /**
-   * Calculates the Minimum Spanning Tree using Prim's algorithm. The resulting MST provides optimal
-   * paths from the root node to all other nodes.
+   * Calculates the MST using Prim's algorithm.
    *
-   * @return true if MST was calculated successfully, false otherwise
+   * @return true if a valid MST was calculated, false otherwise
    */
   public boolean calculate() {
     if (!graph.containsKey(rootNodeId)) {
-      LoggerUtil.warn(
-          "MinimumSpanningTree",
-          "Root node "
-              + rootNodeId
-              + " not found in graph. Graph contains: "
-              + graph.keySet().stream().limit(5).collect(java.util.stream.Collectors.toList()));
+      LoggerUtil.warn("MST", "Root node " + rootNodeId + " not found in graph.");
+      System.err.println(
+          "[DEBUG][MST] Root not found: " + rootNodeId + " graphNodes=" + graph.keySet());
       return false;
     }
 
@@ -48,7 +42,6 @@ public class MinimumSpanningTree {
       minWeight.put(node, Integer.MAX_VALUE);
       parent.put(node, null);
     }
-
     minWeight.put(rootNodeId, 0);
 
     class NodeWeight {
@@ -68,9 +61,7 @@ public class MinimumSpanningTree {
       NodeWeight current = pq.poll();
       String u = current.node;
 
-      if (inTree.contains(u)) {
-        continue;
-      }
+      if (inTree.contains(u)) continue;
 
       inTree.add(u);
 
@@ -85,62 +76,48 @@ public class MinimumSpanningTree {
           int weight = edgeToNeighbor.getWeight();
 
           if (!inTree.contains(v) && weight < minWeight.get(v)) {
-
             parent.put(v, u);
             minWeight.put(v, weight);
             edgeWeight.put(v, weight);
-
             pq.add(new NodeWeight(v, weight));
           }
         }
       }
     }
 
-    // Verify that the MST spans all nodes in the graph
-    // If not, the graph is disconnected and we cannot create a valid MST
     if (inTree.size() != graph.keySet().size()) {
       LoggerUtil.warn(
-          "MinimumSpanningTree",
-          "MST does not span all nodes. Graph is disconnected. "
-              + "Nodes in tree: "
-              + inTree.size()
-              + ", Nodes in graph: "
-              + graph.keySet().size());
-
-      // Clear the partial MST to prevent using an incomplete tree
+          "MST", "MST incomplete: inTree=" + inTree.size() + " graph=" + graph.keySet().size());
+      System.err.println(
+          "[DEBUG][MST] Graph disconnected. Root="
+              + rootNodeId
+              + " reachedNodes="
+              + inTree
+              + " totalGraph="
+              + graph.keySet());
       mstEdges.clear();
       return false;
     }
 
-    // Calculate and log total MST weight for debugging
     int totalWeight = 0;
-    for (Edge edge : mstEdges.values()) {
-      totalWeight += edge.getWeight();
-    }
+    for (Edge edge : mstEdges.values()) totalWeight += edge.getWeight();
+
     LoggerUtil.debug(
-        "MinimumSpanningTree",
-        "MST calculated for root "
+        "MST",
+        "Built MST root=" + rootNodeId + " edges=" + mstEdges.size() + " weight=" + totalWeight);
+    System.out.println(
+        "[DEBUG][MST] Root="
             + rootNodeId
-            + " with total weight: "
-            + totalWeight
-            + " and "
+            + " edgeCount="
             + mstEdges.size()
-            + " edges");
+            + " totalWeight="
+            + totalWeight);
 
     return true;
   }
 
-  /**
-   * Finds the path from a destination node back to the root.
-   *
-   * @param destination the target node
-   * @return list of nodes in the path from destination to root (exclusive of root), or null if no
-   *     path exists
-   */
   public List<String> findPathToRoot(String destination) {
-    if (destination.equals(rootNodeId)) {
-      return Collections.emptyList();
-    }
+    if (destination.equals(rootNodeId)) return Collections.emptyList();
 
     List<String> path = new ArrayList<>();
     String current = destination;
@@ -149,114 +126,61 @@ public class MinimumSpanningTree {
       path.add(current);
       Edge parentEdge = mstEdges.get(current);
       if (parentEdge == null) {
-        return null; // No path exists
+        System.err.println(
+            "[DEBUG][MST] No parent for node "
+                + current
+                + " when tracing path to root="
+                + rootNodeId);
+        return null;
       }
       current = parentEdge.getDestination();
     }
 
     if (!rootNodeId.equals(current)) {
-      return null; // Path doesn't reach root
+      System.err.println("[DEBUG][MST] Path trace failed: could not reach root=" + rootNodeId);
+      return null;
     }
 
     return path;
   }
 
-  /**
-   * Gets all edges in the Minimum Spanning Tree.
-   *
-   * @return map of child nodes to their parent edges
-   */
   public Map<String, Edge> getMSTEdges() {
     return new HashMap<>(mstEdges);
   }
 
-  /**
-   * Extracts all MST edges into a structured format.
-   *
-   * @return list of MST edges with parent-child relationships
-   */
   public List<MSTEdge> extractEdges() {
     List<MSTEdge> edges = new ArrayList<>();
-
     for (Map.Entry<String, Edge> entry : mstEdges.entrySet()) {
       String childNode = entry.getKey();
       Edge edgeToParent = entry.getValue();
       String parentNode = edgeToParent.getDestination();
       edges.add(new MSTEdge(parentNode, childNode, edgeToParent.getWeight()));
     }
-
     return edges;
   }
 
-  /**
-   * Prints the Minimum Spanning Tree in breadth-first order. Displays each edge as: parent, child,
-   * weight.
-   */
   public void print() {
     if (mstEdges.isEmpty()) {
       System.out.println("MST has not been calculated yet.");
       return;
     }
-
-    Queue<String> queue = new LinkedList<>();
-    Set<String> visited = new HashSet<>();
-    List<MSTEdge> edges = extractEdges();
-
-    queue.add(rootNodeId);
-    visited.add(rootNodeId);
-
-    while (!queue.isEmpty()) {
-      String currentNode = queue.poll();
-
-      for (MSTEdge edge : edges) {
-        if (edge.parent.equals(currentNode) && !visited.contains(edge.child)) {
-          System.out.println(formatEdge(edge.parent, edge.child, edge.weight));
-          visited.add(edge.child);
-          queue.add(edge.child);
-        }
-      }
+    for (MSTEdge edge : extractEdges()) {
+      System.out.println(edge.parent + ", " + edge.child + ", " + edge.weight);
     }
   }
 
-  /**
-   * Formats an edge as a string.
-   *
-   * @param parent the parent node
-   * @param child the child node
-   * @param weight the edge weight
-   * @return formatted string "parent, child, weight" (matches link-weights format)
-   */
-  private String formatEdge(String parent, String child, int weight) {
-    return parent + ", " + child + ", " + weight;
-  }
-
-  /**
-   * Gets formatted strings for all MST edges.
-   *
-   * @return list of formatted edge strings
-   */
   public List<String> getFormattedEdges() {
     List<String> formatted = new ArrayList<>();
     for (MSTEdge edge : extractEdges()) {
-      formatted.add(formatEdge(edge.parent, edge.child, edge.weight));
+      formatted.add(edge.parent + ", " + edge.child + ", " + edge.weight);
     }
     return formatted;
   }
 
-  /**
-   * Checks if the MST has been calculated.
-   *
-   * @return true if MST exists, false otherwise
-   */
   public boolean isEmpty() {
     return mstEdges.isEmpty();
   }
 
-  /**
-   * Gets the total weight of the MST.
-   *
-   * @return the sum of all edge weights in the MST
-   */
   public int getTotalWeight() {
     int totalWeight = 0;
     for (Edge edge : mstEdges.values()) {
@@ -265,12 +189,10 @@ public class MinimumSpanningTree {
     return totalWeight;
   }
 
-  /** Clears the calculated MST. */
   public void clear() {
     mstEdges.clear();
   }
 
-  /** Internal class representing an MST edge with parent-child relationship. */
   public static class MSTEdge {
     public final String parent;
     public final String child;

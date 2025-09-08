@@ -13,11 +13,6 @@ public final class OverlayCreator {
 
   private OverlayCreator() {}
 
-  /**
-   * Represents a (normalized) undirected link between two node ids (ip:port strings). Weight is an
-   * integer in 1..10. Two Link objects are equal if they connect the same unordered pair of nodes
-   * (weight not considered in equality/hash).
-   */
   public static final class Link {
     private final String nodeA;
     private final String nodeB;
@@ -37,10 +32,6 @@ public final class OverlayCreator {
       setWeight(weight);
     }
 
-    public Link(String a, String b) {
-      this(a, b, 1); // Default weight
-    }
-
     public String getNodeA() {
       return nodeA;
     }
@@ -49,7 +40,6 @@ public final class OverlayCreator {
       return nodeB;
     }
 
-    /** Ensure weight is in [1,10]. If provided out-of-range, clamp into range. */
     public int getWeight() {
       return weight;
     }
@@ -79,10 +69,6 @@ public final class OverlayCreator {
     }
   }
 
-  /**
-   * ConnectionPlan contains the adjacency map (for node->peers) and the canonical unique link set.
-   * Use getUniqueLinks() when printing or sending Link_Weights to avoid duplicates.
-   */
   public static final class ConnectionPlan {
     private final Map<String, Set<String>> adjacency;
     private final Set<Link> uniqueLinks;
@@ -96,28 +82,11 @@ public final class OverlayCreator {
       return adjacency;
     }
 
-    public Map<String, Set<String>> getNodeConnections() {
-      return adjacency;
-    }
-
-    public List<Link> getAllLinks() {
-      return new ArrayList<>(uniqueLinks);
-    }
-
     public Set<Link> getUniqueLinks() {
       return uniqueLinks;
     }
   }
 
-  /**
-   * Build a simple k-regular-ish overlay using a ring + nearest neighbor approach. If exact
-   * k-regularity cannot be achieved for small N, this will attempt to get as close as possible
-   * while maintaining connectivity.
-   *
-   * @param nodeIds list of node identifiers (IP:port)
-   * @param connectionRequirement CR (k)
-   * @return ConnectionPlan with adjacency + canonical unique links (with weights 1..10)
-   */
   public static ConnectionPlan createOverlay(List<String> nodeIds, int connectionRequirement) {
     return buildOverlay(nodeIds, connectionRequirement);
   }
@@ -132,7 +101,6 @@ public final class OverlayCreator {
 
     int n = nodeIds.size();
 
-    // A k-regular graph is impossible if n*k is odd (total degree must be even)
     if ((n * connectionRequirement) % 2 != 0) {
       LoggerUtil.warn(
           "OverlayCreator",
@@ -140,10 +108,9 @@ public final class OverlayCreator {
               + connectionRequirement
               + "-regular graph with "
               + n
-              + " nodes (n*k must be even). Will approximate.");
+              + " nodes. Approximating.");
     }
 
-    // Clamp k to a realistic maximum
     if (connectionRequirement >= n) {
       connectionRequirement = n - 1;
     }
@@ -153,14 +120,12 @@ public final class OverlayCreator {
       adj.put(id, new LinkedHashSet<>());
     }
 
-    // This algorithm adds edges symmetrically, connecting each node to its k/2 nearest
-    // neighbors on each side of the ring (circulant graph approach)
+    // Ring-based neighbor connections
     for (int i = 0; i < n; i++) {
       for (int j = 1; j <= connectionRequirement / 2; j++) {
         String nodeA = nodeIds.get(i);
         String nodeB = nodeIds.get((i + j) % n);
 
-        // Add the symmetric edge if it doesn't exceed the requirement
         if (adj.get(nodeA).size() < connectionRequirement
             && adj.get(nodeB).size() < connectionRequirement
             && !adj.get(nodeA).contains(nodeB)) {
@@ -170,8 +135,7 @@ public final class OverlayCreator {
       }
     }
 
-    // If k is odd, the logic above leaves one connection missing.
-    // For even n, connect to the node at the opposite side of the ring
+    // If k is odd and n is even, connect opposite nodes
     if (connectionRequirement % 2 != 0 && n % 2 == 0) {
       int half = n / 2;
       for (int i = 0; i < half; i++) {
@@ -186,8 +150,7 @@ public final class OverlayCreator {
       }
     }
 
-    // For odd k and odd n, or other edge cases, try to complete connections
-    // This is a more controlled approach than the previous aggressive loop
+    // Fill missing edges
     for (int i = 0; i < n; i++) {
       String nodeA = nodeIds.get(i);
       if (adj.get(nodeA).size() >= connectionRequirement) continue;
@@ -199,47 +162,47 @@ public final class OverlayCreator {
             && !adj.get(nodeA).contains(nodeB)) {
           adj.get(nodeA).add(nodeB);
           adj.get(nodeB).add(nodeA);
-
-          // Check if we've reached the requirement for nodeA
           if (adj.get(nodeA).size() >= connectionRequirement) break;
         }
       }
     }
 
-    // Verify k-regularity
-    boolean isKRegular = true;
+    // Verify
     for (Map.Entry<String, Set<String>> entry : adj.entrySet()) {
       if (entry.getValue().size() != connectionRequirement) {
-        isKRegular = false;
         LoggerUtil.warn(
-            "OverlayCreator",
-            "Node "
-                + entry.getKey()
-                + " has degree "
-                + entry.getValue().size()
-                + " instead of "
-                + connectionRequirement);
+            "OverlayCreator", "Node " + entry.getKey() + " has degree " + entry.getValue().size());
       }
     }
 
-    if (isKRegular) {
-      LoggerUtil.info(
-          "OverlayCreator",
-          "Successfully created " + connectionRequirement + "-regular graph with " + n + " nodes");
-    }
-
-    // Generate the canonical set of links for the connection plan
+    // Generate unique links with weights in [1,10]
     Set<Link> links = new LinkedHashSet<>();
-    Random rnd = new Random(0); // Deterministic seed for reproducible weights
+    Random rnd = new Random();
     for (String nodeA : nodeIds) {
       for (String nodeB : adj.get(nodeA)) {
-        // To avoid duplicates, only add the link if nodeA is "smaller"
         if (nodeA.compareTo(nodeB) < 0) {
-          int weight = rnd.nextInt(10); // Generate weights 0-9 to match autograder
-          links.add(new Link(nodeA, nodeB, weight));
+          int weight = rnd.nextInt(10) + 1;
+          Link link = new Link(nodeA, nodeB, weight);
+          links.add(link);
+
+          // 🔎 Debug print each edge as it's created
+          System.out.println(
+              "[OverlayCreator] Added link: "
+                  + link.getNodeA()
+                  + " <-> "
+                  + link.getNodeB()
+                  + " weight="
+                  + link.getWeight());
         }
       }
     }
+
+    System.out.println(
+        "[OverlayCreator] Overlay built with "
+            + links.size()
+            + " unique edges across "
+            + nodeIds.size()
+            + " nodes.");
 
     return new ConnectionPlan(adj, links);
   }

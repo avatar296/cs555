@@ -6,17 +6,7 @@ import csx55.overlay.transport.TCPConnection;
 import csx55.overlay.transport.TCPConnectionsCache;
 import csx55.overlay.util.LoggerUtil;
 import csx55.overlay.util.NodeValidationHelper;
-import csx55.overlay.wireformats.DataMessage;
-import csx55.overlay.wireformats.DeregisterRequest;
-import csx55.overlay.wireformats.DeregisterResponse;
-import csx55.overlay.wireformats.Event;
-import csx55.overlay.wireformats.LinkWeights;
-import csx55.overlay.wireformats.MessagingNodesList;
-import csx55.overlay.wireformats.PeerIdentification;
-import csx55.overlay.wireformats.Protocol;
-import csx55.overlay.wireformats.RegisterRequest;
-import csx55.overlay.wireformats.RegisterResponse;
-import csx55.overlay.wireformats.TaskInitiate;
+import csx55.overlay.wireformats.*;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -29,9 +19,6 @@ import java.util.concurrent.Executors;
  * Represents a messaging node in the overlay network. Handles message routing, peer connections,
  * and communication with the registry. Implements the TCPConnectionListener interface to handle
  * network events.
- *
- * <p>This node can send, receive, and relay messages through the overlay network using shortest
- * path routing based on link weights.
  */
 public class MessagingNode implements TCPConnection.TCPConnectionListener {
   private final TCPConnectionsCache peerConnections = new TCPConnectionsCache();
@@ -50,7 +37,6 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
   private TCPConnection registryConnection;
   private ServerSocket serverSocket;
 
-  /** Constructs a new MessagingNode and initializes all services. */
   public MessagingNode() {
     this.statisticsService = new NodeStatisticsService();
     this.routingService = new MessageRoutingService(peerConnections, statisticsService);
@@ -59,20 +45,11 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     this.commandHandler = new csx55.overlay.cli.MessagingNodeCommandHandler(this);
   }
 
-  /**
-   * Starts the messaging node and connects to the registry. Initializes server socket, registers
-   * with the registry, and starts listening for peer connections.
-   *
-   * @param registryHost the hostname of the registry
-   * @param registryPort the port number of the registry
-   */
   private void start(String registryHost, int registryPort) {
     try {
-      // 1) Start listening socket to get actual server port
       serverSocket = new ServerSocket(0);
       this.portNumber = serverSocket.getLocalPort();
 
-      // 2) Connect to registry FIRST to determine our IP
       Socket socket = new Socket(registryHost, registryPort);
       try {
         registryConnection = new TCPConnection(socket, this);
@@ -80,34 +57,26 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
         try {
           socket.close();
         } catch (IOException closeException) {
-          LoggerUtil.warn(
-              "MessagingNode", "Failed to close socket after connection error", closeException);
+          LoggerUtil.warn("MessagingNode", "Failed to close socket", closeException);
         }
         throw e;
       }
 
-      // 3) Use the SAME IP the OS chose for this connection
-      //    This matches what the registry will see
       this.ipAddress = socket.getLocalAddress().getHostAddress();
-
-      // 4) Build node ID and configure services
       this.nodeId = NodeValidationHelper.createNodeId(ipAddress, portNumber);
       routingService.setNodeId(nodeId);
       protocolHandler.setNodeInfo(nodeId, allNodes);
       taskService.setNodeInfo(nodeId, ipAddress, portNumber, registryConnection);
 
-      // 5) Register with the canonicalized IP
       RegisterRequest request = new RegisterRequest(ipAddress, portNumber);
       registryConnection.sendEvent(request);
 
-      // 6) Accept peer connections
       executorService.execute(
           () -> {
             while (running) {
               try {
                 Socket peerSocket = serverSocket.accept();
-                @SuppressWarnings("unused")
-                TCPConnection peerConnection = new TCPConnection(peerSocket, this);
+                new TCPConnection(peerSocket, this);
               } catch (IOException e) {
                 if (running) {
                   LoggerUtil.error("MessagingNode", "Error accepting peer connection", e);
@@ -117,7 +86,6 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
           });
 
       new Thread(commandHandler::startCommandLoop).start();
-
       Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
 
     } catch (IOException e) {
@@ -126,40 +94,18 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     }
   }
 
-  /**
-   * Performs cleanup operations when the node is shutting down. Closes all connections, stops
-   * services, and releases resources.
-   */
   private void cleanup() {
     running = false;
     try {
-      if (serverSocket != null && !serverSocket.isClosed()) {
-        serverSocket.close();
-      }
+      if (serverSocket != null && !serverSocket.isClosed()) serverSocket.close();
       executorService.shutdownNow();
-      try {
-        if (!executorService.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
-          LoggerUtil.warn("MessagingNode", "ExecutorService did not terminate in time");
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
       peerConnections.closeAll();
-      if (registryConnection != null) {
-        registryConnection.close();
-      }
+      if (registryConnection != null) registryConnection.close();
     } catch (IOException e) {
       LoggerUtil.warn("MessagingNode", "Error during cleanup", e);
     }
   }
 
-  /**
-   * Handles incoming events from the network. Processes various protocol messages and delegates to
-   * appropriate services.
-   *
-   * @param event the event received from the network
-   * @param connection the TCP connection that received the event
-   */
   @Override
   public void onEvent(Event event, TCPConnection connection) {
     switch (event.getType()) {
@@ -183,53 +129,36 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
         LinkWeights lw = (LinkWeights) event;
         protocolHandler.handleLinkWeights(lw);
 
-        // Canonicalize our node ID to match what's in the graph
         String canonicalId = findCanonicalIdFromLinkWeights(lw, portNumber);
         if (canonicalId != null && !canonicalId.equals(nodeId)) {
           LoggerUtil.info(
-              "MessagingNode", "Canonicalizing node ID from " + nodeId + " to " + canonicalId);
-
-          // Update our node ID to match the Registry's view
+              "MessagingNode", "Canonicalizing node ID " + nodeId + " → " + canonicalId);
           this.nodeId = canonicalId;
           this.ipAddress = canonicalId.substring(0, canonicalId.lastIndexOf(':'));
-
-          // Update all services with the canonical node ID
           routingService.setNodeId(canonicalId);
           protocolHandler.setNodeInfo(canonicalId, allNodes);
           taskService.setNodeInfo(canonicalId, ipAddress, portNumber, registryConnection);
-
-          // Recreate routing table with the canonical node ID
-          RoutingTable newTable = new RoutingTable(canonicalId);
-          newTable.updateLinkWeights(lw);
-          routingService.updateRoutingTable(newTable);
         }
+
+        RoutingTable newTable = new RoutingTable(nodeId);
+        newTable.updateLinkWeights(lw);
+
+        newTable.buildMST();
+        routingService.updateRoutingTable(newTable);
 
         LoggerUtil.info(
             "MessagingNode",
             "Updated allNodes list with "
                 + allNodes.size()
                 + " nodes after receiving link weights");
-        // Add diagnostic output for testing
-        System.out.println(
-            "MSTRootCheck root="
-                + nodeId
-                + " presentInGraph="
-                + routingService.getRoutingTable().graphContains(nodeId)
-                + " graphNodes="
-                + routingService.getRoutingTable().graphSize()
-                + " mstEdges="
-                + routingService.getRoutingTable().mstEdgeCount()
-                + " mstTotal="
-                + routingService.getRoutingTable().mstTotalWeight());
+
         break;
       case Protocol.TASK_INITIATE:
-        LoggerUtil.info(
-            "MessagingNode", "Handling task initiate with allNodes size: " + allNodes.size());
         taskService.handleTaskInitiate((TaskInitiate) event, allNodes);
         break;
       case Protocol.PULL_TRAFFIC_SUMMARY:
         statisticsService.sendTrafficSummary(ipAddress, portNumber, registryConnection);
-        statisticsService.resetCounters(); // Reset after sending summary per PDF spec
+        statisticsService.resetCounters();
         break;
       case Protocol.DATA_MESSAGE:
         routingService.handleDataMessage((DataMessage) event);
@@ -240,12 +169,6 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     }
   }
 
-  /**
-   * Handles lost connections to the registry or peer nodes. Shuts down if registry connection is
-   * lost, otherwise removes peer from cache.
-   *
-   * @param connection the TCP connection that was lost
-   */
   @Override
   public void onConnectionLost(TCPConnection connection) {
     if (connection == registryConnection) {
@@ -253,7 +176,6 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
       cleanup();
       System.exit(1);
     }
-
     synchronized (peerConnections) {
       for (String nodeId : peerConnections.getAllConnections().keySet()) {
         if (peerConnections.getConnection(nodeId) == connection) {
@@ -265,14 +187,6 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     }
   }
 
-  /**
-   * Finds the canonical node ID from LinkWeights that matches our port. This ensures we use the
-   * exact ID that appears in the graph.
-   *
-   * @param linkWeights the link weights containing node IDs
-   * @param myPort our listening port
-   * @return the canonical node ID, or null if not found
-   */
   private String findCanonicalIdFromLinkWeights(LinkWeights linkWeights, int myPort) {
     for (LinkWeights.LinkInfo link : linkWeights.getLinks()) {
       if (endsWithPort(link.nodeA, myPort)) return link.nodeA;
@@ -281,13 +195,6 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     return null;
   }
 
-  /**
-   * Checks if a node ID ends with the specified port.
-   *
-   * @param nodeId the node ID to check
-   * @param port the port to match
-   * @return true if the node ID ends with the port
-   */
   private boolean endsWithPort(String nodeId, int port) {
     int idx = nodeId.lastIndexOf(':');
     if (idx < 0) return false;
@@ -298,9 +205,6 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     }
   }
 
-  /**
-   * Deregisters this node from the overlay network. Sends a deregistration request to the registry.
-   */
   public void deregister() {
     try {
       DeregisterRequest request = new DeregisterRequest(ipAddress, portNumber);
@@ -310,10 +214,6 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     }
   }
 
-  /**
-   * Prints the minimum spanning tree from this node's perspective. Shows the shortest paths to all
-   * other nodes in the overlay.
-   */
   public void printMinimumSpanningTree() {
     RoutingTable table = routingService.getRoutingTable();
     if (table != null) {
@@ -321,11 +221,6 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
     }
   }
 
-  /**
-   * Main entry point for the MessagingNode application.
-   *
-   * @param args command line arguments: registry-host registry-port
-   */
   public static void main(String[] args) {
     if (args.length != 2) {
       System.out.println(
