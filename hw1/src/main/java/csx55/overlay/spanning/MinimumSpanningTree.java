@@ -50,14 +50,24 @@ public class MinimumSpanningTree {
     // Start with the root node
     minWeight.put(rootNodeId, 0);
 
-    // The PriorityQueue will store the node IDs (String)
-    // The comparator tells the queue how to order the nodes: by looking up their
-    // current minimum weight in the 'minWeight' map.
-    PriorityQueue<String> pq = new PriorityQueue<>(Comparator.comparingInt(minWeight::get));
-    pq.add(rootNodeId);
+    // Inner class to store node with its priority weight at insertion time
+    class NodeWeight {
+      final String node;
+      final int weight;
+
+      NodeWeight(String node, int weight) {
+        this.node = node;
+        this.weight = weight;
+      }
+    }
+
+    // PriorityQueue stores NodeWeight objects with weight captured at insertion
+    PriorityQueue<NodeWeight> pq = new PriorityQueue<>(Comparator.comparingInt(nw -> nw.weight));
+    pq.add(new NodeWeight(rootNodeId, 0));
 
     while (!pq.isEmpty()) {
-      String u = pq.poll(); // Get the node with the smallest weight
+      NodeWeight current = pq.poll();
+      String u = current.node;
 
       // If we've already processed this node, skip it.
       // This handles the case where we've added a node to the PQ multiple times.
@@ -86,8 +96,8 @@ public class MinimumSpanningTree {
             minWeight.put(v, weight);
             edgeWeight.put(v, weight); // Store the actual edge weight
 
-            // Add the neighbor to the priority queue with updated weight
-            pq.add(v);
+            // Add the neighbor to the priority queue with its current weight
+            pq.add(new NodeWeight(v, weight));
           }
         }
       }
