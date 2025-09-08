@@ -81,9 +81,6 @@ public class MinimumSpanningTree {
 
           // If the neighbor is not yet in the tree and we found a cheaper path
           if (!inTree.contains(v) && weight < minWeight.get(v)) {
-            // Remove old entry from queue if exists (by recreating queue without it)
-            pq.remove(v);
-
             // Update the parent and the minimum weight for this neighbor
             parent.put(v, u);
             minWeight.put(v, weight);
