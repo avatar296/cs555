@@ -217,7 +217,16 @@ public class MessagingNode implements TCPConnection.TCPConnectionListener {
   public void printMinimumSpanningTree() {
     RoutingTable table = routingService.getRoutingTable();
     if (table != null) {
-      table.printMST();
+
+      if (!table.waitUntilWeightsReady(3000)) {
+        System.out.println("MST has not been calculated yet.");
+        return;
+      }
+
+      synchronized (table) {
+        table.buildMST();
+        table.printMST();
+      }
     }
   }
 
