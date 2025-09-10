@@ -1,11 +1,12 @@
 package csx55.threads;
 
-public class Worker implements Runnable {
-  private final TaskQueue taskQueue;
-  private final StatsMock stats;
+public class Worker extends Thread {
+  private final TaskQueue queue;
+  private final Stats stats;
 
-  public Worker(TaskQueue queue, StatsMock stats) {
-    this.taskQueue = queue;
+  public Worker(TaskQueue queue, Stats stats, String name) {
+    super(name);
+    this.queue = queue;
     this.stats = stats;
   }
 
@@ -13,21 +14,14 @@ public class Worker implements Runnable {
   public void run() {
     try {
       while (true) {
-        Task task = taskQueue.take();
-
-        if (task.isPoison()) {
-          System.out.println(
-              "DEBUG: "
-                  + Thread.currentThread().getName()
-                  + " consumed poison pill, shutting down. Remaining queue size="
-                  + taskQueue.size());
+        Task t = queue.take();
+        if (t.isPoison()) {
+          System.out.println(getName() + " shutting down");
           break;
         }
-
-        System.out.println("DEBUG: " + Thread.currentThread().getName() + " processing " + task);
-        task.mine();
+        t.mine();
         stats.incrementCompleted();
-        System.out.println(task);
+        System.out.println(getName() + " completed " + t);
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

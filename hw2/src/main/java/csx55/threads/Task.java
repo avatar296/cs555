@@ -1,24 +1,20 @@
 package csx55.threads;
 
+import java.io.Serializable;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Random;
 
-public class Task {
+public class Task implements Serializable {
   private final String id;
-  private boolean poison; // no longer final
+  private boolean poison;
+  private boolean migrated;
   private int nonce;
   private String hash;
-  private boolean migrated;
 
-  private static final Random random = new Random();
+  private static final Random rand = new Random();
 
   public Task(String id) {
     this.id = id;
-    this.poison = false;
-    this.nonce = 0;
-    this.hash = null;
-    this.migrated = false;
   }
 
   public static Task poisonPill() {
@@ -31,19 +27,10 @@ public class Task {
     return poison;
   }
 
-  public String getId() {
-    return id;
-  }
-
   public boolean isMigrated() {
     return migrated;
   }
 
-  public void setMigrated(boolean migrated) {
-    this.migrated = migrated;
-  }
-
-  // For TaskQueue compatibility
   public void markMigrated() {
     this.migrated = true;
   }
@@ -52,35 +39,30 @@ public class Task {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
       while (true) {
-        nonce = random.nextInt(Integer.MAX_VALUE);
-        String input = id + nonce;
-        byte[] encoded = digest.digest(input.getBytes());
+        nonce = rand.nextInt(Integer.MAX_VALUE);
+        byte[] encoded = digest.digest((id + nonce).getBytes());
         StringBuilder sb = new StringBuilder();
-        for (byte b : encoded) {
-          sb.append(String.format("%02x", b));
-        }
+        for (byte b : encoded) sb.append(String.format("%02x", b));
         hash = sb.toString();
-
-        // Easier difficulty: only 3 leading zeros
-        if (hash.startsWith("000")) {
-          break;
-        }
+        if (hash.startsWith("000")) break; // difficulty
       }
-    } catch (NoSuchAlgorithmException e) {
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
   @Override
   public String toString() {
-    return "Task{id='"
+    return "Task{id="
         + id
-        + "', nonce="
+        + ", nonce="
         + nonce
         + ", hash="
         + hash
         + ", migrated="
         + migrated
+        + ", poison="
+        + poison
         + "}";
   }
 }

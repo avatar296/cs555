@@ -1,95 +1,79 @@
 package csx55.threads;
 
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Registry {
-  private final List<ComputeNode> nodes = new ArrayList<>();
-  private final List<Thread> nodeThreads = new ArrayList<>();
+  private final List<ComputeNodeInfo> nodes = new ArrayList<>();
+  private final int port;
 
-  public void registerNode(ComputeNode node) {
-    nodes.add(node);
-    System.out.println("Registry: Registered node " + node.getIpPort());
+  public Registry(int port) {
+    this.port = port;
   }
 
-  public void setupOverlay(int threadPoolSize) {
+  public void start() {
+    try (ServerSocket serverSocket = new ServerSocket(port)) {
+      System.out.println("Registry listening on port " + port);
+
+      while (nodes.size() < 3) { // assume 3 nodes
+        Socket socket = serverSocket.accept();
+        try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+          Object obj = in.readObject();
+          if (obj instanceof ComputeNodeInfo) {
+            ComputeNodeInfo info = (ComputeNodeInfo) obj;
+            nodes.add(info);
+            System.out.println("Registered " + info);
+          } else if (obj instanceof Stats) {
+            Stats s = (Stats) obj;
+            System.out.println("Got stats: " + s);
+          }
+        }
+      }
+
+      setupOverlay();
+      broadcast("START 3");
+
+      // later, gather stats again and then shutdown
+      Thread.sleep(5000);
+      broadcast("SHUTDOWN");
+
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void setupOverlay() {
     int n = nodes.size();
     for (int i = 0; i < n; i++) {
-      ComputeNode current = nodes.get(i);
-      ComputeNode successor = nodes.get((i + 1) % n);
-      current.setSuccessor(successor);
-      current.startThreadPool(threadPoolSize);
+      ComputeNodeInfo current = nodes.get(i);
+      ComputeNodeInfo succ = nodes.get((i + 1) % n);
+      current.setSuccessor(succ);
+      System.out.println(current + " successor -> " + succ);
     }
-    System.out.println(
-        "Registry: Overlay setup complete with " + threadPoolSize + " threads per node.");
   }
 
-  public void startComputation(int rounds) {
-    nodeThreads.clear();
-    for (ComputeNode node : nodes) {
-      Thread t = new Thread(() -> node.runRounds(rounds));
-      nodeThreads.add(t);
-      t.start();
-    }
-    System.out.println("Registry: Started computation for " + rounds + " rounds.");
-
-    // 1. Wait for all nodes to finish generating tasks
-    for (Thread t : nodeThreads) {
-      try {
-        t.join();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
+  private void broadcast(String msg) {
+    for (ComputeNodeInfo node : nodes) {
+      try (Socket socket = new Socket(node.getIp(), node.getPort());
+          ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
+        out.writeObject(msg);
+        out.flush();
+      } catch (Exception e) {
+        e.printStackTrace();
       }
     }
-
-    // DEBUG: Show queue sizes after generation
-    System.out.println("=== DEBUG: All rounds finished. Queue sizes ===");
-    for (ComputeNode node : nodes) {
-      System.out.println("DEBUG: " + node.getIpPort() + " queue size=" + node.getQueueSize());
-    }
-
-    // 2. Send poison pills to all nodes
-    for (ComputeNode node : nodes) {
-      node.shutdown();
-      System.out.println("DEBUG: Shutdown sent to " + node.getIpPort());
-    }
-
-    // 3. Wait for worker pools to finish
-    for (ComputeNode node : nodes) {
-      node.awaitWorkers();
-    }
-
-    // 4. Print final stats
-    printFinalStats();
+    System.out.println("Broadcast: " + msg);
   }
 
-  public void printFinalStats() {
-    int totalCompleted = nodes.stream().mapToInt(n -> n.getStats().getCompletedTasks()).sum();
-
-    System.out.println("\n=== Final Stats Table ===");
-    for (ComputeNode node : nodes) {
-      StatsMock s = node.getStats();
-
-      // Verify invariant
-      int expectedCompleted = s.getGeneratedTasks() + s.getPulledTasks() - s.getPushedTasks();
-      if (expectedCompleted != s.getCompletedTasks()) {
-        System.out.println(
-            "⚠️ Invariant failed for "
-                + node.getIpPort()
-                + ": expected "
-                + expectedCompleted
-                + " but got "
-                + s.getCompletedTasks());
-      }
-
-      System.out.printf(
-          "%s %d %d %d %d %.8f%n",
-          node.getIpPort(),
-          s.getGeneratedTasks(),
-          s.getPulledTasks(),
-          s.getPushedTasks(),
-          s.getCompletedTasks(),
-          s.getPercentOfTotal(totalCompleted));
+  public static void main(String[] args) {
+    if (args.length != 1) {
+      System.err.println("Usage: java csx55.threads.Registry <port>");
+      return;
     }
+    new Registry(Integer.parseInt(args[0])).start();
   }
 }

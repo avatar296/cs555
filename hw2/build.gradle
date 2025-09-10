@@ -14,6 +14,7 @@ repositories {
 }
 
 dependencies {
+    // no external dependencies needed
 }
 
 test {
@@ -30,35 +31,44 @@ spotless {
 }
 
 application {
-    mainClass = 'csx55.threads.TestHarness'
-    // mainClass = 'csx55.mst.Main'
+    // default main class (can override with run tasks)
+    mainClass = 'csx55.threads.Registry'
 }
 
-task runMain(type: JavaExec) {
+tasks.register('runRegistry', JavaExec) {
     group = "Execution"
-    description = "Runs the MST Main program"
+    description = "Runs the Registry"
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'csx55.mst.Main'
+    mainClass = 'csx55.threads.Registry'
     if (project.hasProperty('args')) {
         args project.property('args').split()
     }
 }
 
-task createTar(type: Tar) {
+tasks.register('runNode', JavaExec) {
+    group = "Execution"
+    description = "Runs a ComputeNode"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.threads.ComputeNode'
+    if (project.hasProperty('args')) {
+        args project.property('args').split()
+    }
+}
+
+tasks.register('createTar', Tar) {
     archiveBaseName.set('Christopher_Cowart_HW2')
     archiveExtension.set('tar')
-    
+
     from('.') {
         include 'build.gradle'
         include 'README.txt'
         include 'src/main/java/**/*.java'
-        
-        exclude '**/._*'       
+
+        exclude '**/._*'
         exclude '**/.DS_Store'
-        
-        exclude 'src/test/**'          
-        exclude '**/test/**'           
-        exclude '**/*Test.java'        
-        exclude '**/*Tests.java'       
+        exclude 'src/test/**'
+        exclude '**/test/**'
+        exclude '**/*Test.java'
+        exclude '**/*Tests.java'
     }
 }

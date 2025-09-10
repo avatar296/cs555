@@ -4,13 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ThreadPool {
-  private final List<Thread> workers = new ArrayList<>();
+  private final List<Worker> workers = new ArrayList<>();
 
-  public ThreadPool(int size, TaskQueue queue, StatsMock stats) {
+  public ThreadPool(int size, TaskQueue queue, Stats stats, String nodeId) {
     for (int i = 0; i < size; i++) {
-      Thread t = new Thread(new Worker(queue, stats), "Worker-" + i);
-      workers.add(t);
-      t.start();
+      Worker w = new Worker(queue, stats, "Worker-" + i + "@" + nodeId);
+      workers.add(w);
+      w.start();
     }
   }
 
@@ -19,10 +19,9 @@ public class ThreadPool {
   }
 
   public void joinAll() {
-    for (Thread t : workers) {
+    for (Worker w : workers) {
       try {
-        t.join();
-        System.out.println("DEBUG: " + t.getName() + " has terminated.");
+        w.join();
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       }

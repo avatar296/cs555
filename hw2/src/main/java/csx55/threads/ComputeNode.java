@@ -1,16 +1,19 @@
 package csx55.threads;
 
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.List;
 import java.util.Random;
 
 public class ComputeNode {
   private final String ip;
   private final int port;
-  private ComputeNode successor;
-
+  private ComputeNodeInfo successor;
   private final TaskQueue taskQueue = new TaskQueue();
+  private final Stats stats = new Stats();
   private ThreadPool pool;
-  private final StatsMock stats = new StatsMock();
   private final Random rand = new Random();
 
   public ComputeNode(String ip, int port) {
@@ -18,91 +21,103 @@ public class ComputeNode {
     this.port = port;
   }
 
-  public void setSuccessor(ComputeNode successor) {
-    this.successor = successor;
+  public void connectToRegistry(String registryIp, int registryPort) {
+    try (Socket socket = new Socket(registryIp, registryPort);
+        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
+      out.writeObject(new ComputeNodeInfo(ip, port));
+      out.flush();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 
-  public String getIpPort() {
+  public void startServer() {
+    Thread t =
+        new Thread(
+            () -> {
+              try (ServerSocket serverSocket = new ServerSocket(port)) {
+                System.out.println("Node server on " + ip + ":" + port);
+                while (true) {
+                  Socket socket = serverSocket.accept();
+                  try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+                    Object msg = in.readObject();
+                    if (msg instanceof String) {
+                      handleControlMessage((String) msg);
+                    } else if (msg instanceof List) {
+                      @SuppressWarnings("unchecked")
+                      List<Task> batch = (List<Task>) msg;
+                      taskQueue.addBatch(batch);
+                      stats.incrementPulled(batch.size());
+                    }
+                  }
+                }
+              } catch (Exception e) {
+                e.printStackTrace();
+              }
+            },
+            "Server-" + ip + ":" + port);
+    t.setDaemon(false);
+    t.start();
+  }
+
+  private void handleControlMessage(String msg) {
+    if (msg.startsWith("START")) {
+      int rounds = Integer.parseInt(msg.split(" ")[1]);
+      startThreadPool(3);
+      runRounds(rounds);
+      sendStats();
+    } else if (msg.equals("SHUTDOWN")) {
+      shutdown();
+    }
+  }
+
+  private void startThreadPool(int size) {
+    pool = new ThreadPool(size, taskQueue, stats, getId());
+  }
+
+  private void runRounds(int rounds) {
+    for (int r = 1; r <= rounds; r++) {
+      int num = rand.nextInt(6) + 5;
+      for (int i = 0; i < num; i++) {
+        Task t = new Task(getId() + "-T" + r + "-" + i);
+        stats.incrementGenerated();
+        taskQueue.add(t);
+      }
+      System.out.println(getId() + " generated " + num + " tasks in round " + r);
+    }
+  }
+
+  private void sendStats() {
+    try (Socket socket = new Socket("127.0.0.1", 6000); // Registry assumed local
+        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
+      out.writeObject(stats);
+      out.flush();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void shutdown() {
+    for (int i = 0; i < pool.getSize(); i++) {
+      taskQueue.add(Task.poisonPill());
+    }
+    pool.joinAll();
+    System.out.println(getId() + " shut down cleanly.");
+    System.exit(0);
+  }
+
+  private String getId() {
     return ip + ":" + port;
   }
 
-  public void startThreadPool(int poolSize) {
-    pool = new ThreadPool(poolSize, taskQueue, stats);
-  }
-
-  public void submitTasks(int n) {
-    String nodeId = getIpPort();
-    for (int i = 1; i <= n; i++) {
-      Task t = new Task(nodeId + "-T" + i);
-      stats.incrementGenerated();
-      taskQueue.add(t);
+  public static void main(String[] args) {
+    if (args.length != 4) {
+      System.err.println(
+          "Usage: java csx55.threads.ComputeNode <ip> <port> <registry-ip> <registry-port>");
+      return;
     }
-  }
-
-  public StatsMock getStats() {
-    return stats;
-  }
-
-  public void runRounds(int numberOfRounds) {
-    for (int round = 1; round <= numberOfRounds; round++) {
-      // keep test runs fast: 5–10 tasks
-      int numTasks = rand.nextInt(6) + 5;
-      submitTasks(numTasks);
-      System.out.println(getIpPort() + " generated " + numTasks + " tasks in round " + round);
-
-      if (successor != null && taskQueue.size() > 2000) {
-        migrateTasks(successor, 50);
-      }
-
-      try {
-        Thread.sleep(500);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-    System.out.println("DEBUG: " + getIpPort() + " finished generating all rounds.");
-  }
-
-  public void migrateTasks(ComputeNode target, int numTasks) {
-    List<Task> batch = this.taskQueue.removeBatch(numTasks);
-    if (!batch.isEmpty()) {
-      this.stats.incrementPushed(batch.size());
-      target.taskQueue.addBatch(batch);
-      target.stats.incrementPulled(batch.size());
-      System.out.println(
-          "Migrated "
-              + batch.size()
-              + " tasks from "
-              + this.getIpPort()
-              + " to "
-              + target.getIpPort());
-    }
-  }
-
-  public void shutdown() {
-    int poolSize = pool.getSize();
-    System.out.println(
-        "DEBUG: "
-            + getIpPort()
-            + " injecting "
-            + poolSize
-            + " poison pills. Queue size before="
-            + taskQueue.size());
-    for (int i = 0; i < poolSize; i++) {
-      taskQueue.add(Task.poisonPill());
-    }
-    System.out.println(
-        "DEBUG: " + getIpPort() + " poison pills injected. Queue size after=" + taskQueue.size());
-  }
-
-  public void awaitWorkers() {
-    if (pool != null) {
-      pool.joinAll();
-      System.out.println("DEBUG: " + getIpPort() + " finished all work.");
-    }
-  }
-
-  public int getQueueSize() {
-    return taskQueue.size();
+    ComputeNode node = new ComputeNode(args[0], Integer.parseInt(args[1]));
+    node.connectToRegistry(args[2], Integer.parseInt(args[3]));
+    node.startServer();
   }
 }
