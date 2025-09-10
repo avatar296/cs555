@@ -1,22 +1,31 @@
 package csx55.threads;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ThreadPool {
-  private List<Worker> workers = new ArrayList<>();
-  private TaskQueue taskQueue;
-  private boolean isShutdown = false;
+  private final List<Thread> workers = new ArrayList<>();
 
-  public ThreadPool(int size, TaskQueue queue) {
-    this.taskQueue = queue;
-    // Initialize workers
+  public ThreadPool(int size, TaskQueue queue, StatsMock stats) {
+    for (int i = 0; i < size; i++) {
+      Thread t = new Thread(new Worker(queue, stats), "Worker-" + i);
+      workers.add(t);
+      t.start();
+    }
   }
 
-  public void startWorkers() {
-    // Start worker threads
+  public int getSize() {
+    return workers.size();
   }
 
-  public void shutdown() {
-    isShutdown = true;
+  public void joinAll() {
+    for (Thread t : workers) {
+      try {
+        t.join();
+        System.out.println("DEBUG: " + t.getName() + " has terminated.");
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 }

@@ -1,19 +1,36 @@
 package csx55.threads;
 
 public class Worker implements Runnable {
-  private TaskQueue taskQueue;
-  private boolean running = true;
+  private final TaskQueue taskQueue;
+  private final StatsMock stats;
 
-  public Worker(TaskQueue queue) {
+  public Worker(TaskQueue queue, StatsMock stats) {
     this.taskQueue = queue;
+    this.stats = stats;
   }
 
   @Override
   public void run() {
-    // Continuously take tasks and execute mine()
-  }
+    try {
+      while (true) {
+        Task task = taskQueue.take();
 
-  public void stop() {
-    running = false;
+        if (task.isPoison()) {
+          System.out.println(
+              "DEBUG: "
+                  + Thread.currentThread().getName()
+                  + " consumed poison pill, shutting down. Remaining queue size="
+                  + taskQueue.size());
+          break;
+        }
+
+        System.out.println("DEBUG: " + Thread.currentThread().getName() + " processing " + task);
+        task.mine();
+        stats.incrementCompleted();
+        System.out.println(task);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 }
