@@ -4,36 +4,30 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
-/** Task: proof-of-work mining with SHA-256. */
+/** Serializable task; no Stats reference so completion is credited to the mining node. */
 public class Task implements java.io.Serializable {
   private static final long serialVersionUID = 1L;
 
-  // Tunables via -D flags:
-  // -Dcs555.difficultyBits=17 (spec default)
-  // -Dcs555.printTasks=false (speed up smoke tests)
+  // Tunable via -Dcs555.difficultyBits (default 17 per spec)
   private static final int DIFFICULTY_BITS = Integer.getInteger("cs555.difficultyBits", 17);
-  private static final boolean PRINT_TASKS =
-      Boolean.parseBoolean(System.getProperty("cs555.printTasks", "true"));
 
-  private final String origin;
-  private final Stats stats;
+  private final String origin; // where the task was created (for logging only)
   private boolean migrated = false;
 
-  public Task(String origin, Stats stats) {
+  public Task(String origin) {
     this.origin = origin;
-    this.stats = stats;
   }
 
+  /** Proof-of-work mining until hash has DIFFICULTY_BITS leading zero bits. */
   public void mine() {
     try {
       MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
       byte[] originBytes = origin.getBytes();
-      // Buffer = origin bytes + 4 bytes for nonce (big-endian)
+      // buffer = origin bytes + 4-byte nonce (big-endian)
       byte[] buf = Arrays.copyOf(originBytes, originBytes.length + 4);
 
       int nonce = 0;
-      while (true) {
-        // write nonce as big-endian into the last 4 bytes
+      for (; ; ) {
         buf[buf.length - 4] = (byte) ((nonce >>> 24) & 0xFF);
         buf[buf.length - 3] = (byte) ((nonce >>> 16) & 0xFF);
         buf[buf.length - 2] = (byte) ((nonce >>> 8) & 0xFF);
@@ -41,36 +35,29 @@ public class Task implements java.io.Serializable {
 
         byte[] hash = sha256.digest(buf);
         if (hasLeadingZeroBits(hash, DIFFICULTY_BITS)) {
-          stats.incrementCompleted();
-          if (PRINT_TASKS) {
-            System.out.println(this);
-          }
-          break;
+          return; // success; Worker will credit completion & print
         }
-
-        nonce++; // simple, fast stride; JIT-friendly
+        nonce++; // fast, predictable stride
       }
     } catch (NoSuchAlgorithmException e) {
-      e.printStackTrace();
+      throw new RuntimeException(e);
     }
   }
 
-  // Fast bit-level check: true if hash has at least 'bits' leading zero bits.
   private static boolean hasLeadingZeroBits(byte[] hash, int bits) {
-    int fullBytes = bits / 8;
-    int remBits = bits % 8;
-
-    for (int i = 0; i < fullBytes; i++) {
-      if (hash[i] != 0) return false;
-    }
-    if (remBits == 0) return true;
-
-    int mask = 0xFF << (8 - remBits); // e.g., remBits=4 -> 11110000
-    return (hash[fullBytes] & mask) == 0;
+    int full = bits / 8, rem = bits % 8;
+    for (int i = 0; i < full; i++) if (hash[i] != 0) return false;
+    if (rem == 0) return true;
+    int mask = 0xFF << (8 - rem);
+    return (hash[full] & mask) == 0;
   }
 
   public void markMigrated() {
     this.migrated = true;
+  }
+
+  public boolean isMigrated() {
+    return migrated;
   }
 
   @Override

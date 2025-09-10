@@ -3,10 +3,13 @@ package csx55.threads;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * A single worker thread that continuously takes Tasks from the TaskQueue and mines them. Threads
- * are created once and stay alive until the pool is shut down.
+ * Worker threads take tasks from the queue and mine them. Credit completion to THIS node (via
+ * Stats) AFTER mining.
  */
 public class Worker implements Runnable {
+
+  private static final boolean PRINT_TASKS =
+      Boolean.parseBoolean(System.getProperty("cs555.printTasks", "true"));
 
   private final int id;
   private final TaskQueue queue;
@@ -42,18 +45,22 @@ public class Worker implements Runnable {
   public void run() {
     while (running.get()) {
       try {
-        Task task = queue.take(); // blocks
+        Task task = queue.take(); // blocking
         if (task == null) continue;
 
         stats.incInFlight();
         try {
-          task.mine();
+          task.mine(); // do the work
+          stats.incrementCompleted(); // CREDIT goes to THIS node
+          if (PRINT_TASKS) {
+            System.out.println(task); // print mined task at this node
+          }
         } finally {
           stats.decInFlight();
         }
 
       } catch (InterruptedException e) {
-        if (!running.get()) break; // exiting
+        if (!running.get()) break;
       } catch (Throwable t) {
         t.printStackTrace();
       }
