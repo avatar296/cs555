@@ -1,68 +1,56 @@
 package csx55.threads;
 
-import java.io.Serializable;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Random;
 
-public class Task implements Serializable {
-  private final String id;
-  private boolean poison;
-  private boolean migrated;
-  private int nonce;
-  private String hash;
+/** Task: proof-of-work mining with SHA-256. */
+public class Task implements java.io.Serializable {
 
-  private static final Random rand = new Random();
+  private static final long serialVersionUID = 1L;
+  private final String origin;
+  private final Stats stats;
+  private boolean migrated = false;
 
-  public Task(String id) {
-    this.id = id;
+  public Task(String origin, Stats stats) {
+    this.origin = origin;
+    this.stats = stats;
   }
 
-  public static Task poisonPill() {
-    Task t = new Task("POISON");
-    t.poison = true;
-    return t;
+  public void mine() {
+    try {
+      MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+      Random rand = new Random();
+      int nonce = 0;
+      while (true) {
+        byte[] input = (origin + nonce).getBytes();
+        byte[] hash = sha256.digest(input);
+        String hex = bytesToHex(hash);
+        // Require at least 17 leading zeros in binary (≈5 hex zeros)
+        if (hex.startsWith("00000")) {
+          stats.incrementCompleted();
+          System.out.println(this);
+          break;
+        }
+        nonce += rand.nextInt(100) + 1;
+      }
+    } catch (NoSuchAlgorithmException e) {
+      e.printStackTrace();
+    }
   }
 
-  public boolean isPoison() {
-    return poison;
-  }
-
-  public boolean isMigrated() {
-    return migrated;
+  private String bytesToHex(byte[] bytes) {
+    StringBuilder sb = new StringBuilder();
+    for (byte b : bytes) sb.append(String.format("%02x", b));
+    return sb.toString();
   }
 
   public void markMigrated() {
     this.migrated = true;
   }
 
-  public void mine() {
-    try {
-      MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      while (true) {
-        nonce = rand.nextInt(Integer.MAX_VALUE);
-        byte[] encoded = digest.digest((id + nonce).getBytes());
-        StringBuilder sb = new StringBuilder();
-        for (byte b : encoded) sb.append(String.format("%02x", b));
-        hash = sb.toString();
-        if (hash.startsWith("000")) break; // difficulty
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   @Override
   public String toString() {
-    return "Task{id="
-        + id
-        + ", nonce="
-        + nonce
-        + ", hash="
-        + hash
-        + ", migrated="
-        + migrated
-        + ", poison="
-        + poison
-        + "}";
+    return "Task{" + origin + ", migrated=" + migrated + "}";
   }
 }

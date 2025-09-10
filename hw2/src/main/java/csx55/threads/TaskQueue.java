@@ -1,36 +1,34 @@
 package csx55.threads;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class TaskQueue {
-  private final Queue<Task> queue = new LinkedList<>();
+  private final LinkedBlockingQueue<Task> q = new LinkedBlockingQueue<>();
 
-  public synchronized void add(Task t) {
-    queue.add(t);
-    notifyAll();
+  public void add(Task t) {
+    q.add(t);
   }
 
-  public synchronized void addBatch(List<Task> tasks) {
-    queue.addAll(tasks);
-    notifyAll();
+  public void addBatch(List<Task> batch) {
+    if (batch == null || batch.isEmpty()) return;
+    for (Task t : batch) q.add(t);
   }
 
-  public synchronized Task take() throws InterruptedException {
-    while (queue.isEmpty()) wait();
-    return queue.poll();
+  /** Blocking take used by workers. */
+  public Task take() throws InterruptedException {
+    return q.take();
   }
 
-  public synchronized List<Task> removeBatch(int n) {
-    List<Task> batch = new LinkedList<>();
-    for (int i = 0; i < n && !queue.isEmpty(); i++) {
-      batch.add(queue.poll());
-    }
-    return batch;
+  /** Remove up to n tasks (non-blocking). */
+  public List<Task> removeBatch(int n) {
+    List<Task> res = new ArrayList<>(n);
+    q.drainTo(res, n);
+    return res;
   }
 
-  public synchronized int size() {
-    return queue.size();
+  public int size() {
+    return q.size();
   }
 }

@@ -1,123 +1,151 @@
 package csx55.threads;
 
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.List;
-import java.util.Random;
+import java.io.*;
+import java.net.*;
+import java.util.*;
 
+/**
+ * ComputeNode: registers with registry, runs tasks in rounds, participates in ring load balancing,
+ * and reports stats.
+ */
 public class ComputeNode {
-  private final String ip;
-  private final int port;
-  private ComputeNodeInfo successor;
-  private final TaskQueue taskQueue = new TaskQueue();
-  private final Stats stats = new Stats();
-  private ThreadPool pool;
-  private final Random rand = new Random();
 
-  public ComputeNode(String ip, int port) {
-    this.ip = ip;
-    this.port = port;
+  private final String registryHost;
+  private final int registryPort;
+  private ServerSocket serverSocket;
+  private volatile boolean running = true;
+
+  private String successor;
+  private int poolSize;
+  private ThreadPool pool;
+  private final TaskQueue taskQueue = new TaskQueue();
+
+  private final Stats stats = new Stats();
+  private String myId;
+
+  public ComputeNode(String registryHost, int registryPort) {
+    this.registryHost = registryHost;
+    this.registryPort = registryPort;
   }
 
-  public void connectToRegistry(String registryIp, int registryPort) {
-    try (Socket socket = new Socket(registryIp, registryPort);
-        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
-      out.writeObject(new ComputeNodeInfo(ip, port));
+  public void start() throws IOException {
+    serverSocket = new ServerSocket(0); // pick ephemeral port
+    String ip = InetAddress.getLocalHost().getHostAddress();
+    int port = serverSocket.getLocalPort();
+    myId = ip + ":" + port;
+
+    // register with registry
+    try (Socket sock = new Socket(registryHost, registryPort);
+        ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream())) {
+      out.writeObject("REGISTER " + ip + " " + port);
       out.flush();
+    }
+
+    // accept loop
+    new Thread(
+            () -> {
+              try {
+                while (running) {
+                  Socket sock = serverSocket.accept();
+                  new Thread(() -> handleMessage(sock)).start();
+                }
+              } catch (IOException e) {
+                if (running) e.printStackTrace();
+              }
+            })
+        .start();
+  }
+
+  private void handleMessage(Socket sock) {
+    try (ObjectInputStream in = new ObjectInputStream(sock.getInputStream())) {
+      Object obj = in.readObject();
+      if (obj instanceof String) {
+        String msg = (String) obj;
+        if (msg.startsWith("OVERLAY")) {
+          String[] parts = msg.split(" ");
+          successor = parts[1];
+          poolSize = Integer.parseInt(parts[2]);
+          pool = new ThreadPool(poolSize, taskQueue, stats);
+          System.out.println("Overlay set. Successor=" + successor + " poolSize=" + poolSize);
+        } else if (msg.startsWith("START")) {
+          int rounds = Integer.parseInt(msg.split(" ")[1]);
+          runRounds(rounds);
+          sendStatsToRegistry();
+        } else if (msg.startsWith("TASKS")) {
+          // received migrated tasks
+          @SuppressWarnings("unchecked")
+          List<Task> batch = (List<Task>) in.readObject();
+          for (Task t : batch) {
+            t.markMigrated();
+          }
+          taskQueue.addBatch(batch);
+          stats.incrementPulled(batch.size());
+        }
+      }
     } catch (Exception e) {
       e.printStackTrace();
     }
-  }
-
-  public void startServer() {
-    Thread t =
-        new Thread(
-            () -> {
-              try (ServerSocket serverSocket = new ServerSocket(port)) {
-                System.out.println("Node server on " + ip + ":" + port);
-                while (true) {
-                  Socket socket = serverSocket.accept();
-                  try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-                    Object msg = in.readObject();
-                    if (msg instanceof String) {
-                      handleControlMessage((String) msg);
-                    } else if (msg instanceof List) {
-                      @SuppressWarnings("unchecked")
-                      List<Task> batch = (List<Task>) msg;
-                      taskQueue.addBatch(batch);
-                      stats.incrementPulled(batch.size());
-                    }
-                  }
-                }
-              } catch (Exception e) {
-                e.printStackTrace();
-              }
-            },
-            "Server-" + ip + ":" + port);
-    t.setDaemon(false);
-    t.start();
-  }
-
-  private void handleControlMessage(String msg) {
-    if (msg.startsWith("START")) {
-      int rounds = Integer.parseInt(msg.split(" ")[1]);
-      startThreadPool(3);
-      runRounds(rounds);
-      sendStats();
-    } else if (msg.equals("SHUTDOWN")) {
-      shutdown();
-    }
-  }
-
-  private void startThreadPool(int size) {
-    pool = new ThreadPool(size, taskQueue, stats, getId());
   }
 
   private void runRounds(int rounds) {
-    for (int r = 1; r <= rounds; r++) {
-      int num = rand.nextInt(6) + 5;
-      for (int i = 0; i < num; i++) {
-        Task t = new Task(getId() + "-T" + r + "-" + i);
-        stats.incrementGenerated();
-        taskQueue.add(t);
+    Random rand = new Random();
+    for (int r = 0; r < rounds; r++) {
+      int numTasks = 1 + rand.nextInt(1000);
+      for (int i = 0; i < numTasks; i++) {
+        taskQueue.add(new Task(myId, stats));
       }
-      System.out.println(getId() + " generated " + num + " tasks in round " + r);
+      stats.incrementGenerated(numTasks);
+
+      // wait for local tasks to drain
+      while (taskQueue.size() > 0) {
+        try {
+          Thread.sleep(50);
+        } catch (InterruptedException ignored) {
+        }
+      }
+
+      // do simple balancing with successor
+      balanceLoad();
     }
   }
 
-  private void sendStats() {
-    try (Socket socket = new Socket("127.0.0.1", 6000); // Registry assumed local
-        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
+  private void balanceLoad() {
+    int myOutstanding = taskQueue.size();
+    if (myOutstanding > 20) {
+      int migrateCount = Math.min(10, myOutstanding / 2);
+      List<Task> batch = taskQueue.removeBatch(migrateCount);
+      if (!batch.isEmpty()) {
+        String[] parts = successor.split(":");
+        try (Socket sock = new Socket(parts[0], Integer.parseInt(parts[1]));
+            ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream())) {
+          out.writeObject("TASKS");
+          out.writeObject(batch);
+          out.flush();
+          stats.incrementPushed(batch.size());
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }
+    }
+  }
+
+  private void sendStatsToRegistry() {
+    try (Socket sock = new Socket(registryHost, registryPort);
+        ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream())) {
+      out.writeObject("STATS " + myId);
       out.writeObject(stats);
       out.flush();
-    } catch (Exception e) {
+    } catch (IOException e) {
       e.printStackTrace();
     }
   }
 
-  private void shutdown() {
-    for (int i = 0; i < pool.getSize(); i++) {
-      taskQueue.add(Task.poisonPill());
-    }
-    pool.joinAll();
-    System.out.println(getId() + " shut down cleanly.");
-    System.exit(0);
-  }
-
-  private String getId() {
-    return ip + ":" + port;
-  }
-
-  public static void main(String[] args) {
-    if (args.length != 4) {
-      System.err.println(
-          "Usage: java csx55.threads.ComputeNode <ip> <port> <registry-ip> <registry-port>");
-      return;
+  public static void main(String[] args) throws Exception {
+    if (args.length != 2) {
+      System.err.println("Usage: java csx55.threads.ComputeNode <registry-host> <registry-port>");
+      System.exit(1);
     }
     ComputeNode node = new ComputeNode(args[0], Integer.parseInt(args[1]));
-    node.connectToRegistry(args[2], Integer.parseInt(args[3]));
-    node.startServer();
+    node.start();
   }
 }

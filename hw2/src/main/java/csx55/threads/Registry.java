@@ -1,79 +1,201 @@
 package csx55.threads;
 
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Registry node: accepts registrations, sets up overlay, starts rounds, and
+ * collates/prints
+ * statistics.
+ */
 public class Registry {
-  private final List<ComputeNodeInfo> nodes = new ArrayList<>();
-  private final int port;
 
-  public Registry(int port) {
-    this.port = port;
-  }
+    private final int port;
+    private final List<String> nodes = new ArrayList<>();
+    private final Map<String, Stats> nodeStats = new ConcurrentHashMap<>();
+    private ServerSocket serverSocket;
+    private volatile boolean running = true;
 
-  public void start() {
-    try (ServerSocket serverSocket = new ServerSocket(port)) {
-      System.out.println("Registry listening on port " + port);
+    public Registry(int port) {
+        this.port = port;
+    }
 
-      while (nodes.size() < 3) { // assume 3 nodes
-        Socket socket = serverSocket.accept();
-        try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-          Object obj = in.readObject();
-          if (obj instanceof ComputeNodeInfo) {
-            ComputeNodeInfo info = (ComputeNodeInfo) obj;
-            nodes.add(info);
-            System.out.println("Registered " + info);
-          } else if (obj instanceof Stats) {
-            Stats s = (Stats) obj;
-            System.out.println("Got stats: " + s);
-          }
+    public void start() throws IOException {
+        serverSocket = new ServerSocket(port);
+        System.out.println("Registry listening on port " + port);
+
+        // accept loop in background
+        new Thread(
+                () -> {
+                    try {
+                        while (running) {
+                            Socket socket = serverSocket.accept();
+                            new Thread(() -> handleConnection(socket)).start();
+                        }
+                    } catch (IOException e) {
+                        if (running)
+                            e.printStackTrace();
+                    }
+                })
+                .start();
+
+        // CLI loop for setup-overlay / start
+        try (BufferedReader console = new BufferedReader(new InputStreamReader(System.in))) {
+            String line;
+            while ((line = console.readLine()) != null) {
+                if (line.startsWith("setup-overlay")) {
+                    String[] parts = line.trim().split("\\s+");
+                    if (parts.length != 2) {
+                        System.out.println("Usage: setup-overlay <thread-pool-size>");
+                        continue;
+                    }
+                    int poolSize = Integer.parseInt(parts[1]);
+                    setupOverlay(poolSize);
+                } else if (line.startsWith("start")) {
+                    String[] parts = line.trim().split("\\s+");
+                    if (parts.length != 2) {
+                        System.out.println("Usage: start <number-of-rounds>");
+                        continue;
+                    }
+                    int rounds = Integer.parseInt(parts[1]);
+                    startRounds(rounds);
+                } else if (line.equals("quit")) {
+                    shutdown();
+                    break;
+                } else {
+                    System.out.println("Unknown command: " + line);
+                }
+            }
         }
-      }
-
-      setupOverlay();
-      broadcast("START 3");
-
-      // later, gather stats again and then shutdown
-      Thread.sleep(5000);
-      broadcast("SHUTDOWN");
-
-    } catch (Exception e) {
-      e.printStackTrace();
     }
-  }
 
-  private void setupOverlay() {
-    int n = nodes.size();
-    for (int i = 0; i < n; i++) {
-      ComputeNodeInfo current = nodes.get(i);
-      ComputeNodeInfo succ = nodes.get((i + 1) % n);
-      current.setSuccessor(succ);
-      System.out.println(current + " successor -> " + succ);
-    }
-  }
+    private void handleConnection(Socket socket) {
+        try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+            Object obj = in.readObject();
+            if (obj instanceof String) {
+                String msg = (String) obj;
+                if (msg.startsWith("REGISTER")) {
+                    String[] parts = msg.split(" ");
+                    String ip = parts[1];
+                    int port = Integer.parseInt(parts[2]);
+                    String id = ip + ":" + port;
+                    synchronized (nodes) {
+                        if (!nodes.contains(id))
+                            nodes.add(id);
+                    }
+                    System.out.println("Node registered: " + id);
+                } else if (msg.startsWith("STATS")) {
+                    String[] parts = msg.split(" ");
+                    String nodeId = parts[1];
+                    Stats stats = (Stats) in.readObject();
+                    nodeStats.put(nodeId, stats);
 
-  private void broadcast(String msg) {
-    for (ComputeNodeInfo node : nodes) {
-      try (Socket socket = new Socket(node.getIp(), node.getPort());
-          ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
-        out.writeObject(msg);
-        out.flush();
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
+                    if (nodeStats.size() == nodes.size()) {
+                        printFinalStats();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
-    System.out.println("Broadcast: " + msg);
-  }
 
-  public static void main(String[] args) {
-    if (args.length != 1) {
-      System.err.println("Usage: java csx55.threads.Registry <port>");
-      return;
+    private void setupOverlay(int poolSize) {
+        List<String> alive = new ArrayList<>();
+        synchronized (nodes) {
+            // First pass: probe connectivity and build "alive" list
+            for (String node : nodes) {
+                String[] np = node.split(":");
+                try (Socket probe = new Socket()) {
+                    probe.connect(new InetSocketAddress(np[0], Integer.parseInt(np[1])), 500);
+                    alive.add(node);
+                } catch (IOException e) {
+                    System.out.println("Pruning unreachable node: " + node);
+                }
+            }
+            nodes.clear();
+            nodes.addAll(alive);
+
+            if (nodes.size() < 2) {
+                System.out.println("Not enough alive nodes to form a ring (need >= 2).");
+                return;
+            }
+
+            // Second pass: send overlay to each alive node
+            int n = nodes.size();
+            for (int i = 0; i < n; i++) {
+                String node = nodes.get(i);
+                String successor = nodes.get((i + 1) % n);
+                String[] parts = node.split(":");
+                try (Socket sock = new Socket(parts[0], Integer.parseInt(parts[1]));
+                        ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream())) {
+                    out.writeObject("OVERLAY " + successor + " " + poolSize);
+                    out.flush();
+                } catch (IOException e) {
+                    System.out
+                            .println("Failed to send OVERLAY to " + node + " (will remain in list): " + e.getMessage());
+                }
+            }
+        }
+        System.out.println("Overlay setup complete with pool size " + poolSize + ". Members:");
+        synchronized (nodes) {
+            for (String m : nodes)
+                System.out.println(" - " + m);
+        }
     }
-    new Registry(Integer.parseInt(args[0])).start();
-  }
+
+    private void startRounds(int rounds) {
+        synchronized (nodes) {
+            for (String node : nodes) {
+                String[] parts = node.split(":");
+                try (Socket sock = new Socket(parts[0], Integer.parseInt(parts[1]));
+                        ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream())) {
+                    out.writeObject("START " + rounds);
+                    out.flush();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        System.out.println("Start command sent to all nodes for " + rounds + " rounds.");
+    }
+
+    private void printFinalStats() {
+        long totalCompleted = nodeStats.values().stream().mapToLong(Stats::getCompleted).sum();
+
+        for (String node : nodes) {
+            Stats s = nodeStats.get(node);
+            double percent = (100.0 * s.getCompleted()) / totalCompleted;
+            System.out.printf(
+                    Locale.US,
+                    "%s %d %d %d %d %.8f%n",
+                    node,
+                    s.getGenerated(),
+                    s.getPulled(),
+                    s.getPushed(),
+                    s.getCompleted(),
+                    percent);
+        }
+        System.out.println("Total completed: " + totalCompleted);
+    }
+
+    private void shutdown() {
+        running = false;
+        try {
+            serverSocket.close();
+        } catch (IOException ignored) {
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        if (args.length != 1) {
+            System.err.println("Usage: java csx55.threads.Registry <port>");
+            System.exit(1);
+        }
+        int port = Integer.parseInt(args[0]);
+        Registry reg = new Registry(port);
+        reg.start();
+    }
 }

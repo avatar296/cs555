@@ -1,48 +1,46 @@
 package csx55.threads;
 
 import java.io.Serializable;
+import java.util.concurrent.atomic.AtomicInteger;
 
+/** Stats for each node. */
 public class Stats implements Serializable {
-  private int generated;
-  private int pulled;
-  private int pushed;
-  private int completed;
+  private static final long serialVersionUID = 1L;
 
-  public synchronized void incrementGenerated() {
-    generated++;
+  private final AtomicInteger generated = new AtomicInteger();
+  private final AtomicInteger pulled = new AtomicInteger();
+  private final AtomicInteger pushed = new AtomicInteger();
+  private final AtomicInteger completed = new AtomicInteger();
+
+  public void incrementGenerated(int n) {
+    generated.addAndGet(n);
   }
 
-  public synchronized void incrementPulled(int n) {
-    pulled += n;
+  public void incrementPulled(int n) {
+    pulled.addAndGet(n);
   }
 
-  public synchronized void incrementPushed(int n) {
-    pushed += n;
+  public void incrementPushed(int n) {
+    pushed.addAndGet(n);
   }
 
-  public synchronized void incrementCompleted() {
-    completed++;
+  public void incrementCompleted() {
+    completed.incrementAndGet();
   }
 
   public int getGenerated() {
-    return generated;
+    return generated.get();
   }
 
   public int getPulled() {
-    return pulled;
+    return pulled.get();
   }
 
   public int getPushed() {
-    return pushed;
+    return pushed.get();
   }
 
   public int getCompleted() {
-    return completed;
-  }
-
-  @Override
-  public String toString() {
-    return String.format(
-        "Generated=%d Pulled=%d Pushed=%d Completed=%d", generated, pulled, pushed, completed);
+    return completed.get();
   }
 }
