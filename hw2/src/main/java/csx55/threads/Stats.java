@@ -11,6 +11,8 @@ public class Stats implements Serializable {
   private final AtomicInteger pulled = new AtomicInteger();
   private final AtomicInteger pushed = new AtomicInteger();
   private final AtomicInteger completed = new AtomicInteger();
+  private final AtomicInteger inFlight =
+      new AtomicInteger(); // tasks taken by workers but not yet finished
 
   public void incrementGenerated(int n) {
     generated.addAndGet(n);
@@ -28,6 +30,15 @@ public class Stats implements Serializable {
     completed.incrementAndGet();
   }
 
+  // In-flight tracking used by workers
+  public void incInFlight() {
+    inFlight.incrementAndGet();
+  }
+
+  public void decInFlight() {
+    inFlight.decrementAndGet();
+  }
+
   public int getGenerated() {
     return generated.get();
   }
@@ -42,5 +53,9 @@ public class Stats implements Serializable {
 
   public int getCompleted() {
     return completed.get();
+  }
+
+  public int getInFlight() {
+    return inFlight.get();
   }
 }
