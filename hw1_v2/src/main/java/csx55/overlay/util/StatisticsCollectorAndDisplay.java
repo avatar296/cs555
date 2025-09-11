@@ -181,6 +181,36 @@ public class StatisticsCollectorAndDisplay {
     System.out.println(
         "sum " + totalSent + " " + totalReceived + " " + totalSumSent + " " + totalSumReceived);
 
+    // Consistency verification
+    boolean countConsistent = (totalSent == totalReceived);
+    boolean sumConsistent = (totalSumSent == totalSumReceived);
+
+    if (!countConsistent) {
+      System.err.println(
+          "WARNING: Message count mismatch! Sent: "
+              + totalSent
+              + " != Received: "
+              + totalReceived
+              + " (Difference: "
+              + (totalSent - totalReceived)
+              + ")");
+    }
+
+    if (!sumConsistent) {
+      System.err.println(
+          "WARNING: Message sum mismatch! Sent sum: "
+              + totalSumSent
+              + " != Received sum: "
+              + totalSumReceived
+              + " (Difference: "
+              + (totalSumSent - totalSumReceived)
+              + ")");
+    }
+
+    if (countConsistent && sumConsistent) {
+      System.out.println("Consistency check passed: All messages accounted for correctly.");
+    }
+
     System.out.println(run.getRounds() + " rounds completed");
   }
 
