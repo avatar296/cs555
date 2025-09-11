@@ -4,13 +4,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/**
- * DEREGISTER_RESPONSE
- * Fields (ordered):
- * int type (Protocol.DEREGISTER_RESPONSE)
- * byte status (1=SUCCESS, 0=FAILURE)
- * String info
- */
 public class DeregisterResponse implements Event {
     public static final byte SUCCESS = 1;
     public static final byte FAILURE = 0;

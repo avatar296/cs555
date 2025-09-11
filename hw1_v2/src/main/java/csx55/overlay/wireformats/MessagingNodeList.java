@@ -3,15 +3,6 @@ package csx55.overlay.wireformats;
 import java.io.*;
 import java.util.*;
 
-/**
- * Registry → Node: list of peers this node should DIAL (initiate connections
- * to).
- *
- * Wire:
- * int type (Protocol.MESSAGING_NODE_LIST)
- * int count
- * count x String peerId // each is "ip:port"
- */
 public class MessagingNodeList implements Event {
     private final List<String> peers;
 

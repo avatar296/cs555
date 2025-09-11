@@ -2,7 +2,6 @@ package csx55.overlay.transport;
 
 import csx55.overlay.wireformats.Event;
 import csx55.overlay.wireformats.EventFactory;
-
 import java.io.*;
 import java.net.*;
 
@@ -28,7 +27,6 @@ public class TCPSender implements Closeable {
         return EventFactory.getInstance().read(in);
     }
 
-    // Added getter so node can spawn a registry reader thread
     public DataInputStream getInputStream() {
         return in;
     }

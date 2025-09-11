@@ -1,11 +1,10 @@
-// build.gradle
 plugins {
     id 'application'
     id 'java'
+    id 'com.diffplug.spotless' version '6.25.0'
 }
 
 java {
-    // Compile for Java 11 regardless of the local JDK version
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
 }
@@ -15,79 +14,61 @@ repositories {
 }
 
 dependencies {
-    // no external deps (per assignment)
+    // no external dependencies needed
 }
 
 test {
     enabled = false
 }
 
+spotless {
+    java {
+        googleJavaFormat('1.19.2')
+        target 'src/**/*.java'
+        removeUnusedImports()
+        importOrder()
+    }
+}
+
 application {
-    // Default entry when using `./gradlew run` (optional)
+    // default main class (can override with run tasks)
     mainClass = 'csx55.overlay.node.Registry'
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-    options.release = 11
-}
-
 tasks.register('runRegistry', JavaExec) {
-  group = 'Execution'
-  description = 'Starts the Registry server'
-  classpath = sourceSets.main.runtimeClasspath
-  mainClass = 'csx55.overlay.node.Registry'
-  def cliArgs = (project.findProperty('args') ?: project.findProperty('port') ?: '6000').toString()
-  args cliArgs.split()
-  notCompatibleWithConfigurationCache("Interactive task uses System.in")
-  doFirst { standardInput = System.in }
+    group = "Execution"
+    description = "Runs the Registry"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.overlay.node.Registry'
+    if (project.hasProperty('args')) {
+        args project.property('args').split()
+    }
 }
 
 tasks.register('runMessagingNode', JavaExec) {
-  group = 'Execution'
-  description = 'Starts a Messaging Node client'
-  classpath = sourceSets.main.runtimeClasspath
-  mainClass = 'csx55.overlay.node.MessagingNode'
-  def host = (project.findProperty('host') ?: '127.0.0.1').toString()
-  def port = (project.findProperty('port') ?: '6000').toString()
-  def cliArgs = (project.findProperty('args') ?: "${host} ${port}").toString()
-  args cliArgs.split()
-  notCompatibleWithConfigurationCache("Interactive task uses System.in")
-  doFirst { standardInput = System.in }
+    group = "Execution"
+    description = "Runs a MessagingNode"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.overlay.node.MessagingNode'
+    if (project.hasProperty('args')) {
+        args project.property('args').split()
+    }
 }
 
-/**
- * Canvas submission tarball:
- * includes Java sources, gradle files, and README.
- */
 tasks.register('createTar', Tar) {
-    group = 'Distribution'
-    description = 'Create HW1 submission tarball'
     archiveBaseName.set('Christopher_Cowart_HW1')
     archiveExtension.set('tar')
 
     from('.') {
         include 'build.gradle'
-        include 'settings.gradle'      // include if present
         include 'README.txt'
         include 'src/main/java/**/*.java'
 
-        // exclude build and editor cruft
-        exclude 'build/**'
         exclude '**/._*'
         exclude '**/.DS_Store'
         exclude 'src/test/**'
         exclude '**/test/**'
         exclude '**/*Test.java'
         exclude '**/*Tests.java'
-        exclude '.gradle/**'
-        exclude '.idea/**'
-        exclude '.vscode/**'
     }
-}
-
-/** Ensure wrapper version for graders */
-tasks.wrapper {
-    gradleVersion = '8.3'
-    distributionType = Wrapper.DistributionType.ALL
 }

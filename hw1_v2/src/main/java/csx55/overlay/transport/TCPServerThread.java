@@ -1,17 +1,11 @@
 // src/main/java/csx55/overlay/transport/TCPServerThread.java
 package csx55.overlay.transport;
 
-import csx55.overlay.wireformats.EventFactory;
-
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * Minimal threaded TCP acceptor that delegates each client socket to a handler.
- * No println() to stdout (keeps autograder output clean).
- */
 public final class TCPServerThread implements Runnable {
     @FunctionalInterface
     public interface ClientHandler {
@@ -34,16 +28,18 @@ public final class TCPServerThread implements Runnable {
         try {
             while (!server.isClosed()) {
                 final Socket s = server.accept();
-                pool.submit(() -> {
-                    try (Socket sock = s;
-                            DataInputStream in = new DataInputStream(new BufferedInputStream(sock.getInputStream()));
-                            DataOutputStream out = new DataOutputStream(
-                                    new BufferedOutputStream(sock.getOutputStream()))) {
-                        handler.handle(sock, in, out);
-                    } catch (IOException ignored) {
-                        // client closed or handler error; ignore
-                    }
-                });
+                pool.submit(
+                        () -> {
+                            try (Socket sock = s;
+                                    DataInputStream in = new DataInputStream(
+                                            new BufferedInputStream(sock.getInputStream()));
+                                    DataOutputStream out = new DataOutputStream(
+                                            new BufferedOutputStream(sock.getOutputStream()))) {
+                                handler.handle(sock, in, out);
+                            } catch (IOException ignored) {
+
+                            }
+                        });
             }
         } catch (IOException ignored) {
         } finally {

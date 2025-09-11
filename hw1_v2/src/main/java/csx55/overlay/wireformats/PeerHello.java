@@ -2,7 +2,6 @@ package csx55.overlay.wireformats;
 
 import java.io.*;
 
-/** Simple handshake so peers can learn each other's nodeId (ip:port). */
 public class PeerHello implements Event {
     private final String nodeId;
 

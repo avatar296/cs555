@@ -4,13 +4,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/**
- * DEREGISTER request
- * Fields (ordered):
- * int type (Protocol.DEREGISTER)
- * String ip
- * int port
- */
 public class Deregister implements Event {
     private final String ip;
     private final int port;

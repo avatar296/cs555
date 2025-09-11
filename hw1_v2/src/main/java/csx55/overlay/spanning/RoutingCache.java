@@ -2,10 +2,6 @@ package csx55.overlay.spanning;
 
 import java.util.*;
 
-/**
- * Simple placeholder for caching MSTs per overlay version/root.
- * Not strictly needed yet; you can expand this later for routing.
- */
 public final class RoutingCache {
     private String lastVersionKey = null;
     private Map<String, List<MinimumSpanningTree.Edge>> cacheByRoot = new HashMap<>();

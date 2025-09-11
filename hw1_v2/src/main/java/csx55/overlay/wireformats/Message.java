@@ -2,11 +2,10 @@ package csx55.overlay.wireformats;
 
 import java.io.*;
 
-/** Data packet routed along the overlay. */
 public class Message implements Event {
     private final String sourceId;
     private final String sinkId;
-    private final int payload; // random 32-bit int
+    private final int payload;
 
     public Message(String sourceId, String sinkId, int payload) {
         this.sourceId = sourceId;

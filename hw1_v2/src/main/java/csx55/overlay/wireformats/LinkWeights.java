@@ -3,17 +3,6 @@ package csx55.overlay.wireformats;
 import java.io.*;
 import java.util.*;
 
-/**
- * Registry → all nodes: full overlay with weights.
- *
- * Wire:
- * int type (Protocol.LINK_WEIGHTS)
- * int linkCount
- * repeat linkCount times:
- * String aId // "ip:port"
- * String bId
- * int w
- */
 public class LinkWeights implements Event {
     public static final class Link {
         public final String a, b;

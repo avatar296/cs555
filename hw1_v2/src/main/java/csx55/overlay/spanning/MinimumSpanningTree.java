@@ -2,11 +2,6 @@ package csx55.overlay.spanning;
 
 import java.util.*;
 
-/**
- * Kruskal MST (undirected, connected graph).
- * Input: vertex IDs ("ip:port") and weighted edges.
- * Output: list of edges belonging to the MST (|V|-1 edges).
- */
 public final class MinimumSpanningTree {
 
     public static final class Edge {
@@ -60,16 +55,16 @@ public final class MinimumSpanningTree {
     }
 
     public static List<Edge> kruskal(Collection<String> vertices, Collection<Edge> edges) {
-        // Sort edges by weight, then by (u,v) for determinism
         List<Edge> sorted = new ArrayList<>(edges);
-        sorted.sort((a, b) -> {
-            if (a.w != b.w)
-                return Integer.compare(a.w, b.w);
-            int cu = a.u.compareTo(b.u);
-            if (cu != 0)
-                return cu;
-            return a.v.compareTo(b.v);
-        });
+        sorted.sort(
+                (a, b) -> {
+                    if (a.w != b.w)
+                        return Integer.compare(a.w, b.w);
+                    int cu = a.u.compareTo(b.u);
+                    if (cu != 0)
+                        return cu;
+                    return a.v.compareTo(b.v);
+                });
 
         DSU dsu = new DSU();
         dsu.makeSet(vertices);
@@ -83,8 +78,7 @@ public final class MinimumSpanningTree {
             }
         }
         return mst;
-        // (If the graph was disconnected, mst.size() < |V|-1; assignment's overlay
-        // should be connected.)
+
     }
 
     private MinimumSpanningTree() {

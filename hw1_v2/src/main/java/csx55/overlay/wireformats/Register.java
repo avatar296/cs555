@@ -4,13 +4,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/**
- * REGISTER request
- * Fields (ordered):
- * int type (Protocol.REGISTER)
- * String ip
- * int port
- */
 public class Register implements Event {
     private final String ip;
     private final int port;

@@ -4,7 +4,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 public interface Event {
-    int type();
+  int type();
 
-    void write(DataOutputStream out) throws IOException;
+  void write(DataOutputStream out) throws IOException;
 }

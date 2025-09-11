@@ -1,18 +1,18 @@
 package csx55.overlay.node;
 
 import csx55.overlay.wireformats.*;
-
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 final class OverlayCommands {
     private static List<String> nodeOrder = new ArrayList<>();
     private static final Map<String, Set<String>> adj = new HashMap<>();
     private static final List<LinkWeights.Link> weightedLinks = new ArrayList<>();
 
-    static void setupOverlay(String cmd, Map<String, java.net.InetSocketAddress> registered,
+    static void setupOverlay(
+            String cmd,
+            Map<String, java.net.InetSocketAddress> registered,
             Map<String, DataOutputStream> outs) {
         String[] parts = cmd.split("\\s+");
         if (parts.length != 2)
@@ -32,10 +32,10 @@ final class OverlayCommands {
             adj.put(id, new HashSet<>());
             deg.put(id, 0);
         }
-        // ring
+
         for (int i = 0; i < N; i++)
             addEdge(nodeOrder.get(i), nodeOrder.get((i + 1) % N), adj, deg, edges);
-        // chords
+
         Random rnd = new Random();
         List<String> need = new ArrayList<>();
         while (true) {
@@ -50,7 +50,6 @@ final class OverlayCommands {
             if (!a.equals(b) && !adj.get(a).contains(b))
                 addEdge(a, b, adj, deg, edges);
         }
-        // choose dialers
         Map<String, List<String>> dial = new HashMap<>();
         nodeOrder.forEach(id -> dial.put(id, new ArrayList<>()));
         Random r = new Random();
@@ -61,17 +60,18 @@ final class OverlayCommands {
                     dial.get(dialer).add(dialer.equals(a) ? b : a);
                 }
         // send lists
-        dial.forEach((id, peers) -> {
-            DataOutputStream o = outs.get(id);
-            if (o != null)
-                try {
-                    synchronized (o) {
-                        new MessagingNodeList(peers).write(o);
-                        o.flush();
-                    }
-                } catch (IOException ignored) {
-                }
-        });
+        dial.forEach(
+                (id, peers) -> {
+                    DataOutputStream o = outs.get(id);
+                    if (o != null)
+                        try {
+                            synchronized (o) {
+                                new MessagingNodeList(peers).write(o);
+                                o.flush();
+                            }
+                        } catch (IOException ignored) {
+                        }
+                });
         System.out.println("setup completed with " + CR + " connections");
     }
 
@@ -101,7 +101,11 @@ final class OverlayCommands {
         System.out.println("link weights assigned");
     }
 
-    private static void addEdge(String a, String b, Map<String, Set<String>> adj, Map<String, Integer> deg,
+    private static void addEdge(
+            String a,
+            String b,
+            Map<String, Set<String>> adj,
+            Map<String, Integer> deg,
             Set<String> edges) {
         String k = a.compareTo(b) < 0 ? a + "|" + b : b + "|" + a;
         if (edges.contains(k))

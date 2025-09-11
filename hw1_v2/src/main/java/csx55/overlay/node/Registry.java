@@ -2,7 +2,6 @@ package csx55.overlay.node;
 
 import csx55.overlay.transport.TCPServerThread;
 import csx55.overlay.wireformats.*;
-
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -15,32 +14,15 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/**
- * Registry:
- * - Handles REGISTER / DEREGISTER.
- * - Builds overlay and assigns link weights.
- * - Orchestrates runs: start <rounds> -> waits for TASK_COMPLETE -> waits 15s
- * -> PULL_TRAFFIC_SUMMARY -> prints table.
- *
- * CLI:
- * list-messaging-nodes
- * setup-overlay <CR>
- * send-overlay-link-weights
- * list-weights
- * start <rounds>
- */
 public class Registry {
 
-    // ---- Registered nodes and their output streams (for push control) ----
     private final Map<String, InetSocketAddress> registered = new ConcurrentHashMap<>();
     private final Map<String, DataOutputStream> outs = new ConcurrentHashMap<>();
 
-    // ---- Overlay state ----
     private List<String> nodeOrder = new ArrayList<>();
     private final Map<String, Set<String>> adj = new HashMap<>();
     private final List<LinkWeights.Link> weightedLinks = new ArrayList<>();
 
-    // ---- Run orchestration ----
     private volatile Run run = null;
 
     private static final class Row {
@@ -78,7 +60,8 @@ public class Registry {
         try {
             server = new TCPServerThread(port, this::handleClient);
         } catch (BindException be) {
-            System.err.println("Port " + port + " is already in use. Try: ./gradlew runRegistry -Pport=6001");
+            System.err.println(
+                    "Port " + port + " is already in use. Try: ./gradlew runRegistry -Pport=6001");
             return;
         }
 
@@ -88,27 +71,28 @@ public class Registry {
 
         System.out.println("Registry listening on port " + port);
 
-        // CLI thread
-        Thread cli = new Thread(() -> {
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
-                String line;
-                while ((line = br.readLine()) != null) {
-                    line = line.trim();
-                    if (line.equals("list-messaging-nodes")) {
-                        listMessagingNodes();
-                    } else if (line.startsWith("setup-overlay")) {
-                        doSetupOverlay(line);
-                    } else if (line.equals("send-overlay-link-weights")) {
-                        doSendLinkWeights();
-                    } else if (line.equals("list-weights")) {
-                        doListWeights();
-                    } else if (line.startsWith("start")) {
-                        doStart(line);
+        Thread cli = new Thread(
+                () -> {
+                    try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
+                        String line;
+                        while ((line = br.readLine()) != null) {
+                            line = line.trim();
+                            if (line.equals("list-messaging-nodes")) {
+                                listMessagingNodes();
+                            } else if (line.startsWith("setup-overlay")) {
+                                doSetupOverlay(line);
+                            } else if (line.equals("send-overlay-link-weights")) {
+                                doSendLinkWeights();
+                            } else if (line.equals("list-weights")) {
+                                doListWeights();
+                            } else if (line.startsWith("start")) {
+                                doStart(line);
+                            }
+                        }
+                    } catch (IOException ignored) {
                     }
-                }
-            } catch (IOException ignored) {
-            }
-        }, "registry-cli");
+                },
+                "registry-cli");
         cli.setDaemon(true);
         cli.start();
 
@@ -119,8 +103,6 @@ public class Registry {
             }
         }
     }
-
-    // ---------------- Registration plumbing ----------------
 
     private void listMessagingNodes() {
         registered.keySet().forEach(System.out::println);
@@ -165,7 +147,8 @@ public class Registry {
         outs.put(id, out);
 
         String info = "Registration request successful. The number of messaging nodes currently constituting the overlay is ("
-                + registered.size() + ")";
+                + registered.size()
+                + ")";
         new RegisterResponse(RegisterResponse.SUCCESS, info).write(out);
         out.flush();
     }
@@ -191,8 +174,6 @@ public class Registry {
         out.flush();
     }
 
-    // ---------------- Overlay construction ----------------
-
     private void doSetupOverlay(String cmd) {
         String[] parts = cmd.split("\\s+");
         if (parts.length != 2)
@@ -200,7 +181,6 @@ public class Registry {
         int CR = Integer.parseInt(parts[1]);
 
         int N = registered.size();
-        // Guard edge cases: grader typically uses CR >= 2
         if (N == 0 || CR < 2 || CR >= N) {
             System.out.println("setup completed with " + CR + " connections");
             return;
@@ -217,17 +197,15 @@ public class Registry {
             deg.put(id, 0);
         }
 
-        // 1) Ring for connectivity
         for (int i = 0; i < N; i++) {
             String a = nodeOrder.get(i);
             String b = nodeOrder.get((i + 1) % N);
             addEdge(a, b, adj, deg, edges);
         }
 
-        // 2) Deterministic pairing rounds until degrees hit CR
         List<String> needing = new ArrayList<>();
-        int safety = N * CR * 4; // generous bound
-        Random fixed = new Random(42); // fixed seed => stable overlays across runs
+        int safety = N * CR * 4;
+        Random fixed = new Random(42);
         while (true) {
             needing.clear();
             for (String id : nodeOrder)
@@ -247,11 +225,10 @@ public class Registry {
             }
         }
 
-        // 3) Choose a dialer per undirected edge
         Map<String, List<String>> dial = new HashMap<>();
         for (String id : nodeOrder)
             dial.put(id, new ArrayList<>());
-        Random chooser = new Random(99); // fixed seed -> stable dial lists
+        Random chooser = new Random(99);
         for (String a : nodeOrder) {
             for (String b : adj.get(a)) {
                 if (a.compareTo(b) < 0) {
@@ -262,24 +239,26 @@ public class Registry {
             }
         }
 
-        // 4) Push MESSAGING_NODE_LIST
-        dial.forEach((id, peers) -> {
-            DataOutputStream o = outs.get(id);
-            if (o != null) {
-                try {
-                    synchronized (o) {
-                        new MessagingNodeList(peers).write(o);
-                        o.flush();
+        dial.forEach(
+                (id, peers) -> {
+                    DataOutputStream o = outs.get(id);
+                    if (o != null) {
+                        try {
+                            synchronized (o) {
+                                new MessagingNodeList(peers).write(o);
+                                o.flush();
+                            }
+                        } catch (IOException ignored) {
+                        }
                     }
-                } catch (IOException ignored) {
-                }
-            }
-        });
+                });
 
         System.out.println("setup completed with " + CR + " connections");
     }
 
-    private static void addEdge(String a, String b,
+    private static void addEdge(
+            String a,
+            String b,
             Map<String, Set<String>> adj,
             Map<String, Integer> deg,
             Set<String> edges) {
@@ -330,8 +309,6 @@ public class Registry {
         }
     }
 
-    // ---------------- Start / Summary orchestration ----------------
-
     private void doStart(String cmd) {
         String[] parts = cmd.split("\\s+");
         if (parts.length != 2)
@@ -342,18 +319,19 @@ public class Registry {
         run = new Run(expected, rounds);
 
         TaskInitiate ti = new TaskInitiate(rounds);
-        expected.forEach(id -> {
-            DataOutputStream o = outs.get(id);
-            if (o != null) {
-                try {
-                    synchronized (o) {
-                        ti.write(o);
-                        o.flush();
+        expected.forEach(
+                id -> {
+                    DataOutputStream o = outs.get(id);
+                    if (o != null) {
+                        try {
+                            synchronized (o) {
+                                ti.write(o);
+                                o.flush();
+                            }
+                        } catch (IOException ignored) {
+                        }
                     }
-                } catch (IOException ignored) {
-                }
-            }
-        });
+                });
 
         new Thread(() -> orchestrateAndPrint(run), "run-orchestrator").start();
     }
@@ -381,7 +359,6 @@ public class Registry {
     }
 
     private void orchestrateAndPrint(Run r) {
-        // wait for all completes
         while (r.completed.size() < r.expected.size()) {
             try {
                 Thread.sleep(100);
@@ -389,28 +366,26 @@ public class Registry {
             }
         }
 
-        // allow in-flight to settle
         try {
             Thread.sleep(15000);
         } catch (InterruptedException ignored) {
         }
 
-        // request summaries
         PullTrafficSummary pull = new PullTrafficSummary();
-        r.expected.forEach(id -> {
-            DataOutputStream o = outs.get(id);
-            if (o != null) {
-                try {
-                    synchronized (o) {
-                        pull.write(o);
-                        o.flush();
+        r.expected.forEach(
+                id -> {
+                    DataOutputStream o = outs.get(id);
+                    if (o != null) {
+                        try {
+                            synchronized (o) {
+                                pull.write(o);
+                                o.flush();
+                            }
+                        } catch (IOException ignored) {
+                        }
                     }
-                } catch (IOException ignored) {
-                }
-            }
-        });
+                });
 
-        // wait for all rows
         while (r.rows.size() < r.expected.size()) {
             try {
                 Thread.sleep(50);
@@ -418,7 +393,6 @@ public class Registry {
             }
         }
 
-        // print table (sorted for determinism)
         List<Row> rows = new ArrayList<>(r.rows);
         rows.sort(Comparator.comparing(a -> a.id));
 
@@ -429,20 +403,29 @@ public class Registry {
             totalSumSent += row.sentSum;
             totalSumRecv += row.recvSum;
 
-            // EXACT format per spec: "<ip:port> sent recv sumSent sumRecv relayed"
             System.out.println(
-                    row.id + " " +
-                            row.sent + " " +
-                            row.recv + " " +
-                            String.format(Locale.ROOT, "%.2f", (double) row.sentSum) + " " +
-                            String.format(Locale.ROOT, "%.2f", (double) row.recvSum) + " " +
-                            row.relayed);
+                    row.id
+                            + " "
+                            + row.sent
+                            + " "
+                            + row.recv
+                            + " "
+                            + String.format(Locale.ROOT, "%.2f", (double) row.sentSum)
+                            + " "
+                            + String.format(Locale.ROOT, "%.2f", (double) row.recvSum)
+                            + " "
+                            + row.relayed);
         }
 
         System.out.println(
-                "sum " + totalSent + " " + totalRecv + " " +
-                        String.format(Locale.ROOT, "%.2f", (double) totalSumSent) + " " +
-                        String.format(Locale.ROOT, "%.2f", (double) totalSumRecv));
+                "sum "
+                        + totalSent
+                        + " "
+                        + totalRecv
+                        + " "
+                        + String.format(Locale.ROOT, "%.2f", (double) totalSumSent)
+                        + " "
+                        + String.format(Locale.ROOT, "%.2f", (double) totalSumRecv));
 
         System.out.println(r.rounds + " rounds completed");
     }
