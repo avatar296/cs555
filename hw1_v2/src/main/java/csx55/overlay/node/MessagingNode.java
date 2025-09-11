@@ -181,7 +181,10 @@ public class MessagingNode {
   }
 
   private void handleDialList(MessagingNodeList m) {
-    int ok = 0;
+    int attempted = m.peers().size();
+    int successful = 0;
+    List<String> failed = new ArrayList<>();
+
     for (String peer : m.peers()) {
       try {
         String[] parts = peer.split(":");
@@ -193,11 +196,17 @@ public class MessagingNode {
         neighbor.put(peer, c);
         startPeerReader(c);
         sendHello(c);
-        ok++;
-      } catch (IOException ignored) {
+        successful++;
+      } catch (IOException e) {
+        failed.add(peer);
+        System.err.println("Failed to connect to " + peer + ": " + e.getMessage());
       }
     }
-    System.out.println("All connections are established. Number of connections: " + ok);
+
+    System.out.println("All connections are established. Number of connections: " + successful);
+    if (!failed.isEmpty()) {
+      System.err.println("Warning: Failed to connect to " + failed.size() + " peer(s): " + failed);
+    }
   }
 
   private void handleLinkWeights(LinkWeights lw) {

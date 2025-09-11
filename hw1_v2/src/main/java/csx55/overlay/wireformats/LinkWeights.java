@@ -9,6 +9,9 @@ public class LinkWeights implements Event {
     public final int w;
 
     public Link(String a, String b, int w) {
+      if (w < 1 || w > 10) {
+        throw new IllegalArgumentException("Link weight must be between 1 and 10, got: " + w);
+      }
       this.a = a;
       this.b = b;
       this.w = w;

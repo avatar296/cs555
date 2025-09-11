@@ -42,8 +42,10 @@ public class OverlayCreator {
 
     Random random = new Random();
     List<String> needConnections = new ArrayList<>();
+    int maxAttempts = 10000;
+    int attempts = 0;
 
-    while (true) {
+    while (attempts < maxAttempts) {
       needConnections.clear();
       for (String nodeId : nodeOrder) {
         if (nodeDegrees.get(nodeId) < connectionRequirement) {
@@ -60,6 +62,36 @@ public class OverlayCreator {
 
       if (!nodeA.equals(nodeB) && !adjacencyList.get(nodeA).contains(nodeB)) {
         addEdge(nodeA, nodeB, adjacencyList, nodeDegrees, edges);
+        attempts = 0;
+      } else {
+        attempts++;
+      }
+    }
+
+    if (!isFullyConnected()) {
+      System.err.println("Warning: Overlay is not fully connected. Attempting to fix...");
+
+      for (int retries = 0; retries < 3; retries++) {
+        for (int i = 0; i < nodeCount; i++) {
+          for (int j = i + 1; j < nodeCount; j++) {
+            String nodeA = nodeOrder.get(i);
+            String nodeB = nodeOrder.get(j);
+            if (!adjacencyList.get(nodeA).contains(nodeB)
+                && nodeDegrees.get(nodeA) < connectionRequirement
+                && nodeDegrees.get(nodeB) < connectionRequirement) {
+              addEdge(nodeA, nodeB, adjacencyList, nodeDegrees, edges);
+            }
+          }
+        }
+
+        if (isFullyConnected()) {
+          System.out.println("Overlay connectivity fixed successfully.");
+          break;
+        }
+      }
+
+      if (!isFullyConnected()) {
+        System.err.println("Error: Unable to create a fully connected overlay after retries.");
       }
     }
 
@@ -160,5 +192,30 @@ public class OverlayCreator {
             }
           }
         });
+  }
+
+  private boolean isFullyConnected() {
+    if (nodeOrder.isEmpty()) {
+      return true;
+    }
+
+    Set<String> visited = new HashSet<>();
+    Queue<String> queue = new LinkedList<>();
+
+    String startNode = nodeOrder.get(0);
+    queue.add(startNode);
+    visited.add(startNode);
+
+    while (!queue.isEmpty()) {
+      String current = queue.poll();
+      for (String neighbor : adjacencyList.get(current)) {
+        if (!visited.contains(neighbor)) {
+          visited.add(neighbor);
+          queue.add(neighbor);
+        }
+      }
+    }
+
+    return visited.size() == nodeOrder.size();
   }
 }

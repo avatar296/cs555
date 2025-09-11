@@ -5,7 +5,6 @@ import csx55.overlay.wireformats.TaskSummaryResponse;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.*;
-import java.util.Locale;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class StatisticsCollectorAndDisplay {
@@ -172,24 +171,17 @@ public class StatisticsCollectorAndDisplay {
               + " "
               + stats.getMessagesReceived()
               + " "
-              + String.format(Locale.ROOT, "%.2f", (double) stats.getSumMessagesSent())
+              + stats.getSumMessagesSent()
               + " "
-              + String.format(Locale.ROOT, "%.2f", (double) stats.getSumMessagesReceived())
+              + stats.getSumMessagesReceived()
               + " "
               + stats.getMessagesRelayed());
     }
 
     System.out.println(
-        "sum "
-            + totalSent
-            + " "
-            + totalReceived
-            + " "
-            + String.format(Locale.ROOT, "%.2f", (double) totalSumSent)
-            + " "
-            + String.format(Locale.ROOT, "%.2f", (double) totalSumReceived));
+        "sum " + totalSent + " " + totalReceived + " " + totalSumSent + " " + totalSumReceived);
 
-    System.out.println("\n" + run.getRounds() + " rounds completed");
+    System.out.println(run.getRounds() + " rounds completed");
   }
 
   public static boolean waitForCompletion(StatisticsRun run, long timeoutMillis) {
