@@ -1,53 +1,68 @@
+// src/main/java/csx55/overlay/transport/TCPServerThread.java
 package csx55.overlay.transport;
 
-import csx55.overlay.wireformats.Event;
 import csx55.overlay.wireformats.EventFactory;
 
 import java.io.*;
 import java.net.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class TCPServerThread implements Runnable, AutoCloseable {
-    public interface Handler {
+/**
+ * Minimal threaded TCP acceptor that delegates each client socket to a handler.
+ * No println() to stdout (keeps autograder output clean).
+ */
+public final class TCPServerThread implements Runnable {
+    @FunctionalInterface
+    public interface ClientHandler {
         void handle(Socket s, DataInputStream in, DataOutputStream out) throws IOException;
     }
 
-    private final ServerSocket server;
-    private final Handler handler;
+    private final int port;
+    private final ClientHandler handler;
+    private volatile ServerSocket server;
     private final ExecutorService pool = Executors.newCachedThreadPool();
-    private volatile boolean running = true;
 
-    public TCPServerThread(int port, Handler handler) throws IOException {
-        this.server = new ServerSocket(port);
+    public TCPServerThread(int port, ClientHandler handler) throws IOException {
+        this.port = port;
         this.handler = handler;
-    }
-
-    public int getLocalPort() {
-        return server.getLocalPort();
+        this.server = new ServerSocket(port);
     }
 
     @Override
     public void run() {
-        while (running) {
-            try {
-                Socket s = server.accept();
+        try {
+            while (!server.isClosed()) {
+                final Socket s = server.accept();
                 pool.submit(() -> {
-                    try (DataInputStream in = new DataInputStream(new BufferedInputStream(s.getInputStream()));
+                    try (Socket sock = s;
+                            DataInputStream in = new DataInputStream(new BufferedInputStream(sock.getInputStream()));
                             DataOutputStream out = new DataOutputStream(
-                                    new BufferedOutputStream(s.getOutputStream()))) {
-                        handler.handle(s, in, out);
+                                    new BufferedOutputStream(sock.getOutputStream()))) {
+                        handler.handle(sock, in, out);
                     } catch (IOException ignored) {
+                        // client closed or handler error; ignore
                     }
                 });
+            }
+        } catch (IOException ignored) {
+        } finally {
+            try {
+                server.close();
             } catch (IOException ignored) {
             }
+            pool.shutdownNow();
         }
     }
 
-    @Override
-    public void close() throws IOException {
-        running = false;
-        server.close();
-        pool.shutdownNow();
+    public int getPort() {
+        return port;
+    }
+
+    public void close() {
+        try {
+            server.close();
+        } catch (IOException ignored) {
+        }
     }
 }
