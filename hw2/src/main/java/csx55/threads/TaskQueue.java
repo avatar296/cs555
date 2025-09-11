@@ -16,12 +16,10 @@ public class TaskQueue {
     for (Task t : batch) q.add(t);
   }
 
-  /** Blocking take used by workers. */
   public Task take() throws InterruptedException {
     return q.take();
   }
 
-  /** Remove up to n tasks (non-blocking). */
   public List<Task> removeBatch(int n) {
     List<Task> res = new ArrayList<>(n);
     q.drainTo(res, n);

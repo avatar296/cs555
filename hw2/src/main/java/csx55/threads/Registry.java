@@ -5,10 +5,6 @@ import java.net.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Registry node: accepts registrations, sets up overlay, starts rounds, and collates/prints
- * statistics.
- */
 public class Registry {
 
   private final int port;
@@ -16,6 +12,7 @@ public class Registry {
   private final Map<String, Stats> nodeStats = new ConcurrentHashMap<>();
   private ServerSocket serverSocket;
   private volatile boolean running = true;
+  private volatile boolean statsPrinted = false;
 
   public Registry(int port) {
     this.port = port;
@@ -25,7 +22,6 @@ public class Registry {
     serverSocket = new ServerSocket(port);
     System.out.println("Registry listening on port " + port);
 
-    // accept loop in background
     new Thread(
             () -> {
               try {
@@ -39,7 +35,6 @@ public class Registry {
             })
         .start();
 
-    // CLI loop for setup-overlay / start
     try (BufferedReader console = new BufferedReader(new InputStreamReader(System.in))) {
       String line;
       while ((line = console.readLine()) != null) {
@@ -70,30 +65,41 @@ public class Registry {
   }
 
   private void handleConnection(Socket socket) {
-    try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-      Object obj = in.readObject();
-      if (obj instanceof String) {
-        String msg = (String) obj;
-        if (msg.startsWith("REGISTER")) {
-          String[] parts = msg.split(" ");
-          String ip = parts[1];
-          int port = Integer.parseInt(parts[2]);
-          String id = ip + ":" + port;
-          synchronized (nodes) {
-            if (!nodes.contains(id)) nodes.add(id);
-          }
-          System.out.println("Node registered: " + id);
-        } else if (msg.startsWith("STATS")) {
-          String[] parts = msg.split(" ");
-          String nodeId = parts[1];
-          Stats stats = (Stats) in.readObject();
-          nodeStats.put(nodeId, stats);
+    try {
+      PushbackInputStream pin = new PushbackInputStream(socket.getInputStream());
+      int first = pin.read();
+      if (first == -1) {
+        socket.close();
+        return;
+      }
+      pin.unread(first);
 
-          if (nodeStats.size() == nodes.size()) {
-            printFinalStats();
+      try (ObjectInputStream in = new ObjectInputStream(pin)) {
+        Object obj = in.readObject();
+        if (obj instanceof String) {
+          String msg = (String) obj;
+          if (msg.startsWith("REGISTER")) {
+            String[] parts = msg.split(" ");
+            String ip = parts[1];
+            int port = Integer.parseInt(parts[2]);
+            String id = ip + ":" + port;
+            synchronized (nodes) {
+              if (!nodes.contains(id)) nodes.add(id);
+            }
+            System.out.println("Node registered: " + id);
+          } else if (msg.startsWith("STATS")) {
+            String[] parts = msg.split(" ");
+            String nodeId = parts[1];
+            Stats stats = (Stats) in.readObject();
+            nodeStats.put(nodeId, stats);
+
+            if (nodeStats.size() == nodes.size()) {
+              printFinalStats();
+            }
           }
         }
       }
+    } catch (EOFException e) {
     } catch (Exception e) {
       e.printStackTrace();
     }
@@ -102,7 +108,6 @@ public class Registry {
   private void setupOverlay(int poolSize) {
     List<String> alive = new ArrayList<>();
     synchronized (nodes) {
-      // First pass: probe connectivity and build "alive" list
       for (String node : nodes) {
         String[] np = node.split(":");
         try (Socket probe = new Socket()) {
@@ -120,15 +125,15 @@ public class Registry {
         return;
       }
 
-      // Second pass: send overlay to each alive node
       int n = nodes.size();
       for (int i = 0; i < n; i++) {
         String node = nodes.get(i);
         String successor = nodes.get((i + 1) % n);
+        String predecessor = nodes.get((i - 1 + n) % n);
         String[] parts = node.split(":");
         try (Socket sock = new Socket(parts[0], Integer.parseInt(parts[1]));
             ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream())) {
-          out.writeObject("OVERLAY " + successor + " " + poolSize);
+          out.writeObject("OVERLAY " + successor + " " + predecessor + " " + poolSize);
           out.flush();
         } catch (IOException e) {
           System.out.println(
@@ -143,6 +148,9 @@ public class Registry {
   }
 
   private void startRounds(int rounds) {
+    nodeStats.clear();
+    statsPrinted = false;
+
     synchronized (nodes) {
       for (String node : nodes) {
         String[] parts = node.split(":");
@@ -159,6 +167,9 @@ public class Registry {
   }
 
   private void printFinalStats() {
+    if (statsPrinted) return;
+    statsPrinted = true;
+
     long totalCompleted = nodeStats.values().stream().mapToLong(Stats::getCompleted).sum();
 
     for (String node : nodes) {

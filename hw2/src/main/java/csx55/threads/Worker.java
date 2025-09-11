@@ -2,23 +2,16 @@ package csx55.threads;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Worker threads take tasks from the queue and mine them. Credit completion to THIS node (via
- * Stats) AFTER mining.
- */
 public class Worker implements Runnable {
 
-  private static final boolean PRINT_TASKS =
-      Boolean.parseBoolean(System.getProperty("cs555.printTasks", "true"));
+  private static final boolean PRINT_TASKS = Boolean.parseBoolean(System.getProperty("cs555.printTasks", "true"));
 
-  private final int id;
   private final TaskQueue queue;
   private final Stats stats;
   private final AtomicBoolean running = new AtomicBoolean(true);
   private final Thread thread;
 
   public Worker(int id, TaskQueue queue, Stats stats) {
-    this.id = id;
     this.queue = queue;
     this.stats = stats;
     this.thread = new Thread(this, "Worker-" + id);
@@ -45,30 +38,27 @@ public class Worker implements Runnable {
   public void run() {
     while (running.get()) {
       try {
-        Task task = queue.take(); // blocking
-        if (task == null) continue;
+        Task task = queue.take();
+        if (task == null)
+          continue;
 
         stats.incInFlight();
         try {
-          task.mine(); // do the work
-          stats.incrementCompleted(); // CREDIT goes to THIS node
+          task.mine();
+          stats.incrementCompleted();
           if (PRINT_TASKS) {
-            System.out.println(task); // print mined task at this node
+            System.out.println(task);
           }
         } finally {
           stats.decInFlight();
         }
 
       } catch (InterruptedException e) {
-        if (!running.get()) break;
+        if (!running.get())
+          break;
       } catch (Throwable t) {
         t.printStackTrace();
       }
     }
-  }
-
-  @Override
-  public String toString() {
-    return "Worker{id=" + id + ", name=" + Thread.currentThread().getName() + "}";
   }
 }

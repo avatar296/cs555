@@ -3,7 +3,6 @@ package csx55.threads;
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Stats for each node. */
 public class Stats implements Serializable {
   private static final long serialVersionUID = 1L;
 
@@ -11,8 +10,7 @@ public class Stats implements Serializable {
   private final AtomicInteger pulled = new AtomicInteger();
   private final AtomicInteger pushed = new AtomicInteger();
   private final AtomicInteger completed = new AtomicInteger();
-  private final AtomicInteger inFlight =
-      new AtomicInteger(); // tasks taken by workers but not yet finished
+  private final AtomicInteger inFlight = new AtomicInteger();
 
   public void incrementGenerated(int n) {
     generated.addAndGet(n);

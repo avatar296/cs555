@@ -4,26 +4,22 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
-/** Serializable task; no Stats reference so completion is credited to the mining node. */
 public class Task implements java.io.Serializable {
   private static final long serialVersionUID = 1L;
 
-  // Tunable via -Dcs555.difficultyBits (default 17 per spec)
   private static final int DIFFICULTY_BITS = Integer.getInteger("cs555.difficultyBits", 17);
 
-  private final String origin; // where the task was created (for logging only)
+  private final String origin;
   private boolean migrated = false;
 
   public Task(String origin) {
     this.origin = origin;
   }
 
-  /** Proof-of-work mining until hash has DIFFICULTY_BITS leading zero bits. */
   public void mine() {
     try {
       MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
       byte[] originBytes = origin.getBytes();
-      // buffer = origin bytes + 4-byte nonce (big-endian)
       byte[] buf = Arrays.copyOf(originBytes, originBytes.length + 4);
 
       int nonce = 0;
@@ -35,9 +31,9 @@ public class Task implements java.io.Serializable {
 
         byte[] hash = sha256.digest(buf);
         if (hasLeadingZeroBits(hash, DIFFICULTY_BITS)) {
-          return; // success; Worker will credit completion & print
+          return;
         }
-        nonce++; // fast, predictable stride
+        nonce++;
       }
     } catch (NoSuchAlgorithmException e) {
       throw new RuntimeException(e);
