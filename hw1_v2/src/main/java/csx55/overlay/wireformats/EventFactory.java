@@ -24,6 +24,10 @@ public final class EventFactory {
                 return new Deregister(in);
             case Protocol.DEREGISTER_RESPONSE:
                 return new DeregisterResponse(in);
+            case Protocol.MESSAGING_NODE_LIST:
+                return new MessagingNodeList(in);
+            case Protocol.LINK_WEIGHTS:
+                return new LinkWeights(in);
             default:
                 throw new IOException("Unknown event type: " + t);
         }

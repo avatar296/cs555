@@ -4,7 +4,7 @@ import csx55.overlay.wireformats.Event;
 import csx55.overlay.wireformats.EventFactory;
 
 import java.io.*;
-import java.net.Socket;
+import java.net.*;
 
 public class TCPSender implements Closeable {
     private final Socket socket;
@@ -12,7 +12,9 @@ public class TCPSender implements Closeable {
     private final DataInputStream in;
 
     public TCPSender(String host, int port) throws IOException {
-        this.socket = new Socket(host, port);
+        this.socket = new Socket();
+        socket.connect(new InetSocketAddress(host, port), 5000);
+        socket.setSoTimeout(0); // blocking
         this.out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
         this.in = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
     }
@@ -24,6 +26,11 @@ public class TCPSender implements Closeable {
 
     public Event read() throws IOException {
         return EventFactory.getInstance().read(in);
+    }
+
+    // Added getter so node can spawn a registry reader thread
+    public DataInputStream getInputStream() {
+        return in;
     }
 
     public Socket socket() {

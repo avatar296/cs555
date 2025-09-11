@@ -29,21 +29,12 @@ application {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    // Ensures class files target Java 11 even on newer JDKs (e.g., 17/21)
     options.release = 11
 }
 
-/**
- * Run tasks with sensible defaults.
- * Override with:
- *   ./gradlew runRegistry -Pport=6000
- *   ./gradlew runMessagingNode -Phost=127.0.0.1 -Pport=6000
- * Or:
- *   ./gradlew runRegistry -Pargs="6000"
- *   ./gradlew runMessagingNode -Pargs="127.0.0.1 6000"
- */
 tasks.register('runRegistry', JavaExec) {
-  group = "Execution"; description = "Starts the Registry server"
+  group = 'Execution'
+  description = 'Starts the Registry server'
   classpath = sourceSets.main.runtimeClasspath
   mainClass = 'csx55.overlay.node.Registry'
   def cliArgs = (project.findProperty('args') ?: project.findProperty('port') ?: '6000').toString()
@@ -53,7 +44,8 @@ tasks.register('runRegistry', JavaExec) {
 }
 
 tasks.register('runMessagingNode', JavaExec) {
-  group = "Execution"; description = "Starts a Messaging Node client"
+  group = 'Execution'
+  description = 'Starts a Messaging Node client'
   classpath = sourceSets.main.runtimeClasspath
   mainClass = 'csx55.overlay.node.MessagingNode'
   def host = (project.findProperty('host') ?: '127.0.0.1').toString()
