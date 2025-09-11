@@ -108,7 +108,7 @@ public class MessagingNode {
                       handleLinkWeights((LinkWeights) e);
                     } else if (e instanceof TaskInitiate) {
                       handleTaskInitiate((TaskInitiate) e);
-                    } else if (e instanceof PullTrafficSummary) {
+                    } else if (e instanceof TaskSummaryRequest) {
                       handlePullSummary();
                     } else if (e instanceof DeregisterResponse) {
                       regEvents.offer(e);
@@ -219,8 +219,8 @@ public class MessagingNode {
   }
 
   private void handlePullSummary() {
-    TrafficSummary ts =
-        new TrafficSummary(
+    TaskSummaryResponse ts =
+        new TaskSummaryResponse(
             selfIp,
             selfPort,
             sendTracker.get(),

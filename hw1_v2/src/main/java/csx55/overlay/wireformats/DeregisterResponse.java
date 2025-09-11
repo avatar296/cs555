@@ -5,39 +5,39 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 public class DeregisterResponse implements Event {
-    public static final byte SUCCESS = 1;
-    public static final byte FAILURE = 0;
+  public static final byte SUCCESS = 1;
+  public static final byte FAILURE = 0;
 
-    private final byte status;
-    private final String info;
+  private final byte status;
+  private final String info;
 
-    public DeregisterResponse(byte status, String info) {
-        this.status = status;
-        this.info = info;
-    }
+  public DeregisterResponse(byte status, String info) {
+    this.status = status;
+    this.info = info;
+  }
 
-    public DeregisterResponse(DataInputStream in) throws IOException {
-        this.status = in.readByte();
-        this.info = in.readUTF();
-    }
+  public DeregisterResponse(DataInputStream in) throws IOException {
+    this.status = in.readByte();
+    this.info = in.readUTF();
+  }
 
-    public byte status() {
-        return status;
-    }
+  public byte status() {
+    return status;
+  }
 
-    public String info() {
-        return info;
-    }
+  public String info() {
+    return info;
+  }
 
-    @Override
-    public int type() {
-        return Protocol.DEREGISTER_RESPONSE;
-    }
+  @Override
+  public int type() {
+    return Protocol.DEREGISTER_RESPONSE;
+  }
 
-    @Override
-    public void write(DataOutputStream out) throws IOException {
-        out.writeInt(type());
-        out.writeByte(status);
-        out.writeUTF(info);
-    }
+  @Override
+  public void write(DataOutputStream out) throws IOException {
+    out.writeInt(type());
+    out.writeByte(status);
+    out.writeUTF(info);
+  }
 }

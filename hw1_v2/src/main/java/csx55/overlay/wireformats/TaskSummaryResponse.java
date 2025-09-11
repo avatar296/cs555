@@ -2,7 +2,7 @@ package csx55.overlay.wireformats;
 
 import java.io.*;
 
-public class TrafficSummary implements Event {
+public class TaskSummaryResponse implements Event {
   private final String ip;
   private final int port;
   private final int sentCount;
@@ -11,7 +11,7 @@ public class TrafficSummary implements Event {
   private final long recvSum;
   private final int relayedCount;
 
-  public TrafficSummary(
+  public TaskSummaryResponse(
       String ip,
       int port,
       int sentCount,
@@ -28,7 +28,7 @@ public class TrafficSummary implements Event {
     this.relayedCount = relayedCount;
   }
 
-  public TrafficSummary(DataInputStream in) throws IOException {
+  public TaskSummaryResponse(DataInputStream in) throws IOException {
     this.ip = in.readUTF();
     this.port = in.readInt();
     this.sentCount = in.readInt();

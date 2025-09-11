@@ -2,10 +2,10 @@ package csx55.overlay.wireformats;
 
 import java.io.*;
 
-public class PullTrafficSummary implements Event {
-  public PullTrafficSummary() {}
+public class TaskSummaryRequest implements Event {
+  public TaskSummaryRequest() {}
 
-  public PullTrafficSummary(DataInputStream in) {}
+  public TaskSummaryRequest(DataInputStream in) {}
 
   @Override
   public int type() {

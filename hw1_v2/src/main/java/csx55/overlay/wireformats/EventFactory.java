@@ -13,8 +13,12 @@ public final class EventFactory {
   }
 
   public Event read(DataInputStream in) throws IOException {
-    int t = in.readInt();
-    switch (t) {
+    int messageType = in.readInt();
+    return createEvent(messageType, in);
+  }
+
+  public Event createEvent(int messageType, DataInputStream in) throws IOException {
+    switch (messageType) {
       case Protocol.REGISTER:
         return new Register(in);
       case Protocol.REGISTER_RESPONSE:
@@ -32,16 +36,16 @@ public final class EventFactory {
       case Protocol.TASK_COMPLETE:
         return new TaskComplete(in);
       case Protocol.PULL_TRAFFIC_SUMMARY:
-        return new PullTrafficSummary(in);
+        return new TaskSummaryRequest(in);
       case Protocol.TRAFFIC_SUMMARY:
-        return new TrafficSummary(in);
+        return new TaskSummaryResponse(in);
       case Protocol.MESSAGE:
         return new Message(in);
       case Protocol.PEER_HELLO:
         return new PeerHello(in);
 
       default:
-        throw new IOException("Unknown event type: " + t);
+        throw new IOException("Unknown event type: " + messageType);
     }
   }
 }

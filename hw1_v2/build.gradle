@@ -31,7 +31,6 @@ spotless {
 }
 
 application {
-    // default main class (can override with run tasks)
     mainClass = 'csx55.overlay.node.Registry'
 }
 
