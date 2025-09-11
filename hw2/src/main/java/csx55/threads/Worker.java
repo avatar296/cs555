@@ -4,7 +4,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Worker implements Runnable {
 
-  private static final boolean PRINT_TASKS = Boolean.parseBoolean(System.getProperty("cs555.printTasks", "true"));
+  private static final boolean PRINT_TASKS =
+      Boolean.parseBoolean(System.getProperty("cs555.printTasks", "true"));
 
   private final TaskQueue queue;
   private final Stats stats;
@@ -39,8 +40,7 @@ public class Worker implements Runnable {
     while (running.get()) {
       try {
         Task task = queue.take();
-        if (task == null)
-          continue;
+        if (task == null) continue;
 
         stats.incInFlight();
         try {
@@ -54,8 +54,7 @@ public class Worker implements Runnable {
         }
 
       } catch (InterruptedException e) {
-        if (!running.get())
-          break;
+        if (!running.get()) break;
       } catch (Throwable t) {
         t.printStackTrace();
       }

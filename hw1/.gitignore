@@ -5,6 +5,15 @@ gradle-app.setting
 !gradle-wrapper.jar
 .gradletasknamecache
 
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
 # IDE
 .idea/
 *.iml
@@ -15,20 +24,15 @@ gradle-app.setting
 .classpath
 .project
 bin/
+out/
 
-# macOS
+# OS
 .DS_Store
+Thumbs.db
+._*
 
-# Java
-*.class
+# Logs
 *.log
-*.jar
-!gradle/wrapper/gradle-wrapper.jar
-*.war
-*.ear
-hs_err_pid*
 
-# Package files
-*.zip
-*.tar.gz
-*.rar
+# Package Files
+*.tar

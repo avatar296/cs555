@@ -4,97 +4,40 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/**
- * Response message sent by the registry after processing a registration request. Contains a status
- * code indicating success or failure and additional information about the registration result.
- *
- * <p>Wire format: - int: message type (REGISTER_RESPONSE) - byte: status code (1 for success, 0 for
- * failure) - String: additional information or error message
- */
-public class RegisterResponse extends AbstractEvent {
+public class RegisterResponse implements Event {
+  public static final byte SUCCESS = 1;
+  public static final byte FAILURE = 0;
 
-  /** Message type identifier */
-  private static final int TYPE = Protocol.REGISTER_RESPONSE;
+  private final byte status;
+  private final String info;
 
-  /** Status code: 1 for success, 0 for failure */
-  private byte statusCode;
-
-  /** Additional information or error message */
-  private String additionalInfo;
-
-  /**
-   * Constructs a new RegisterResponse.
-   *
-   * @param statusCode the status code (1 for success, 0 for failure)
-   * @param additionalInfo additional information or error message
-   */
-  public RegisterResponse(byte statusCode, String additionalInfo) {
-    this.statusCode = statusCode;
-    this.additionalInfo = additionalInfo;
+  public RegisterResponse(byte status, String info) {
+    this.status = status;
+    this.info = info;
   }
 
-  /**
-   * Constructs a RegisterResponse by deserializing from bytes.
-   *
-   * @param marshalledBytes the serialized message data
-   * @throws IOException if deserialization fails or message type is invalid
-   */
-  public RegisterResponse(byte[] marshalledBytes) throws IOException {
-    deserializeFrom(marshalledBytes);
+  public RegisterResponse(DataInputStream in) throws IOException {
+    this.status = in.readByte();
+    this.info = in.readUTF();
   }
 
-  /**
-   * Gets the message type.
-   *
-   * @return the protocol message type (REGISTER_RESPONSE)
-   */
-  @Override
-  public int getType() {
-    return TYPE;
+  public byte status() {
+    return status;
   }
 
-  /**
-   * Serializes this message to bytes for network transmission.
-   *
-   * @return the serialized message as a byte array
-   * @throws IOException if serialization fails
-   */
-  @Override
-  protected void writeData(DataOutputStream dout) throws IOException {
-    dout.writeByte(statusCode);
-    dout.writeUTF(additionalInfo);
+  public String info() {
+    return info;
   }
 
   @Override
-  protected void readData(DataInputStream din) throws IOException {
-    this.statusCode = din.readByte();
-    this.additionalInfo = din.readUTF();
+  public int type() {
+    return Protocol.REGISTER_RESPONSE;
   }
 
-  /**
-   * Gets the status code.
-   *
-   * @return 1 for success, 0 for failure
-   */
-  public byte getStatusCode() {
-    return statusCode;
-  }
-
-  /**
-   * Gets the additional information.
-   *
-   * @return additional information or error message
-   */
-  public String getAdditionalInfo() {
-    return additionalInfo;
-  }
-
-  /**
-   * Checks if the registration was successful.
-   *
-   * @return true if successful (status code = 1), false otherwise
-   */
-  public boolean isSuccess() {
-    return statusCode == 1;
+  @Override
+  public void write(DataOutputStream out) throws IOException {
+    out.writeInt(type());
+    out.writeByte(status);
+    out.writeUTF(info);
   }
 }

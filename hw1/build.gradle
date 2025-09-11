@@ -14,6 +14,7 @@ repositories {
 }
 
 dependencies {
+    // no external dependencies needed
 }
 
 test {
@@ -33,9 +34,9 @@ application {
     mainClass = 'csx55.overlay.node.Registry'
 }
 
-task runRegistry(type: JavaExec) {
+tasks.register('runRegistry', JavaExec) {
     group = "Execution"
-    description = "Starts the Registry server"
+    description = "Runs the Registry"
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'csx55.overlay.node.Registry'
     if (project.hasProperty('args')) {
@@ -43,9 +44,9 @@ task runRegistry(type: JavaExec) {
     }
 }
 
-task runMessagingNode(type: JavaExec) {
+tasks.register('runMessagingNode', JavaExec) {
     group = "Execution"
-    description = "Starts a Messaging Node client"
+    description = "Runs a MessagingNode"
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'csx55.overlay.node.MessagingNode'
     if (project.hasProperty('args')) {

@@ -1,217 +1,77 @@
 package csx55.overlay.spanning;
 
-import csx55.overlay.util.LoggerUtil;
 import java.util.*;
 
-/**
- * Implements Prim's algorithm to build a Minimum Spanning Tree (MST) rooted at a given node. Adds a
- * stale-PQ-entry guard so the MST always uses the best (minimal) connecting edge.
- */
-public class MinimumSpanningTree {
+public final class MinimumSpanningTree {
 
-  private final String rootNodeId;
-  private final Map<String, List<Edge>> graph;
+  public static final class Edge {
+    public final String u, v;
+    public final int w;
 
-  /** child -> edgeToParent (destination=parent, weight=edgeWeight) */
-  private final Map<String, Edge> mstEdges;
+    public Edge(String u, String v, int w) {
+      this.u = u;
+      this.v = v;
+      this.w = w;
+    }
 
-  public MinimumSpanningTree(String rootNodeId, Map<String, List<Edge>> graph) {
-    this.rootNodeId = rootNodeId;
-    this.graph = graph;
-    this.mstEdges = new HashMap<>();
+    public String other(String x) {
+      return x.equals(u) ? v : u;
+    }
   }
 
-  /** Calculates the MST using Prim's algorithm. */
-  public boolean calculate() {
-    if (!graph.containsKey(rootNodeId)) {
-      LoggerUtil.warn("MST", "Root node " + rootNodeId + " not found in graph.");
-      System.err.println(
-          "[DEBUG][MST] Root not found: " + rootNodeId + " graphNodes=" + graph.keySet());
-      return false;
-    }
+  private static final class DSU {
+    private final Map<String, String> parent = new HashMap<>();
+    private final Map<String, Integer> rank = new HashMap<>();
 
-    mstEdges.clear();
-
-    final Map<String, Integer> minWeight = new HashMap<>();
-    final Map<String, String> parent = new HashMap<>();
-    final Set<String> inTree = new HashSet<>();
-
-    for (String node : graph.keySet()) {
-      minWeight.put(node, Integer.MAX_VALUE);
-      parent.put(node, null);
-    }
-    minWeight.put(rootNodeId, 0);
-
-    class NodeWeight {
-      final String node;
-      final int weight;
-
-      NodeWeight(String node, int weight) {
-        this.node = node;
-        this.weight = weight;
+    void makeSet(Collection<String> verts) {
+      for (String v : verts) {
+        parent.put(v, v);
+        rank.put(v, 0);
       }
     }
 
-    PriorityQueue<NodeWeight> pq = new PriorityQueue<>(Comparator.comparingInt(nw -> nw.weight));
-    pq.add(new NodeWeight(rootNodeId, 0));
+    String find(String x) {
+      String p = parent.get(x);
+      if (!p.equals(x)) parent.put(x, p = find(p));
+      return p;
+    }
 
-    while (!pq.isEmpty()) {
-      NodeWeight current = pq.poll();
-      String u = current.node;
-
-      if (inTree.contains(u)) continue;
-
-      Integer bestKey = minWeight.get(u);
-      if (bestKey == null || current.weight != bestKey) {
-        System.err.println(
-            "[DEBUG][MST] Stale PQ entry for "
-                + u
-                + " popped="
-                + current.weight
-                + " best="
-                + bestKey);
-        continue;
+    boolean union(String a, String b) {
+      String ra = find(a), rb = find(b);
+      if (ra.equals(rb)) return false;
+      int rka = rank.get(ra), rkb = rank.get(rb);
+      if (rka < rkb) parent.put(ra, rb);
+      else if (rka > rkb) parent.put(rb, ra);
+      else {
+        parent.put(rb, ra);
+        rank.put(ra, rka + 1);
       }
+      return true;
+    }
+  }
 
-      inTree.add(u);
+  public static List<Edge> kruskal(Collection<String> vertices, Collection<Edge> edges) {
+    List<Edge> sorted = new ArrayList<>(edges);
+    sorted.sort(
+        (a, b) -> {
+          if (a.w != b.w) return Integer.compare(a.w, b.w);
+          int cu = a.u.compareTo(b.u);
+          if (cu != 0) return cu;
+          return a.v.compareTo(b.v);
+        });
 
-      String p = parent.get(u);
-      if (p != null) {
-        mstEdges.put(u, new Edge(p, bestKey));
+    DSU dsu = new DSU();
+    dsu.makeSet(vertices);
+
+    List<Edge> mst = new ArrayList<>();
+    for (Edge e : sorted) {
+      if (dsu.union(e.u, e.v)) {
+        mst.add(e);
+        if (mst.size() == vertices.size() - 1) break;
       }
-
-      List<Edge> neighbors = graph.get(u);
-      if (neighbors != null) {
-        for (Edge e : neighbors) {
-          String v = e.getDestination();
-          int w = e.getWeight();
-          if (!inTree.contains(v) && w < minWeight.get(v)) {
-            parent.put(v, u);
-            minWeight.put(v, w);
-            pq.add(new NodeWeight(v, w));
-          }
-        }
-      }
     }
-
-    if (inTree.size() != graph.keySet().size()) {
-      LoggerUtil.warn(
-          "MST", "MST incomplete: inTree=" + inTree.size() + " graph=" + graph.keySet().size());
-      System.err.println(
-          "[DEBUG][MST] Graph disconnected. Root="
-              + rootNodeId
-              + " reachedNodes="
-              + inTree
-              + " totalGraph="
-              + graph.keySet());
-      mstEdges.clear();
-      return false;
-    }
-
-    int totalWeight = getTotalWeight();
-    LoggerUtil.debug(
-        "MST",
-        "Built MST root=" + rootNodeId + " edges=" + mstEdges.size() + " weight=" + totalWeight);
-    System.out.println(
-        "[DEBUG][MST] Root="
-            + rootNodeId
-            + " edgeCount="
-            + mstEdges.size()
-            + " totalWeight="
-            + totalWeight);
-    return true;
+    return mst;
   }
 
-  /** Returns the path from destination back to the root (exclusive of root). */
-  public List<String> findPathToRoot(String destination) {
-    if (destination.equals(rootNodeId)) return Collections.emptyList();
-
-    List<String> path = new ArrayList<>();
-    String current = destination;
-
-    while (current != null && !current.equals(rootNodeId)) {
-      path.add(current);
-      Edge parentEdge = mstEdges.get(current);
-      if (parentEdge == null) {
-        System.err.println(
-            "[DEBUG][MST] No parent for node "
-                + current
-                + " when tracing path to root="
-                + rootNodeId);
-        return null;
-      }
-      current = parentEdge.getDestination(); // parent
-    }
-
-    if (!rootNodeId.equals(current)) {
-      System.err.println("[DEBUG][MST] Path trace failed: could not reach root=" + rootNodeId);
-      return null;
-    }
-
-    return path;
-  }
-
-  /** child -> edgeToParent map (copy). */
-  public Map<String, Edge> getMSTEdges() {
-    return new HashMap<>(mstEdges);
-  }
-
-  /** Convert internal MST map to parent-child-weight triples. */
-  public List<MSTEdge> extractEdges() {
-    List<MSTEdge> edges = new ArrayList<>();
-    for (Map.Entry<String, Edge> entry : mstEdges.entrySet()) {
-      String child = entry.getKey();
-      Edge toParent = entry.getValue();
-      String parent = toParent.getDestination();
-      edges.add(new MSTEdge(parent, child, toParent.getWeight()));
-    }
-    return edges;
-  }
-
-  /** Print edges as "parent, child, weight" lines. */
-  public void print() {
-    if (mstEdges.isEmpty()) {
-      System.out.println("MST has not been calculated yet.");
-      return;
-    }
-    for (MSTEdge e : extractEdges()) {
-      System.out.println(e.parent + ", " + e.child + ", " + e.weight);
-    }
-  }
-
-  /** Formatted edge strings (for print-mst output validation). */
-  public List<String> getFormattedEdges() {
-    List<String> out = new ArrayList<>();
-    for (MSTEdge e : extractEdges()) {
-      out.add(e.parent + ", " + e.child + ", " + e.weight);
-    }
-    return out;
-  }
-
-  public boolean isEmpty() {
-    return mstEdges.isEmpty();
-  }
-
-  public int getTotalWeight() {
-    int total = 0;
-    for (Edge e : mstEdges.values()) total += e.getWeight();
-    return total;
-  }
-
-  public void clear() {
-    mstEdges.clear();
-  }
-
-  /** Parent-child weighted edge for printing/debugging. */
-  public static class MSTEdge {
-    public final String parent;
-    public final String child;
-    public final int weight;
-
-    public MSTEdge(String parent, String child, int weight) {
-      this.parent = parent;
-      this.child = child;
-      this.weight = weight;
-    }
-  }
+  private MinimumSpanningTree() {}
 }

@@ -1,188 +1,223 @@
 package csx55.overlay.node;
 
-import csx55.overlay.node.registry.*;
-import csx55.overlay.transport.TCPConnection;
-import csx55.overlay.transport.TCPConnectionsCache;
-import csx55.overlay.util.LoggerUtil;
-import csx55.overlay.wireformats.DeregisterRequest;
-import csx55.overlay.wireformats.Event;
-import csx55.overlay.wireformats.Protocol;
-import csx55.overlay.wireformats.RegisterRequest;
-import csx55.overlay.wireformats.TaskComplete;
-import csx55.overlay.wireformats.TrafficSummary;
+import csx55.overlay.transport.TCPServerThread;
+import csx55.overlay.util.OverlayCreator;
+import csx55.overlay.util.StatisticsCollectorAndDisplay;
+import csx55.overlay.wireformats.*;
+import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.ServerSocket;
+import java.io.InputStreamReader;
+import java.net.BindException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * The central registry node for the overlay network. Manages node registration, overlay topology
- * setup, task orchestration, and statistics collection from all messaging nodes.
- *
- * <p>This registry acts as the control plane for the distributed system, coordinating overlay
- * construction and messaging tasks.
- */
-public class Registry implements TCPConnection.TCPConnectionListener {
-  private final TCPConnectionsCache connectionsCache = new TCPConnectionsCache();
-  private final NodeRegistrationService registrationService;
-  private final OverlayManagementService overlayService;
-  private final TaskOrchestrationService taskService;
-  private final StatisticsCollectionService statisticsService;
-  private final csx55.overlay.cli.RegistryCommandHandler commandHandler;
-  private volatile boolean running = true;
-  private ServerSocket serverSocket;
+public class Registry {
 
-  /** Constructs a new Registry and initializes all services. */
-  public Registry() {
-    this.registrationService = new NodeRegistrationService(connectionsCache);
-    this.overlayService = new OverlayManagementService(registrationService);
-    this.statisticsService = new StatisticsCollectionService();
-    this.taskService =
-        new TaskOrchestrationService(registrationService, statisticsService, overlayService);
-    this.registrationService.setTaskService(taskService);
-    this.registrationService.setOverlayService(overlayService);
-    this.commandHandler = new csx55.overlay.cli.RegistryCommandHandler(this);
-  }
+  private final Map<String, InetSocketAddress> registered = new ConcurrentHashMap<>();
+  private final Map<String, DataOutputStream> outs = new ConcurrentHashMap<>();
+  private final OverlayCreator overlayCreator = new OverlayCreator();
+  private volatile StatisticsCollectorAndDisplay.StatisticsRun statisticsRun = null;
 
-  /**
-   * Starts the registry server on the specified port. Begins accepting connections from messaging
-   * nodes.
-   *
-   * @param port the port number to listen on
-   */
-  public void start(int port) {
-    try {
-      serverSocket = new ServerSocket(port);
-      LoggerUtil.info("Registry", "Registry listening on port: " + port);
-
-      new Thread(commandHandler::startCommandLoop).start();
-
-      Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
-      while (running) {
-        try {
-          Socket clientSocket = serverSocket.accept();
-          try {
-            new TCPConnection(clientSocket, this);
-          } catch (Exception e) {
-            try {
-              clientSocket.close();
-            } catch (IOException closeException) {
-              LoggerUtil.warn(
-                  "Registry", "Failed to close socket after connection error", closeException);
-            }
-            throw e;
-          }
-        } catch (IOException e) {
-          if (running) {
-            LoggerUtil.error("Registry", "Failed to create connection: " + e.getMessage());
-          }
-        }
-      }
-    } catch (IOException e) {
-      LoggerUtil.error("Registry", "Failed to start registry on port " + port, e);
-      cleanup();
-    }
-  }
-
-  /**
-   * Performs cleanup operations when the registry is shutting down. Closes the server socket and
-   * releases resources.
-   */
-  private void cleanup() {
-    running = false;
-    try {
-      if (serverSocket != null && !serverSocket.isClosed()) {
-        serverSocket.close();
-      }
-    } catch (IOException e) {
-      LoggerUtil.warn("Registry", "Error during cleanup: " + e.getMessage());
-    }
-  }
-
-  /**
-   * Handles incoming events from messaging nodes. Processes registration requests, task
-   * completions, and traffic summaries.
-   *
-   * @param event the event received from a messaging node
-   * @param connection the TCP connection that received the event
-   */
-  @Override
-  public void onEvent(Event event, TCPConnection connection) {
-    try {
-      switch (event.getType()) {
-        case Protocol.REGISTER_REQUEST:
-          registrationService.handleRegisterRequest((RegisterRequest) event, connection);
-          break;
-        case Protocol.DEREGISTER_REQUEST:
-          registrationService.handleDeregisterRequest((DeregisterRequest) event, connection);
-          break;
-        case Protocol.TASK_COMPLETE:
-          taskService.handleTaskComplete((TaskComplete) event, connection);
-          break;
-        case Protocol.TRAFFIC_SUMMARY:
-          statisticsService.handleTrafficSummary((TrafficSummary) event, connection);
-          break;
-        default:
-          LoggerUtil.warn("Registry", "Unknown event type received: " + event.getType());
-      }
-    } catch (IOException e) {
-      LoggerUtil.error("Registry", "Error handling event type " + event.getType(), e);
-    }
-  }
-
-  /**
-   * Handles lost connections to messaging nodes. Removes the disconnected node from the registry.
-   *
-   * @param connection the TCP connection that was lost
-   */
-  @Override
-  public void onConnectionLost(TCPConnection connection) {
-    LoggerUtil.info("Registry", "Connection lost with: " + connection.getSocket().getInetAddress());
-    registrationService.handleConnectionLost(connection);
-  }
-
-  /** Lists all registered messaging nodes. Delegates to the registration service. */
-  public void listMessagingNodes() {
-    registrationService.listMessagingNodes();
-  }
-
-  /** Lists all link weights in the overlay. Delegates to the overlay management service. */
-  public void listWeights() {
-    overlayService.listWeights();
-  }
-
-  /**
-   * Sets up the overlay with the specified connection requirement.
-   *
-   * @param cr the number of connections per node
-   */
-  public void setupOverlay(int cr) {
-    overlayService.setupOverlay(cr);
-  }
-
-  /** Sends link weights to all messaging nodes. Delegates to the overlay management service. */
-  public void sendOverlayLinkWeights() {
-    overlayService.sendOverlayLinkWeights();
-  }
-
-  /**
-   * Starts a messaging task with the specified number of rounds.
-   *
-   * @param numberOfRounds the number of rounds for the messaging task
-   */
-  public void startMessaging(int numberOfRounds) {
-    taskService.startMessaging(numberOfRounds);
-  }
-
-  /**
-   * Main entry point for the Registry application.
-   *
-   * @param args command line arguments: port-number
-   */
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     if (args.length != 1) {
-      System.out.println("Usage: java csx55.overlay.node.Registry <port>");
+      System.err.println("Usage: java csx55.overlay.node.Registry <port>");
       return;
     }
-    new Registry().start(Integer.parseInt(args[0]));
+    int port = Integer.parseInt(args[0]);
+    new Registry().run(port);
+  }
+
+  private void run(int port) throws Exception {
+    TCPServerThread server;
+    try {
+      server = new TCPServerThread(port, this::handleClient);
+    } catch (BindException be) {
+      System.err.println(
+          "Port " + port + " is already in use. Try: ./gradlew runRegistry -Pport=6001");
+      return;
+    }
+
+    Thread acceptor = new Thread(server, "registry-acceptor");
+    acceptor.setDaemon(true);
+    acceptor.start();
+
+    System.out.println("Registry listening on port " + port);
+
+    Thread cli =
+        new Thread(
+            () -> {
+              try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                  line = line.trim();
+                  if (line.equals("list-messaging-nodes")) {
+                    listMessagingNodes();
+                  } else if (line.startsWith("setup-overlay")) {
+                    doSetupOverlay(line);
+                  } else if (line.equals("send-overlay-link-weights")) {
+                    doSendLinkWeights();
+                  } else if (line.equals("list-weights")) {
+                    doListWeights();
+                  } else if (line.startsWith("start")) {
+                    doStart(line);
+                  }
+                }
+              } catch (IOException ignored) {
+              }
+            },
+            "registry-cli");
+    cli.setDaemon(true);
+    cli.start();
+
+    synchronized (this) {
+      try {
+        this.wait();
+      } catch (InterruptedException ignored) {
+      }
+    }
+  }
+
+  private void listMessagingNodes() {
+    registered.keySet().forEach(System.out::println);
+  }
+
+  private void handleClient(Socket s, DataInputStream in, DataOutputStream out) throws IOException {
+    EventFactory f = EventFactory.getInstance();
+    try {
+      while (!s.isClosed()) {
+        Event ev = f.read(in);
+        if (ev instanceof Register) {
+          handleRegister((Register) ev, s, out);
+        } else if (ev instanceof Deregister) {
+          handleDeregister((Deregister) ev, s, out);
+        } else if (ev instanceof TaskComplete) {
+          handleTaskComplete((TaskComplete) ev);
+        } else if (ev instanceof TaskSummaryResponse) {
+          handleTaskSummaryResponse((TaskSummaryResponse) ev);
+        }
+      }
+    } catch (IOException ignored) {
+      // client closed; cleanup on deregister or on push-fail
+    }
+  }
+
+  private void handleRegister(Register r, Socket s, DataOutputStream out) throws IOException {
+    String remoteIp = s.getInetAddress().getHostAddress();
+    String id = r.ip() + ":" + r.port();
+
+    if (!remoteIp.equals(r.ip())) {
+      new RegisterResponse(RegisterResponse.FAILURE, "IP mismatch").write(out);
+      out.flush();
+      return;
+    }
+    if (registered.containsKey(id)) {
+      new RegisterResponse(RegisterResponse.FAILURE, "Already registered").write(out);
+      out.flush();
+      return;
+    }
+
+    registered.put(id, new InetSocketAddress(r.ip(), r.port()));
+    outs.put(id, out);
+
+    String info =
+        "Registration request successful. The number of messaging nodes currently constituting the overlay is ("
+            + registered.size()
+            + ")";
+    new RegisterResponse(RegisterResponse.SUCCESS, info).write(out);
+    out.flush();
+  }
+
+  private void handleDeregister(Deregister d, Socket s, DataOutputStream out) throws IOException {
+    String remoteIp = s.getInetAddress().getHostAddress();
+    String id = d.ip() + ":" + d.port();
+
+    if (!remoteIp.equals(d.ip())) {
+      new DeregisterResponse(DeregisterResponse.FAILURE, "IP mismatch").write(out);
+      out.flush();
+      return;
+    }
+    if (!registered.containsKey(id)) {
+      new DeregisterResponse(DeregisterResponse.FAILURE, "Not registered").write(out);
+      out.flush();
+      return;
+    }
+
+    registered.remove(id);
+    outs.remove(id);
+    new DeregisterResponse(DeregisterResponse.SUCCESS, "Deregistration successful").write(out);
+    out.flush();
+  }
+
+  private void doSetupOverlay(String cmd) {
+    String[] parts = cmd.split("\\s+");
+    if (parts.length != 2) {
+      System.out.println("Usage: setup-overlay <connection-requirement>");
+      return;
+    }
+    int CR = Integer.parseInt(parts[1]);
+
+    // Use the OverlayCreator utility
+    overlayCreator.setupOverlay(CR, registered, outs);
+  }
+
+  private void doSendLinkWeights() {
+    // Use the OverlayCreator utility
+    overlayCreator.sendLinkWeights(outs);
+  }
+
+  private void doListWeights() {
+    for (LinkWeights.Link l : overlayCreator.getWeightedLinks()) {
+      System.out.println(l.a + ", " + l.b + ", " + l.w);
+    }
+  }
+
+  private void doStart(String cmd) {
+    String[] parts = cmd.split("\\s+");
+    if (parts.length != 2) return;
+    int rounds = Integer.parseInt(parts[1]);
+
+    Set<String> expected = new LinkedHashSet<>(registered.keySet());
+    statisticsRun = new StatisticsCollectorAndDisplay.StatisticsRun(expected, rounds);
+
+    TaskInitiate ti = new TaskInitiate(rounds);
+    expected.forEach(
+        id -> {
+          DataOutputStream o = outs.get(id);
+          if (o != null) {
+            try {
+              synchronized (o) {
+                ti.write(o);
+                o.flush();
+              }
+            } catch (IOException ignored) {
+            }
+          }
+        });
+
+    new Thread(
+            () ->
+                StatisticsCollectorAndDisplay.collectAndDisplayStatistics(
+                    statisticsRun, outs, 15000),
+            "run-orchestrator")
+        .start();
+  }
+
+  private void handleTaskComplete(TaskComplete tc) {
+    StatisticsCollectorAndDisplay.StatisticsRun run = statisticsRun;
+    if (run == null) return;
+    String id = tc.ip() + ":" + tc.port();
+    run.markNodeCompleted(id);
+  }
+
+  private void handleTaskSummaryResponse(TaskSummaryResponse ts) {
+    StatisticsCollectorAndDisplay.StatisticsRun run = statisticsRun;
+    if (run == null) return;
+    StatisticsCollectorAndDisplay.NodeStatistics stats =
+        StatisticsCollectorAndDisplay.processTrafficSummary(ts);
+    run.addStatistics(stats);
   }
 }

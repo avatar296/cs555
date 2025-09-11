@@ -1,241 +1,459 @@
 package csx55.overlay.node;
 
-import csx55.overlay.node.messaging.*;
-import csx55.overlay.spanning.RoutingTable;
-import csx55.overlay.transport.TCPConnection;
-import csx55.overlay.transport.TCPConnectionsCache;
-import csx55.overlay.util.LoggerUtil;
-import csx55.overlay.util.NodeValidationHelper;
+import csx55.overlay.spanning.MinimumSpanningTree;
+import csx55.overlay.transport.TCPSender;
 import csx55.overlay.wireformats.*;
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Represents a messaging node in the overlay network. Handles message routing, peer connections,
- * and communication with the registry. Implements the TCPConnectionListener interface to handle
- * network events.
- */
-public class MessagingNode implements TCPConnection.TCPConnectionListener {
-  private final TCPConnectionsCache peerConnections = new TCPConnectionsCache();
-  private final ExecutorService executorService = Executors.newCachedThreadPool();
-  private final NodeStatisticsService statisticsService;
-  private final MessageRoutingService routingService;
-  private final ProtocolHandlerService protocolHandler;
-  private final TaskExecutionService taskService;
-  private final csx55.overlay.cli.MessagingNodeCommandHandler commandHandler;
-  private final List<String> allNodes = new ArrayList<>();
+public class MessagingNode {
 
-  private volatile boolean running = true;
-  private String nodeId;
-  private String ipAddress;
-  private int portNumber;
-  private TCPConnection registryConnection;
-  private ServerSocket serverSocket;
+  private String selfIp;
+  private int selfPort;
 
-  public MessagingNode() {
-    this.statisticsService = new NodeStatisticsService();
-    this.routingService = new MessageRoutingService(peerConnections, statisticsService);
-    this.protocolHandler = new ProtocolHandlerService(peerConnections, routingService);
-    this.taskService = new TaskExecutionService(routingService, executorService, statisticsService);
-    this.commandHandler = new csx55.overlay.cli.MessagingNodeCommandHandler(this);
+  private String selfId() {
+    return selfIp + ":" + selfPort;
   }
 
-  private void start(String registryHost, int registryPort) {
-    try {
-      serverSocket = new ServerSocket(0);
-      this.portNumber = serverSocket.getLocalPort();
+  private TCPSender registry;
 
-      Socket socket = new Socket(registryHost, registryPort);
-      try {
-        registryConnection = new TCPConnection(socket, this);
-      } catch (Exception e) {
-        try {
-          socket.close();
-        } catch (IOException closeException) {
-          LoggerUtil.warn("MessagingNode", "Failed to close socket", closeException);
-        }
-        throw e;
-      }
+  private ServerSocket peerServer;
+  private final Map<String, Conn> neighbor = new ConcurrentHashMap<>();
+  private final Set<Conn> anonymous = ConcurrentHashMap.newKeySet();
 
-      this.ipAddress = socket.getLocalAddress().getHostAddress();
-      this.nodeId = NodeValidationHelper.createNodeId(ipAddress, portNumber);
-      routingService.setNodeId(nodeId);
-      protocolHandler.setNodeInfo(nodeId, allNodes);
-      taskService.setNodeInfo(nodeId, ipAddress, portNumber, registryConnection);
+  private static final class Conn {
+    final Socket s;
+    final DataInputStream in;
+    final DataOutputStream out;
+    volatile String peerId;
 
-      RegisterRequest request = new RegisterRequest(ipAddress, portNumber);
-      registryConnection.sendEvent(request);
-
-      executorService.execute(
-          () -> {
-            while (running) {
-              try {
-                Socket peerSocket = serverSocket.accept();
-                new TCPConnection(peerSocket, this);
-              } catch (IOException e) {
-                if (running) {
-                  LoggerUtil.error("MessagingNode", "Error accepting peer connection", e);
-                }
-              }
-            }
-          });
-
-      new Thread(commandHandler::startCommandLoop).start();
-      Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
-
-    } catch (IOException e) {
-      LoggerUtil.error("MessagingNode", "Failed to start messaging node", e);
-      cleanup();
+    Conn(Socket s) throws IOException {
+      this.s = s;
+      this.in = new DataInputStream(new BufferedInputStream(s.getInputStream()));
+      this.out = new DataOutputStream(new BufferedOutputStream(s.getOutputStream()));
     }
   }
 
-  private void cleanup() {
-    running = false;
-    try {
-      if (serverSocket != null && !serverSocket.isClosed()) serverSocket.close();
-      executorService.shutdownNow();
-      peerConnections.closeAll();
-      if (registryConnection != null) registryConnection.close();
-    } catch (IOException e) {
-      LoggerUtil.warn("MessagingNode", "Error during cleanup", e);
-    }
-  }
+  private final Set<String> vertices = ConcurrentHashMap.newKeySet();
+  private final List<MinimumSpanningTree.Edge> links = new CopyOnWriteArrayList<>();
+  private final Map<String, List<MinimumSpanningTree.Edge>> mstCache = new ConcurrentHashMap<>();
 
-  @Override
-  public void onEvent(Event event, TCPConnection connection) {
-    switch (event.getType()) {
-      case Protocol.REGISTER_RESPONSE:
-        protocolHandler.handleRegisterResponse((RegisterResponse) event);
-        break;
-      case Protocol.DEREGISTER_RESPONSE:
-        if (protocolHandler.handleDeregisterResponse((DeregisterResponse) event)) {
-          cleanup();
-          System.exit(0);
-        }
-        break;
-      case Protocol.MESSAGING_NODES_LIST:
-        try {
-          protocolHandler.handlePeerList((MessagingNodesList) event, this);
-        } catch (IOException e) {
-          LoggerUtil.error("MessagingNode", "Error handling peer list", e);
-        }
-        break;
-      case Protocol.LINK_WEIGHTS:
-        LinkWeights lw = (LinkWeights) event;
-        protocolHandler.handleLinkWeights(lw);
+  private final AtomicInteger sendTracker = new AtomicInteger(0);
+  private final AtomicInteger receiveTracker = new AtomicInteger(0);
+  private final AtomicInteger relayTracker = new AtomicInteger(0);
+  private final AtomicLong sendSummation = new AtomicLong(0);
+  private final AtomicLong receiveSummation = new AtomicLong(0);
 
-        String canonicalId = findCanonicalIdFromLinkWeights(lw, portNumber);
-        if (canonicalId != null && !canonicalId.equals(nodeId)) {
-          LoggerUtil.info(
-              "MessagingNode", "Canonicalizing node ID " + nodeId + " → " + canonicalId);
-          this.nodeId = canonicalId;
-          this.ipAddress = canonicalId.substring(0, canonicalId.lastIndexOf(':'));
-          routingService.setNodeId(canonicalId);
-          protocolHandler.setNodeInfo(canonicalId, allNodes);
-          taskService.setNodeInfo(canonicalId, ipAddress, portNumber, registryConnection);
-        }
+  private final BlockingQueue<Event> regEvents = new LinkedBlockingQueue<>();
 
-        RoutingTable newTable = new RoutingTable(nodeId);
-        newTable.updateLinkWeights(lw);
-
-        newTable.buildMST();
-        routingService.updateRoutingTable(newTable);
-
-        LoggerUtil.info(
-            "MessagingNode",
-            "Updated allNodes list with "
-                + allNodes.size()
-                + " nodes after receiving link weights");
-
-        break;
-      case Protocol.TASK_INITIATE:
-        taskService.handleTaskInitiate((TaskInitiate) event, allNodes);
-        break;
-      case Protocol.PULL_TRAFFIC_SUMMARY:
-        statisticsService.sendTrafficSummary(ipAddress, portNumber, registryConnection);
-        statisticsService.resetCounters();
-        break;
-      case Protocol.DATA_MESSAGE:
-        routingService.handleDataMessage((DataMessage) event);
-        break;
-      case Protocol.PEER_IDENTIFICATION:
-        protocolHandler.handlePeerIdentification((PeerIdentification) event, connection);
-        break;
-    }
-  }
-
-  @Override
-  public void onConnectionLost(TCPConnection connection) {
-    if (connection == registryConnection) {
-      LoggerUtil.error("MessagingNode", "Lost connection to Registry. Shutting down...");
-      cleanup();
-      System.exit(1);
-    }
-    synchronized (peerConnections) {
-      for (String nodeId : peerConnections.getAllConnections().keySet()) {
-        if (peerConnections.getConnection(nodeId) == connection) {
-          peerConnections.removeConnection(nodeId);
-          LoggerUtil.info("MessagingNode", "Lost connection to peer: " + nodeId);
-          break;
-        }
-      }
-    }
-  }
-
-  private String findCanonicalIdFromLinkWeights(LinkWeights linkWeights, int myPort) {
-    for (LinkWeights.LinkInfo link : linkWeights.getLinks()) {
-      if (endsWithPort(link.nodeA, myPort)) return link.nodeA;
-      if (endsWithPort(link.nodeB, myPort)) return link.nodeB;
-    }
-    return null;
-  }
-
-  private boolean endsWithPort(String nodeId, int port) {
-    int idx = nodeId.lastIndexOf(':');
-    if (idx < 0) return false;
-    try {
-      return Integer.parseInt(nodeId.substring(idx + 1)) == port;
-    } catch (NumberFormatException e) {
-      return false;
-    }
-  }
-
-  public void deregister() {
-    try {
-      DeregisterRequest request = new DeregisterRequest(ipAddress, portNumber);
-      registryConnection.sendEvent(request);
-    } catch (IOException e) {
-      LoggerUtil.error("MessagingNode", "Failed to deregister", e);
-    }
-  }
-
-  public void printMinimumSpanningTree() {
-    RoutingTable table = routingService.getRoutingTable();
-    if (table != null) {
-
-      if (!table.waitUntilWeightsReady(3000)) {
-        System.out.println("MST has not been calculated yet.");
-        return;
-      }
-
-      synchronized (table) {
-        table.buildMST();
-        table.printMST();
-      }
-    }
-  }
-
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     if (args.length != 2) {
-      System.out.println(
+      System.err.println(
           "Usage: java csx55.overlay.node.MessagingNode <registry-host> <registry-port>");
       return;
     }
-    new MessagingNode().start(args[0], Integer.parseInt(args[1]));
+    new MessagingNode().run(args[0], Integer.parseInt(args[1]));
+  }
+
+  private void run(String registryHost, int registryPort) throws Exception {
+    peerServer = new ServerSocket(0);
+    selfPort = peerServer.getLocalPort();
+
+    Thread acceptPeers =
+        new Thread(
+            () -> {
+              try {
+                while (!peerServer.isClosed()) {
+                  Socket s = peerServer.accept();
+                  Conn c = new Conn(s);
+                  anonymous.add(c);
+                  startPeerReader(c);
+                  sendHello(c);
+                }
+              } catch (IOException ignored) {
+              }
+            },
+            "peer-acceptor");
+    acceptPeers.setDaemon(true);
+    acceptPeers.start();
+
+    try (TCPSender reg = new TCPSender(registryHost, registryPort)) {
+      this.registry = reg;
+
+      selfIp = reg.socket().getLocalAddress().getHostAddress();
+
+      reg.send(new Register(selfIp, selfPort));
+      Event resp = reg.read();
+      if (!(resp instanceof RegisterResponse)) {
+        return;
+      }
+      RegisterResponse rr = (RegisterResponse) resp;
+      if (rr.status() != RegisterResponse.SUCCESS) {
+        return;
+      }
+
+      Thread regReader =
+          new Thread(
+              () -> {
+                try {
+                  while (true) {
+                    Event e = reg.read();
+                    if (e instanceof MessagingNodeList) {
+                      handleDialList((MessagingNodeList) e);
+                    } else if (e instanceof LinkWeights) {
+                      handleLinkWeights((LinkWeights) e);
+                    } else if (e instanceof TaskInitiate) {
+                      handleTaskInitiate((TaskInitiate) e);
+                    } else if (e instanceof TaskSummaryRequest) {
+                      handlePullSummary();
+                    } else if (e instanceof DeregisterResponse) {
+                      regEvents.offer(e);
+                    }
+                  }
+                } catch (IOException ignored) {
+                }
+              },
+              "registry-reader");
+      regReader.setDaemon(true);
+      regReader.start();
+
+      final Object blocker = new Object();
+      Thread cli =
+          new Thread(
+              () -> {
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
+                  String line;
+                  while ((line = br.readLine()) != null) {
+                    line = line.trim();
+                    if (line.equals("exit-overlay")) {
+                      try {
+                        reg.send(new Deregister(selfIp, selfPort));
+                        regEvents.poll(5, TimeUnit.SECONDS); // best-effort wait
+                        System.out.println("exited overlay");
+                      } catch (Exception ex) {
+                        System.out.println("exited overlay");
+                      }
+                      synchronized (blocker) {
+                        blocker.notifyAll();
+                      }
+                      return;
+                    } else if (line.equals("print-mst")) {
+                      printMST();
+                    }
+                  }
+                } catch (IOException ignored) {
+                }
+              },
+              "node-cli");
+      cli.setDaemon(true);
+      cli.start();
+
+      synchronized (blocker) {
+        blocker.wait();
+      }
+
+    } finally {
+      try {
+        peerServer.close();
+      } catch (IOException ignored) {
+      }
+      neighbor
+          .values()
+          .forEach(
+              c -> {
+                try {
+                  c.s.close();
+                } catch (IOException ignored) {
+                }
+              });
+      anonymous.forEach(
+          c -> {
+            try {
+              c.s.close();
+            } catch (IOException ignored) {
+            }
+          });
+    }
+  }
+
+  private void handleDialList(MessagingNodeList m) {
+    int attempted = m.peers().size();
+    int successful = 0;
+    List<String> failed = new ArrayList<>();
+
+    for (String peer : m.peers()) {
+      try {
+        String[] parts = peer.split(":");
+        String host = parts[0];
+        int port = Integer.parseInt(parts[1]);
+        Socket s = new Socket(host, port);
+        Conn c = new Conn(s);
+        c.peerId = peer;
+        neighbor.put(peer, c);
+        startPeerReader(c);
+        sendHello(c);
+        successful++;
+      } catch (IOException e) {
+        failed.add(peer);
+        System.err.println("Failed to connect to " + peer + ": " + e.getMessage());
+      }
+    }
+
+    System.out.println("All connections are established. Number of connections: " + successful);
+    if (!failed.isEmpty()) {
+      System.err.println("Warning: Failed to connect to " + failed.size() + " peer(s): " + failed);
+    }
+  }
+
+  private void handleLinkWeights(LinkWeights lw) {
+    vertices.clear();
+    links.clear();
+    mstCache.clear();
+
+    for (LinkWeights.Link l : lw.links()) {
+      links.add(new MinimumSpanningTree.Edge(l.a, l.b, l.w));
+      vertices.add(l.a);
+      vertices.add(l.b);
+    }
+
+    System.out.println("Link weights received and processed. Ready to send messages.");
+  }
+
+  private void handleTaskInitiate(TaskInitiate ti) {
+    new Thread(() -> runRounds(ti.rounds()), "sender-rounds").start();
+  }
+
+  private void handlePullSummary() {
+    TaskSummaryResponse ts =
+        new TaskSummaryResponse(
+            selfIp,
+            selfPort,
+            sendTracker.get(),
+            sendSummation.get(),
+            receiveTracker.get(),
+            receiveSummation.get(),
+            relayTracker.get());
+    try {
+      registry.send(ts);
+    } catch (IOException ignored) {
+    }
+    sendTracker.set(0);
+    receiveTracker.set(0);
+    relayTracker.set(0);
+    sendSummation.set(0);
+    receiveSummation.set(0);
+  }
+
+  private void startPeerReader(Conn c) {
+    new Thread(
+            () -> {
+              try {
+                EventFactory f = EventFactory.getInstance();
+                while (!c.s.isClosed()) {
+                  Event e = f.read(c.in);
+                  if (e instanceof PeerHello) {
+                    String id = ((PeerHello) e).nodeId();
+                    c.peerId = id;
+                    anonymous.remove(c);
+                    neighbor.put(id, c);
+                  } else if (e instanceof Message) {
+                    onMessage((Message) e);
+                  }
+                }
+              } catch (IOException ignored) {
+              }
+            },
+            "peer-reader")
+        .start();
+  }
+
+  private void sendHello(Conn c) {
+    try {
+      synchronized (c.out) {
+        new PeerHello(selfId()).write(c.out);
+        c.out.flush();
+      }
+    } catch (IOException ignored) {
+    }
+  }
+
+  private void runRounds(int rounds) {
+    if (vertices.isEmpty() || links.isEmpty()) return;
+
+    List<String> nodes = new ArrayList<>(vertices);
+    Random rnd = new Random();
+
+    for (int r = 0; r < rounds; r++) {
+      String sink;
+      do {
+        sink = nodes.get(rnd.nextInt(nodes.size()));
+      } while (sink.equals(selfId()));
+
+      for (int i = 0; i < 5; i++) {
+        int payload = rnd.nextInt(Integer.MAX_VALUE);
+        sendTracker.incrementAndGet();
+        sendSummation.addAndGet(payload);
+        routeMessage(selfId(), sink, payload);
+      }
+    }
+
+    try {
+      registry.send(new TaskComplete(selfIp, selfPort));
+    } catch (IOException ignored) {
+    }
+  }
+
+  private void routeMessage(String src, String dst, int payload) {
+    if (src.equals(dst)) {
+      receiveTracker.incrementAndGet();
+      receiveSummation.addAndGet(payload);
+      return;
+    }
+
+    List<MinimumSpanningTree.Edge> mst =
+        mstCache.computeIfAbsent(src, s -> MinimumSpanningTree.kruskal(vertices, links));
+
+    Map<String, List<String>> a = new HashMap<>();
+    for (String v : vertices) a.put(v, new ArrayList<>());
+    for (MinimumSpanningTree.Edge e : mst) {
+      a.get(e.u).add(e.v);
+      a.get(e.v).add(e.u);
+    }
+
+    String cur = selfId();
+    if (cur.equals(dst)) {
+      receiveTracker.incrementAndGet();
+      receiveSummation.addAndGet(payload);
+      return;
+    }
+
+    Map<String, String> parent = new HashMap<>();
+    Deque<String> q = new ArrayDeque<>();
+    q.add(cur);
+    parent.put(cur, "");
+
+    while (!q.isEmpty()) {
+      String u = q.removeFirst();
+      if (u.equals(dst)) break;
+      for (String v : a.getOrDefault(u, Collections.emptyList())) {
+        if (!parent.containsKey(v)) {
+          parent.put(v, u);
+          q.addLast(v);
+        }
+      }
+    }
+    if (!parent.containsKey(dst)) return;
+
+    String step = dst;
+    String prev = parent.get(step);
+    while (prev != null && !prev.isEmpty() && !prev.equals(cur)) {
+      step = prev;
+      prev = parent.get(step);
+    }
+
+    Conn c = neighbor.get(step);
+    if (c == null) return;
+
+    try {
+      synchronized (c.out) {
+        new Message(src, dst, payload).write(c.out);
+        c.out.flush();
+      }
+    } catch (IOException ignored) {
+    }
+  }
+
+  private void onMessage(Message m) {
+    if (m.sinkId().equals(selfId())) {
+      receiveTracker.incrementAndGet();
+      receiveSummation.addAndGet(m.payload());
+    } else {
+      relayTracker.incrementAndGet();
+
+      List<MinimumSpanningTree.Edge> mst =
+          mstCache.computeIfAbsent(m.sourceId(), s -> MinimumSpanningTree.kruskal(vertices, links));
+
+      Map<String, List<String>> a = new HashMap<>();
+      for (String v : vertices) a.put(v, new ArrayList<>());
+      for (MinimumSpanningTree.Edge e : mst) {
+        a.get(e.u).add(e.v);
+        a.get(e.v).add(e.u);
+      }
+
+      String cur = selfId(), dst = m.sinkId();
+
+      Map<String, String> parent = new HashMap<>();
+      Deque<String> q = new ArrayDeque<>();
+      q.add(cur);
+      parent.put(cur, "");
+
+      while (!q.isEmpty()) {
+        String u = q.removeFirst();
+        if (u.equals(dst)) break;
+        for (String v : a.getOrDefault(u, Collections.emptyList())) {
+          if (!parent.containsKey(v)) {
+            parent.put(v, u);
+            q.addLast(v);
+          }
+        }
+      }
+      if (!parent.containsKey(dst)) return;
+
+      String step = dst;
+      String prev = parent.get(step);
+      while (prev != null && !prev.isEmpty() && !prev.equals(cur)) {
+        step = prev;
+        prev = parent.get(step);
+      }
+
+      Conn c = neighbor.get(step);
+      if (c == null) return;
+
+      try {
+        synchronized (c.out) {
+          m.write(c.out);
+          c.out.flush();
+        }
+      } catch (IOException ignored) {
+      }
+    }
+  }
+
+  private void printMST() {
+    if (vertices.isEmpty() || links.isEmpty()) return;
+
+    String root = selfId();
+    List<MinimumSpanningTree.Edge> mstEdges =
+        mstCache.computeIfAbsent(root, s -> MinimumSpanningTree.kruskal(vertices, links));
+
+    Map<String, List<MinimumSpanningTree.Edge>> adj = new HashMap<>();
+    for (String v : vertices) adj.put(v, new ArrayList<>());
+    for (MinimumSpanningTree.Edge e : mstEdges) {
+      adj.get(e.u).add(e);
+      adj.get(e.v).add(e);
+    }
+
+    Set<String> vis = new HashSet<>();
+    Deque<String> q = new ArrayDeque<>();
+    vis.add(root);
+    q.add(root);
+
+    while (!q.isEmpty()) {
+      String u = q.removeFirst();
+      List<MinimumSpanningTree.Edge> nbrs = new ArrayList<>(adj.get(u));
+      nbrs.sort(Comparator.comparing(e -> e.other(u)));
+      for (MinimumSpanningTree.Edge e : nbrs) {
+        String v = e.other(u);
+        if (!vis.contains(v)) {
+          vis.add(v);
+          q.addLast(v);
+          System.out.println(u + ", " + v + ", " + e.w);
+        }
+      }
+    }
   }
 }
