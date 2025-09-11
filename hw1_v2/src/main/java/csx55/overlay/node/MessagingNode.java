@@ -294,7 +294,7 @@ public class MessagingNode {
       } while (sink.equals(selfId()));
 
       for (int i = 0; i < 5; i++) {
-        int payload = rnd.nextInt();
+        int payload = rnd.nextInt(Integer.MAX_VALUE);
         sendTracker.incrementAndGet();
         sendSummation.addAndGet(payload);
         routeMessage(selfId(), sink, payload);

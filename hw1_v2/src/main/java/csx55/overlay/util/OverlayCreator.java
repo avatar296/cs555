@@ -19,7 +19,17 @@ public class OverlayCreator {
 
     int nodeCount = registeredNodes.size();
     if (nodeCount == 0 || connectionRequirement < 0 || connectionRequirement >= nodeCount) {
-      System.out.println("setup completed with " + connectionRequirement + " connections");
+      // Calculate expected edges for the message
+      int expectedEdges = 0;
+      if (nodeCount > 0 && connectionRequirement >= 0) {
+        if (connectionRequirement >= nodeCount) {
+          // Complete graph case
+          expectedEdges = nodeCount * (nodeCount - 1) / 2;
+        } else {
+          expectedEdges = (nodeCount * connectionRequirement) / 2;
+        }
+      }
+      System.out.println("setup completed with " + expectedEdges + " connections");
       return;
     }
 
@@ -35,36 +45,48 @@ public class OverlayCreator {
       nodeDegrees.put(nodeId, 0);
     }
 
+    // Ring-based neighbor connections (like hw1)
     for (int i = 0; i < nodeCount; i++) {
-      addEdge(
-          nodeOrder.get(i), nodeOrder.get((i + 1) % nodeCount), adjacencyList, nodeDegrees, edges);
-    }
+      // Connect to neighbors at distance 1, 2, ... up to CR/2
+      for (int j = 1; j <= connectionRequirement / 2; j++) {
+        String nodeA = nodeOrder.get(i);
+        String nodeB = nodeOrder.get((i + j) % nodeCount);
 
-    Random random = new Random();
-    List<String> needConnections = new ArrayList<>();
-    int maxAttempts = 10000;
-    int attempts = 0;
-
-    while (attempts < maxAttempts) {
-      needConnections.clear();
-      for (String nodeId : nodeOrder) {
-        if (nodeDegrees.get(nodeId) < connectionRequirement) {
-          needConnections.add(nodeId);
+        if (nodeDegrees.get(nodeA) < connectionRequirement
+            && nodeDegrees.get(nodeB) < connectionRequirement
+            && !adjacencyList.get(nodeA).contains(nodeB)) {
+          addEdge(nodeA, nodeB, adjacencyList, nodeDegrees, edges);
         }
       }
+    }
 
-      if (needConnections.isEmpty()) {
-        break;
+    // If CR is odd and nodeCount is even, connect opposite nodes
+    if (connectionRequirement % 2 != 0 && nodeCount % 2 == 0) {
+      int half = nodeCount / 2;
+      for (int i = 0; i < half; i++) {
+        String nodeA = nodeOrder.get(i);
+        String nodeB = nodeOrder.get(i + half);
+        if (nodeDegrees.get(nodeA) < connectionRequirement
+            && nodeDegrees.get(nodeB) < connectionRequirement
+            && !adjacencyList.get(nodeA).contains(nodeB)) {
+          addEdge(nodeA, nodeB, adjacencyList, nodeDegrees, edges);
+        }
       }
+    }
 
-      String nodeA = needConnections.get(random.nextInt(needConnections.size()));
-      String nodeB = needConnections.get(random.nextInt(needConnections.size()));
+    // Fill any missing edges systematically
+    for (int i = 0; i < nodeCount; i++) {
+      String nodeA = nodeOrder.get(i);
+      if (nodeDegrees.get(nodeA) >= connectionRequirement) continue;
 
-      if (!nodeA.equals(nodeB) && !adjacencyList.get(nodeA).contains(nodeB)) {
-        addEdge(nodeA, nodeB, adjacencyList, nodeDegrees, edges);
-        attempts = 0;
-      } else {
-        attempts++;
+      for (int j = i + 1; j < nodeCount; j++) {
+        String nodeB = nodeOrder.get(j);
+        if (nodeDegrees.get(nodeA) < connectionRequirement
+            && nodeDegrees.get(nodeB) < connectionRequirement
+            && !adjacencyList.get(nodeA).contains(nodeB)) {
+          addEdge(nodeA, nodeB, adjacencyList, nodeDegrees, edges);
+          if (nodeDegrees.get(nodeA) >= connectionRequirement) break;
+        }
       }
     }
 
@@ -109,7 +131,7 @@ public class OverlayCreator {
     }
 
     sendMessagingNodeLists(dialerMap, outputStreams);
-    System.out.println("setup completed with " + connectionRequirement + " connections");
+    System.out.println("setup completed with " + edges.size() + " connections");
   }
 
   public void sendLinkWeights(Map<String, DataOutputStream> outputStreams) {

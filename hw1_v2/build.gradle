@@ -54,20 +54,21 @@ tasks.register('runMessagingNode', JavaExec) {
     }
 }
 
-tasks.register('createTar', Tar) {
+task createTar(type: Tar) {
     archiveBaseName.set('Christopher_Cowart_HW1')
     archiveExtension.set('tar')
-
+    
     from('.') {
         include 'build.gradle'
         include 'README.txt'
         include 'src/main/java/**/*.java'
-
-        exclude '**/._*'
+        
+        exclude '**/._*'       
         exclude '**/.DS_Store'
-        exclude 'src/test/**'
-        exclude '**/test/**'
-        exclude '**/*Test.java'
-        exclude '**/*Tests.java'
+        
+        exclude 'src/test/**'          
+        exclude '**/test/**'           
+        exclude '**/*Test.java'        
+        exclude '**/*Tests.java'       
     }
 }

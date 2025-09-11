@@ -164,54 +164,19 @@ public class StatisticsCollectorAndDisplay {
       totalSumSent += stats.getSumMessagesSent();
       totalSumReceived += stats.getSumMessagesReceived();
 
-      System.out.println(
-          stats.getNodeId()
-              + " "
-              + stats.getMessagesSent()
-              + " "
-              + stats.getMessagesReceived()
-              + " "
-              + stats.getSumMessagesSent()
-              + " "
-              + stats.getSumMessagesReceived()
-              + " "
-              + stats.getMessagesRelayed());
+      System.out.printf(
+          "%s %d %d %.2f %.2f %d%n",
+          stats.getNodeId(),
+          stats.getMessagesSent(),
+          stats.getMessagesReceived(),
+          (double) stats.getSumMessagesSent(),
+          (double) stats.getSumMessagesReceived(),
+          stats.getMessagesRelayed());
     }
 
-    System.out.println(
-        "sum " + totalSent + " " + totalReceived + " " + totalSumSent + " " + totalSumReceived);
-
-    // Consistency verification
-    boolean countConsistent = (totalSent == totalReceived);
-    boolean sumConsistent = (totalSumSent == totalSumReceived);
-
-    if (!countConsistent) {
-      System.err.println(
-          "WARNING: Message count mismatch! Sent: "
-              + totalSent
-              + " != Received: "
-              + totalReceived
-              + " (Difference: "
-              + (totalSent - totalReceived)
-              + ")");
-    }
-
-    if (!sumConsistent) {
-      System.err.println(
-          "WARNING: Message sum mismatch! Sent sum: "
-              + totalSumSent
-              + " != Received sum: "
-              + totalSumReceived
-              + " (Difference: "
-              + (totalSumSent - totalSumReceived)
-              + ")");
-    }
-
-    if (countConsistent && sumConsistent) {
-      System.out.println("Consistency check passed: All messages accounted for correctly.");
-    }
-
-    System.out.println(run.getRounds() + " rounds completed");
+    System.out.printf(
+        "sum %d %d %.2f %.2f%n",
+        totalSent, totalReceived, (double) totalSumSent, (double) totalSumReceived);
   }
 
   public static boolean waitForCompletion(StatisticsRun run, long timeoutMillis) {
@@ -235,6 +200,8 @@ public class StatisticsCollectorAndDisplay {
       StatisticsRun run, Map<String, DataOutputStream> outputStreams, long delayBeforeCollection) {
 
     waitForCompletion(run, 60000);
+
+    System.out.println(run.getRounds() + " rounds completed");
 
     try {
       Thread.sleep(delayBeforeCollection);
