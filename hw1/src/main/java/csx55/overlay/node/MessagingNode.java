@@ -294,7 +294,8 @@ public class MessagingNode {
       } while (sink.equals(selfId()));
 
       for (int i = 0; i < 5; i++) {
-        int payload = rnd.nextInt(Integer.MAX_VALUE);
+
+        int payload = rnd.nextInt();
         sendTracker.incrementAndGet();
         sendSummation.addAndGet(payload);
         routeMessage(selfId(), sink, payload);
@@ -451,6 +452,7 @@ public class MessagingNode {
         if (!vis.contains(v)) {
           vis.add(v);
           q.addLast(v);
+          // Print in comma-separated format matching list-weights: "u, v, weight"
           System.out.println(u + ", " + v + ", " + e.w);
         }
       }

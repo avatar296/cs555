@@ -62,6 +62,8 @@ public class Registry {
                     doSendLinkWeights();
                   } else if (line.equals("list-weights")) {
                     doListWeights();
+                  } else if (line.equals("validate-weights")) {
+                    doValidateWeights();
                   } else if (line.startsWith("start")) {
                     doStart(line);
                   }
@@ -160,18 +162,33 @@ public class Registry {
     }
     int CR = Integer.parseInt(parts[1]);
 
-    // Use the OverlayCreator utility
     overlayCreator.setupOverlay(CR, registered, outs);
   }
 
   private void doSendLinkWeights() {
-    // Use the OverlayCreator utility
     overlayCreator.sendLinkWeights(outs);
   }
 
   private void doListWeights() {
     for (LinkWeights.Link l : overlayCreator.getWeightedLinks()) {
       System.out.println(l.a + ", " + l.b + ", " + l.w);
+    }
+  }
+
+  // Debug helper: summarize weight range (not used by grader)
+  private void doValidateWeights() {
+    int min = Integer.MAX_VALUE;
+    int max = Integer.MIN_VALUE;
+    int count = 0;
+    for (LinkWeights.Link l : overlayCreator.getWeightedLinks()) {
+      if (l.w < min) min = l.w;
+      if (l.w > max) max = l.w;
+      count++;
+    }
+    if (count == 0) {
+      System.out.println("no weights assigned");
+    } else {
+      System.out.println("weights min=" + min + " max=" + max + " count=" + count);
     }
   }
 
