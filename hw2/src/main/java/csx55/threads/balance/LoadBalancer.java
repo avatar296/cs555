@@ -4,6 +4,7 @@ import csx55.threads.core.OverlayState;
 import csx55.threads.core.Stats;
 import csx55.threads.core.Task;
 import csx55.threads.core.TaskQueue;
+import csx55.threads.util.Log;
 import csx55.threads.util.NetworkUtil;
 import csx55.threads.util.Protocol;
 import java.io.IOException;
@@ -40,8 +41,16 @@ public class LoadBalancer {
   public void balanceThresholdBased() {
     int myOutstanding = taskQueue.size();
     String successor = state.getSuccessor();
+    Log.info(
+        "[BALANCE] Queue size: "
+            + myOutstanding
+            + ", pushThreshold: "
+            + pushThreshold
+            + ", successor: "
+            + successor);
     if (myOutstanding > pushThreshold && successor != null) {
       int migrateCount = Math.max(minBatchSize, myOutstanding / 2);
+      Log.info("[PUSH] Attempting to push " + migrateCount + " tasks to " + successor);
       List<Task> raw = taskQueue.removeBatch(migrateCount);
       if (raw == null || raw.isEmpty()) return;
 
@@ -60,7 +69,9 @@ public class LoadBalancer {
       try {
         NetworkUtil.sendTasks(successor, toSend);
         stats.incrementPushed(toSend.size());
+        Log.info("[PUSH] Successfully pushed " + toSend.size() + " tasks to " + successor);
       } catch (IOException e) {
+        Log.error("[PUSH] Failed to push tasks to " + successor + ": " + e.getMessage());
         taskQueue.addBatch(toSend);
       }
     }
@@ -126,11 +137,21 @@ public class LoadBalancer {
 
   public void sendPullRequestIfIdle() {
     String predecessor = state.getPredecessor();
-    if (predecessor != null && taskQueue.size() < pullThreshold) {
-      int capacity = Math.max(minBatchSize, Math.max(0, pushThreshold - taskQueue.size()));
+    int queueSize = taskQueue.size();
+    Log.info(
+        "[PULL] Queue size: "
+            + queueSize
+            + ", pullThreshold: "
+            + pullThreshold
+            + ", predecessor: "
+            + predecessor);
+    if (predecessor != null && queueSize < pullThreshold) {
+      int capacity = Math.max(minBatchSize, Math.max(0, pushThreshold - queueSize));
       try {
+        Log.info("[PULL] Sending pull request to " + predecessor + " with capacity " + capacity);
         NetworkUtil.sendString(predecessor, Protocol.PULL_REQUEST + " " + myId + " " + capacity);
-      } catch (IOException ignored) {
+      } catch (IOException e) {
+        Log.error("[PULL] Failed to send pull request: " + e.getMessage());
       }
     }
   }

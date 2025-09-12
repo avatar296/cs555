@@ -47,8 +47,8 @@ public class ComputeNode {
   private final Stats stats = new Stats();
   private String myId;
   private final OverlayState state = new OverlayState();
-  private RoundAggregator roundAggregator;
-  private LoadBalancer loadBalancer;
+  private volatile RoundAggregator roundAggregator;
+  private volatile LoadBalancer loadBalancer;
 
   public ComputeNode(String registryHost, int registryPort) {
     this.registryHost = registryHost;
@@ -140,6 +140,27 @@ public class ComputeNode {
                       + ") ringSize="
                       + state.getRingSize());
             }
+
+            // Initialize load balancer and round aggregator after pool is set up
+            if (roundAggregator == null) {
+              roundAggregator = new RoundAggregator(myId, state);
+            }
+            if (loadBalancer == null) {
+              loadBalancer =
+                  new LoadBalancer(
+                      myId,
+                      taskQueue,
+                      stats,
+                      state,
+                      PUSH_THRESHOLD,
+                      PULL_THRESHOLD,
+                      MIN_BATCH_SIZE);
+              Log.info(
+                  "[INIT] LoadBalancer initialized with pushThreshold="
+                      + PUSH_THRESHOLD
+                      + ", pullThreshold="
+                      + PULL_THRESHOLD);
+            }
           } else {
             // Backward compatibility: OVERLAY <successor> <maybe-predecessor-or-pool> <maybe-pool>
             state.setPredecessor(parts.length > 3 ? parts[2] : null);
@@ -177,21 +198,6 @@ public class ComputeNode {
                       + " (pool size locked: "
                       + poolSize
                       + ")");
-            }
-
-            if (roundAggregator == null) {
-              roundAggregator = new RoundAggregator(myId, state);
-            }
-            if (loadBalancer == null) {
-              loadBalancer =
-                  new LoadBalancer(
-                      myId,
-                      taskQueue,
-                      stats,
-                      state,
-                      PUSH_THRESHOLD,
-                      PULL_THRESHOLD,
-                      MIN_BATCH_SIZE);
             }
           }
 
@@ -260,9 +266,12 @@ public class ComputeNode {
         }
       }
 
-      WaitUtil.waitUntilDrained(taskQueue, stats);
+      // Removed waitUntilDrained to allow tasks to migrate between rounds
+      // WaitUtil.waitUntilDrained(taskQueue, stats);
     }
 
+    // Wait for all tasks to complete at the end of all rounds
+    WaitUtil.waitUntilDrained(taskQueue, stats);
     balancer.interrupt();
   }
 
@@ -274,11 +283,33 @@ public class ComputeNode {
         int queueSize = taskQueue.size();
         int inFlight = stats.getInFlight();
 
+        Log.info(
+            "[BALANCE_CHECK] Queue: "
+                + queueSize
+                + ", InFlight: "
+                + inFlight
+                + ", PushThreshold: "
+                + PUSH_THRESHOLD
+                + ", PullThreshold: "
+                + PULL_THRESHOLD
+                + ", LoadBalancer: "
+                + (loadBalancer != null ? "initialized" : "null"));
+
         if (queueSize > PUSH_THRESHOLD && loadBalancer != null) {
+          Log.info(
+              "[BALANCE_CHECK] Triggering push - queue "
+                  + queueSize
+                  + " > threshold "
+                  + PUSH_THRESHOLD);
           loadBalancer.balanceThresholdBased();
         }
 
         if (queueSize < PULL_THRESHOLD && inFlight < poolSize / 2 && loadBalancer != null) {
+          Log.info(
+              "[BALANCE_CHECK] Triggering pull - queue "
+                  + queueSize
+                  + " < threshold "
+                  + PULL_THRESHOLD);
           loadBalancer.sendPullRequestIfIdle();
         }
       } catch (InterruptedException e) {
