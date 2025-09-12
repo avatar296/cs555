@@ -1,4 +1,4 @@
-package csx55.threads;
+package csx55.threads.core;
 
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;

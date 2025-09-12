@@ -175,7 +175,6 @@ public class Registry {
     }
   }
 
-  // Debug helper: summarize weight range (not used by grader)
   private void doValidateWeights() {
     int min = Integer.MAX_VALUE;
     int max = Integer.MIN_VALUE;

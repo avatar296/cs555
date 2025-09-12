@@ -1,5 +1,6 @@
-package csx55.threads;
+package csx55.threads.core;
 
+import csx55.threads.util.Config;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -7,7 +8,7 @@ import java.util.Arrays;
 public class Task implements java.io.Serializable {
   private static final long serialVersionUID = 1L;
 
-  private static final int DIFFICULTY_BITS = Integer.getInteger("cs555.difficultyBits", 17);
+  private static final int DIFFICULTY_BITS = Config.getInt("cs555.difficultyBits", 17);
 
   private final String origin;
   private boolean migrated = false;

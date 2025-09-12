@@ -1,4 +1,4 @@
-package csx55.threads;
+package csx55.threads.core;
 
 import java.util.ArrayList;
 import java.util.List;

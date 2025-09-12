@@ -1,11 +1,11 @@
-package csx55.threads;
+package csx55.threads.core;
 
+import csx55.threads.util.Config;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Worker implements Runnable {
 
-  private static final boolean PRINT_TASKS =
-      Boolean.parseBoolean(System.getProperty("cs555.printTasks", "true"));
+  private static final boolean PRINT_TASKS = Config.getBool("cs555.printTasks", true);
 
   private final TaskQueue queue;
   private final Stats stats;

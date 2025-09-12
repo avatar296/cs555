@@ -55,12 +55,6 @@ Registry:
 Messaging Node:
     ./gradlew runMessagingNode -Phost=<registry-host> -Pport=<registry-port>
 
-CREATING SUBMISSION TAR:
-=======================
-./gradlew createTar
-
-This will create Christopher_Cowart_HW1.tar in build/distributions/
-
 REGISTRY COMMANDS:
 ==================
 - list-messaging-nodes      : List all registered nodes
@@ -73,41 +67,3 @@ MESSAGING NODE COMMANDS:
 ========================
 - print-mst                : Display computed MST
 - exit-overlay             : Deregister and exit
-
-KEY FEATURES:
-=============
-- Modular design with utility classes for overlay creation and statistics
-- Uses Prim's algorithm for MST computation from each source node
-- Supports configurable connection requirements (CR)
-- Tracks comprehensive message statistics (sent, received, relayed, sums)
-- Thread-safe implementation using concurrent collections
-- All communication is TCP-based with custom byte[] marshalling
-- No Java serialization used
-
-TESTING PROCEDURE:
-==================
-1. Start Registry:
-   ./gradlew runRegistry -Pport=5000
-
-2. Start MessagingNodes (minimum 10):
-   ./gradlew runMessagingNode -Phost=localhost -Pport=5000
-
-3. Setup overlay (e.g., CR=4):
-   setup-overlay 4
-
-4. Send link weights:
-   send-overlay-link-weights
-
-5. Start message rounds:
-   start 5
-
-6. View statistics after completion
-
-NOTES:
-======
-- Java version: 11
-- Gradle version: 8.3
-- All communications use TCP
-- No external libraries used
-- Tests are disabled as per assignment requirements
-- Refactored from HW1 with improved architecture and cleaner code organization
