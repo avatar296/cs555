@@ -31,6 +31,11 @@ public class LinkWeights implements Event {
       String a = in.readUTF();
       String b = in.readUTF();
       int w = in.readInt();
+
+      if (w < 1 || w > 10) {
+
+        w = Math.max(1, Math.min(10, w));
+      }
       ls.add(new Link(a, b, w));
     }
     this.links = Collections.unmodifiableList(ls);

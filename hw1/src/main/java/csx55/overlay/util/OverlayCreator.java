@@ -114,7 +114,8 @@ public class OverlayCreator {
     for (String nodeA : nodeOrder) {
       for (String nodeB : adjacencyList.get(nodeA)) {
         if (nodeA.compareTo(nodeB) < 0) {
-          weightedLinks.add(new LinkWeights.Link(nodeA, nodeB, 1 + random.nextInt(10)));
+          int weight = random.nextInt(10) + 1;
+          weightedLinks.add(new LinkWeights.Link(nodeA, nodeB, weight));
         }
       }
     }
