@@ -1,10 +1,10 @@
 package csx55.threads;
 
+import csx55.hashing.Task;
 import csx55.threads.balance.LoadBalancer;
 import csx55.threads.balance.RoundAggregator;
 import csx55.threads.core.OverlayState;
 import csx55.threads.core.Stats;
-import csx55.threads.core.Task;
 import csx55.threads.core.TaskQueue;
 import csx55.threads.core.ThreadPool;
 import csx55.threads.util.Config;
@@ -251,7 +251,11 @@ public class ComputeNode {
     for (int r = 0; r < rounds; r++) {
       int toGen = 1 + rand.nextInt(Math.max(1, MAX_TASKS_PER_ROUND));
       for (int i = 0; i < toGen; i++) {
-        taskQueue.add(new Task(myId));
+        String[] parts = myId.split(":");
+        String ip = parts[0];
+        int port = Integer.parseInt(parts[1]);
+        int payload = rand.nextInt();
+        taskQueue.add(new Task(ip, port, r, payload));
       }
       stats.incrementGenerated(toGen);
 

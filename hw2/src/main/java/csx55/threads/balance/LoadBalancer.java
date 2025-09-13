@@ -1,8 +1,8 @@
 package csx55.threads.balance;
 
+import csx55.hashing.Task;
 import csx55.threads.core.OverlayState;
 import csx55.threads.core.Stats;
-import csx55.threads.core.Task;
 import csx55.threads.core.TaskQueue;
 import csx55.threads.util.Log;
 import csx55.threads.util.NetworkUtil;

@@ -1,5 +1,7 @@
 package csx55.threads.core;
 
+import csx55.hashing.Miner;
+import csx55.hashing.Task;
 import csx55.threads.util.Config;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -44,7 +46,7 @@ public class Worker implements Runnable {
 
         stats.incInFlight();
         try {
-          task.mine();
+          Miner.getInstance().mine(task);
           stats.incrementCompleted();
           if (PRINT_TASKS) {
             System.out.println(task);

@@ -1,6 +1,6 @@
 package csx55.threads.util;
 
-import csx55.threads.core.Task;
+import csx55.hashing.Task;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;

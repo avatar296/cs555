@@ -1,5 +1,6 @@
 package csx55.threads.core;
 
+import csx55.hashing.Task;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
