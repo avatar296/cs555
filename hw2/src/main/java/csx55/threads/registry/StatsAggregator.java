@@ -58,7 +58,7 @@ public class StatsAggregator {
       double percent = (totalCompleted == 0) ? 0.0 : (100.0 * s.getCompleted()) / totalCompleted;
       System.out.printf(
           Locale.US,
-          "%s %d %d %d %d %.8f%n",
+          "%s %d %d %d %d %.4f%n",
           node,
           s.getGenerated(),
           s.getPulled(),
@@ -69,7 +69,7 @@ public class StatsAggregator {
 
     System.out.printf(
         Locale.US,
-        "Total %d %d %d %d %.8f%n",
+        "Total %d %d %d %d %.4f%n",
         totalGenerated,
         totalPulled,
         totalPushed,

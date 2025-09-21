@@ -15,11 +15,11 @@ public final class Log {
   }
 
   public static void info(String msg) {
-    System.out.println("[INFO] " + ts() + " [" + thread() + "] " + msg);
+    System.err.println("[INFO] " + ts() + " [" + thread() + "] " + msg);
   }
 
   public static void warn(String msg) {
-    System.out.println("[WARN] " + ts() + " [" + thread() + "] " + msg);
+    System.err.println("[WARN] " + ts() + " [" + thread() + "] " + msg);
   }
 
   public static void error(String msg) {

@@ -13,11 +13,19 @@ import java.util.*;
 
 public class Registry {
 
+  private enum State {
+    ACCEPTING,
+    OVERLAY_BUILT,
+    RUNNING,
+    SHUTTING_DOWN
+  }
+
   private final int port;
   private final List<String> nodes = new ArrayList<>();
   private final StatsAggregator aggregator = new StatsAggregator();
   private ServerSocket serverSocket;
   private volatile boolean running = true;
+  private volatile State state = State.ACCEPTING;
 
   public Registry(int port) {
     this.port = port;
@@ -88,6 +96,10 @@ public class Registry {
             int port = Integer.parseInt(parts[2]);
             String id = NodeId.toId(ip, port);
             synchronized (nodes) {
+              if (state != State.ACCEPTING) {
+                Log.warn("Late registration rejected for " + id + " (overlay already built)");
+                return;
+              }
               if (!nodes.contains(id)) nodes.add(id);
             }
             Log.info("Node registered: " + id);
@@ -111,6 +123,10 @@ public class Registry {
   private void setupOverlay(int poolSize) {
     List<String> alive = new ArrayList<>();
     synchronized (nodes) {
+      if (state != State.ACCEPTING) {
+        Log.warn("Overlay already built, ignoring setup-overlay command");
+        return;
+      }
       for (String node : nodes) {
         try (Socket probe = new Socket()) {
           NodeId nid = NodeId.parse(node);
@@ -142,6 +158,7 @@ public class Registry {
               "Failed to send OVERLAY to " + node + " (will remain in list): " + e.getMessage());
         }
       }
+      state = State.OVERLAY_BUILT;
     }
     Log.info("Overlay setup complete with pool size " + poolSize + ". Members:");
     synchronized (nodes) {
@@ -150,6 +167,13 @@ public class Registry {
   }
 
   private void startRounds(int rounds) {
+    synchronized (nodes) {
+      if (state != State.OVERLAY_BUILT) {
+        Log.warn("Cannot start rounds - overlay not built");
+        return;
+      }
+      state = State.RUNNING;
+    }
     aggregator.clear();
 
     synchronized (nodes) {

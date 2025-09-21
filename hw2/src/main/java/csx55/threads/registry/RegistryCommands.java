@@ -23,12 +23,12 @@ public final class RegistryCommands {
       switch (cmd) {
         case "setup-overlay":
           if (parts.length != 2) {
-            System.out.println("Usage: setup-overlay <thread-pool-size>");
+            System.err.println("Usage: setup-overlay <thread-pool-size>");
             return true;
           }
           int size = Integer.parseInt(parts[1]);
           if (size < 2 || size > 16) {
-            System.out.println("Thread pool size must be between 2 and 16");
+            System.err.println("Thread pool size must be between 2 and 16");
             return true;
           }
           actions.setupOverlay(size);
@@ -36,12 +36,12 @@ public final class RegistryCommands {
 
         case "start":
           if (parts.length != 2) {
-            System.out.println("Usage: start <number-of-rounds>");
+            System.err.println("Usage: start <number-of-rounds>");
             return true;
           }
           int rounds = Integer.parseInt(parts[1]);
           if (rounds <= 0) {
-            System.out.println("number-of-rounds must be > 0");
+            System.err.println("number-of-rounds must be > 0");
             return true;
           }
           actions.startRounds(rounds);
@@ -52,12 +52,12 @@ public final class RegistryCommands {
           return false;
 
         default:
-          System.out.println("Unknown command: " + line);
-          System.out.println("Available: setup-overlay <size>, start <rounds>, quit");
+          System.err.println("Unknown command: " + line);
+          System.err.println("Available: setup-overlay <size>, start <rounds>, quit");
           return true;
       }
     } catch (NumberFormatException nfe) {
-      System.out.println("Invalid number format: " + nfe.getMessage());
+      System.err.println("Invalid number format: " + nfe.getMessage());
       return true;
     }
   }
