@@ -55,7 +55,7 @@ tasks.register('runNode', JavaExec) {
     }
 }
 
-tasks.register('createTar', Tar) {
+task createTar(type: Tar) {
     archiveBaseName.set('Christopher_Cowart_HW2')
     archiveExtension.set('tar')
 
