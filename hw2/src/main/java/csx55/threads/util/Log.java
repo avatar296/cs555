@@ -6,6 +6,8 @@ import java.time.format.DateTimeFormatter;
 public final class Log {
   private Log() {}
 
+  private static final boolean QUIET = !Boolean.getBoolean("cs555.verbose");
+
   private static String ts() {
     return DateTimeFormatter.ISO_INSTANT.format(Instant.now());
   }
@@ -15,14 +17,14 @@ public final class Log {
   }
 
   public static void info(String msg) {
-    System.err.println("[INFO] " + ts() + " [" + thread() + "] " + msg);
+    if (!QUIET) System.err.println("[INFO] " + ts() + " [" + thread() + "] " + msg);
   }
 
   public static void warn(String msg) {
-    System.err.println("[WARN] " + ts() + " [" + thread() + "] " + msg);
+    if (!QUIET) System.err.println("[WARN] " + ts() + " [" + thread() + "] " + msg);
   }
 
   public static void error(String msg) {
-    System.err.println("[ERROR] " + ts() + " [" + thread() + "] " + msg);
+    if (!QUIET) System.err.println("[ERROR] " + ts() + " [" + thread() + "] " + msg);
   }
 }

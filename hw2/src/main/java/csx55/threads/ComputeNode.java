@@ -107,7 +107,7 @@ public class ComputeNode {
             if (pool == null) {
               poolSize = newPoolSize;
               try {
-                pool = new ThreadPool(poolSize, taskQueue, stats);
+                pool = new ThreadPool(poolSize, taskQueue, stats, myId);
                 Log.info(
                     "Overlay set. Successor="
                         + state.getSuccessor()
@@ -169,7 +169,7 @@ public class ComputeNode {
             if (pool == null) {
               poolSize = newPoolSize;
               try {
-                pool = new ThreadPool(poolSize, taskQueue, stats);
+                pool = new ThreadPool(poolSize, taskQueue, stats, myId);
                 Log.info(
                     "Overlay set. Successor="
                         + state.getSuccessor()
