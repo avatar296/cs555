@@ -17,14 +17,15 @@ public final class Log {
   }
 
   public static void info(String msg) {
-    if (!QUIET) System.err.println("[INFO] " + ts() + " [" + thread() + "] " + msg);
+    if (!QUIET) System.out.println("[INFO] " + ts() + " [" + thread() + "] " + msg);
   }
 
   public static void warn(String msg) {
-    if (!QUIET) System.err.println("[WARN] " + ts() + " [" + thread() + "] " + msg);
+    if (!QUIET) System.out.println("[WARN] " + ts() + " [" + thread() + "] " + msg);
   }
 
   public static void error(String msg) {
-    if (!QUIET) System.err.println("[ERROR] " + ts() + " [" + thread() + "] " + msg);
+    // Always print errors regardless of QUIET setting
+    System.out.println("[ERROR] " + ts() + " [" + thread() + "] " + msg);
   }
 }

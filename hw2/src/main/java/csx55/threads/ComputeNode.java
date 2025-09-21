@@ -60,23 +60,35 @@ public class ComputeNode {
     String ip = InetAddress.getLocalHost().getHostAddress();
     int port = serverSocket.getLocalPort();
     myId = ip + ":" + port;
+    System.out.println("[NODE-START] ComputeNode started at " + myId);
 
+    System.out.println(
+        "[NODE-START] Registering with Registry at " + registryHost + ":" + registryPort);
     try (Socket sock = new Socket(registryHost, registryPort);
         ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream())) {
       out.writeObject(Protocol.REGISTER + " " + ip + " " + port);
       out.flush();
+      System.out.println("[NODE-START] Registration sent successfully");
+    } catch (IOException e) {
+      System.out.println("[NODE-ERROR] Failed to register with Registry: " + e.getMessage());
+      throw e;
     }
 
     new Thread(
             () -> {
+              System.out.println("[NODE-START] Accept thread started for " + myId);
               try {
                 while (running) {
                   Socket sock = serverSocket.accept();
                   new Thread(() -> handleMessage(sock)).start();
                 }
               } catch (IOException e) {
-                if (running) e.printStackTrace();
+                if (running) {
+                  System.out.println("[NODE-ERROR] Accept thread died: " + e.getMessage());
+                  e.printStackTrace(System.out);
+                }
               }
+              System.out.println("[NODE-START] Accept thread exiting for " + myId);
             },
             "ComputeNode-AcceptLoop")
         .start();
@@ -106,8 +118,11 @@ public class ComputeNode {
 
             if (pool == null) {
               poolSize = newPoolSize;
+              System.out.println(
+                  "[NODE-DEBUG] Creating ThreadPool with size " + poolSize + " for node " + myId);
               try {
                 pool = new ThreadPool(poolSize, taskQueue, stats, myId);
+                System.out.println("[NODE-DEBUG] ThreadPool created successfully");
                 Log.info(
                     "Overlay set. Successor="
                         + state.getSuccessor()
@@ -118,8 +133,17 @@ public class ComputeNode {
                         + " ringSize="
                         + state.getRingSize());
               } catch (IllegalArgumentException e) {
+                System.out.println("[NODE-DEBUG] ThreadPool creation failed: " + e.getMessage());
                 Log.error("Invalid pool size: " + e.getMessage());
                 pool = null; // Ensure pool is null if creation failed
+              } catch (Exception e) {
+                System.out.println(
+                    "[NODE-DEBUG] Unexpected error creating ThreadPool: "
+                        + e.getClass().getName()
+                        + " - "
+                        + e.getMessage());
+                e.printStackTrace(System.out);
+                pool = null;
               }
             } else {
               if (poolSize != newPoolSize) {
@@ -161,6 +185,11 @@ public class ComputeNode {
                       + ", pullThreshold="
                       + PULL_THRESHOLD);
             }
+            System.out.println(
+                "[NODE-OVERLAY] OVERLAY processing complete for "
+                    + myId
+                    + ", pool="
+                    + (pool != null ? "initialized" : "null"));
           } else {
             // Backward compatibility: OVERLAY <successor> <maybe-predecessor-or-pool> <maybe-pool>
             state.setPredecessor(parts.length > 3 ? parts[2] : null);
@@ -231,9 +260,15 @@ public class ComputeNode {
           if (roundAggregator != null) roundAggregator.handleGenMessage(msg);
         }
       }
-    } catch (EOFException ignored) {
+    } catch (EOFException e) {
+      System.out.println("[NODE-ERROR] EOF exception in handleMessage: " + e.getMessage());
     } catch (Exception e) {
-      e.printStackTrace();
+      System.out.println(
+          "[NODE-ERROR] Exception in handleMessage: "
+              + e.getClass().getName()
+              + " - "
+              + e.getMessage());
+      e.printStackTrace(System.out);
     } finally {
       try {
         sock.close();
@@ -358,6 +393,8 @@ public class ComputeNode {
         .addShutdownHook(
             new Thread(
                 () -> {
+                  System.out.println("[NODE-DEBUG] ComputeNode shutdown hook triggered!");
+                  Thread.dumpStack();
                   Log.info("Shutdown signal received.");
                   node.shutdown();
                 }));

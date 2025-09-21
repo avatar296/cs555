@@ -39,6 +39,7 @@ public class Worker implements Runnable {
 
   @Override
   public void run() {
+    System.out.println("[WORKER-START] " + thread.getName() + " started for node " + nodeId);
     while (running.get()) {
       try {
         Task task = queue.take();
