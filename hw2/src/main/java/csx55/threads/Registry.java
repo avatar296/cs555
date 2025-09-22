@@ -130,15 +130,6 @@ public class Registry {
               + e.getMessage());
       e.printStackTrace(System.out);
     }
-
-    System.out.println("[DEBUG] Entering wait() to keep Registry alive");
-    synchronized (this) {
-      try {
-        this.wait();
-      } catch (InterruptedException ignored) {
-        System.out.println("[DEBUG] Registry main thread interrupted");
-      }
-    }
   }
 
   private void handleConnection(Socket socket) {

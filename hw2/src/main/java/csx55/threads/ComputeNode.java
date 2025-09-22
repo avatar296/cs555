@@ -283,10 +283,16 @@ public class ComputeNode {
     balancer.start();
 
     Random rand = new Random();
+    // Parse IP and port from myId (format: "ip:port")
+    String[] idParts = myId.split(":");
+    String ip = idParts[0];
+    int port = Integer.parseInt(idParts[1]);
+
     for (int r = 0; r < rounds; r++) {
       int toGen = 1 + rand.nextInt(Math.max(1, MAX_TASKS_PER_ROUND));
       for (int i = 0; i < toGen; i++) {
-        taskQueue.add(new Task(myId));
+        int payload = rand.nextInt(); // Random payload for each task
+        taskQueue.add(new Task(ip, port, r, payload));
       }
       stats.incrementGenerated(toGen);
 
