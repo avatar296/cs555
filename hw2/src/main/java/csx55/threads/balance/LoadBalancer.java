@@ -8,7 +8,6 @@ import csx55.threads.util.Log;
 import csx55.threads.util.NetworkUtil;
 import csx55.threads.util.Protocol;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 public class LoadBalancer {
@@ -54,25 +53,17 @@ public class LoadBalancer {
       List<Task> raw = taskQueue.removeBatch(migrateCount);
       if (raw == null || raw.isEmpty()) return;
 
-      List<Task> toSend = new ArrayList<>();
-      List<Task> keep = new ArrayList<>();
       for (Task t : raw) {
-        if (t.isMigrated()) keep.add(t);
-        else {
-          t.markMigrated();
-          toSend.add(t);
-        }
+        t.markMigrated();
       }
-      if (!keep.isEmpty()) taskQueue.addBatch(keep);
-      if (toSend.isEmpty()) return;
 
       try {
-        NetworkUtil.sendTasks(successor, toSend);
-        stats.incrementPushed(toSend.size());
-        Log.info("[PUSH] Successfully pushed " + toSend.size() + " tasks to " + successor);
+        NetworkUtil.sendTasks(successor, raw);
+        stats.incrementPushed(raw.size());
+        Log.info("[PUSH] Successfully pushed " + raw.size() + " tasks to " + successor);
       } catch (IOException e) {
         Log.error("[PUSH] Failed to push tasks to " + successor + ": " + e.getMessage());
-        taskQueue.addBatch(toSend);
+        taskQueue.addBatch(raw);
       }
     }
   }
@@ -87,22 +78,15 @@ public class LoadBalancer {
       int migrateCount = Math.max(minBatchSize, excess);
       List<Task> raw = taskQueue.removeBatch(migrateCount);
       if (raw != null && !raw.isEmpty()) {
-        List<Task> toSend = new ArrayList<>();
-        List<Task> keep = new ArrayList<>();
         for (Task t : raw) {
-          if (t.isMigrated()) keep.add(t);
-          else {
-            t.markMigrated();
-            toSend.add(t);
-          }
+          t.markMigrated();
         }
-        if (!keep.isEmpty()) taskQueue.addBatch(keep);
-        if (!toSend.isEmpty()) {
+        if (!raw.isEmpty()) {
           try {
-            NetworkUtil.sendTasks(successor, toSend);
-            stats.incrementPushed(toSend.size());
+            NetworkUtil.sendTasks(successor, raw);
+            stats.incrementPushed(raw.size());
           } catch (IOException e) {
-            taskQueue.addBatch(toSend);
+            taskQueue.addBatch(raw);
           }
         }
       }
@@ -116,8 +100,7 @@ public class LoadBalancer {
   public void handlePullRequest(String requestingNode, int capacity) {
     int myQueue = taskQueue.size();
     if (myQueue > pullThreshold) {
-      int shareCount =
-          Math.min(capacity, Math.min(minBatchSize, Math.max(0, (myQueue - pullThreshold) / 2)));
+      int shareCount = Math.min(capacity, Math.max(minBatchSize, (myQueue - pullThreshold) / 2));
       if (shareCount > 0) {
         List<Task> toShare = taskQueue.removeBatch(shareCount);
         if (toShare != null && !toShare.isEmpty()) {

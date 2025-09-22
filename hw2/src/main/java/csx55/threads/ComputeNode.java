@@ -29,9 +29,9 @@ public class ComputeNode {
 
   private static final int MAX_TASKS_PER_ROUND = Config.getInt("cs555.maxTasksPerRound", 1000);
 
-  private static final int PUSH_THRESHOLD = Config.getInt("cs555.pushThreshold", 20);
-  private static final int PULL_THRESHOLD = Config.getInt("cs555.pullThreshold", 5);
-  private static final int MIN_BATCH_SIZE = Config.getInt("cs555.minBatchSize", 10);
+  private static final int PUSH_THRESHOLD = Config.getInt("cs555.pushThreshold", 100);
+  private static final int PULL_THRESHOLD = Config.getInt("cs555.pullThreshold", 30);
+  private static final int MIN_BATCH_SIZE = Config.getInt("cs555.minBatchSize", 50);
   private static final long BALANCE_CHECK_INTERVAL =
       Config.getLong("cs555.balanceCheckInterval", 100);
 
