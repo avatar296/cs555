@@ -47,12 +47,14 @@ public class Worker implements Runnable {
 
         stats.incInFlight();
         try {
-          task.setMinedAt(nodeId); // Set the mining node before mining
+          task.setMinedAt(nodeId);
           task.mine();
-          stats.incrementCompleted();
+
           if (PRINT_TASKS) {
             System.out.println(task);
           }
+
+          stats.incrementCompleted();
         } finally {
           stats.decInFlight();
         }

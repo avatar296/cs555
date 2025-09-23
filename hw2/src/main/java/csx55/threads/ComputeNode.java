@@ -62,6 +62,17 @@ public class ComputeNode {
     myId = ip + ":" + port;
     System.out.println("[NODE-START] ComputeNode started at " + myId);
 
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  try {
+                    System.out.flush();
+                  } catch (Throwable ignore) {
+                  }
+                },
+                "StdoutFlusher"));
+
     System.out.println(
         "[NODE-START] Registering with Registry at " + registryHost + ":" + registryPort);
     try (Socket sock = new Socket(registryHost, registryPort);
@@ -109,126 +120,81 @@ public class ComputeNode {
 
         if (msg.startsWith(Protocol.OVERLAY)) {
           String[] parts = msg.split(" ");
+
           state.setSuccessor(parts[1]);
-          // Expected: OVERLAY <successor> <predecessor> <poolSize> <ringSize>
-          if (parts.length >= 5) {
-            state.setPredecessor(parts[2]);
-            int newPoolSize = Integer.parseInt(parts[3]);
-            state.setRingSize(Integer.parseInt(parts[4]));
+          state.setPredecessor(parts[2]);
+          int newPoolSize = Integer.parseInt(parts[3]);
+          state.setRingSize(Integer.parseInt(parts[4]));
 
-            if (pool == null) {
-              poolSize = newPoolSize;
-              System.out.println(
-                  "[NODE-DEBUG] Creating ThreadPool with size " + poolSize + " for node " + myId);
-              try {
-                pool = new ThreadPool(poolSize, taskQueue, stats, myId);
-                System.out.println("[NODE-DEBUG] ThreadPool created successfully");
-                Log.info(
-                    "Overlay set. Successor="
-                        + state.getSuccessor()
-                        + " Predecessor="
-                        + state.getPredecessor()
-                        + " poolSize="
-                        + poolSize
-                        + " ringSize="
-                        + state.getRingSize());
-              } catch (IllegalArgumentException e) {
-                System.out.println("[NODE-DEBUG] ThreadPool creation failed: " + e.getMessage());
-                Log.error("Invalid pool size: " + e.getMessage());
-                pool = null; // Ensure pool is null if creation failed
-              } catch (Exception e) {
-                System.out.println(
-                    "[NODE-DEBUG] Unexpected error creating ThreadPool: "
-                        + e.getClass().getName()
-                        + " - "
-                        + e.getMessage());
-                e.printStackTrace(System.out);
-                pool = null;
-              }
-            } else {
-              if (poolSize != newPoolSize) {
-                Log.warn(
-                    "Overlay requested pool size change from "
-                        + poolSize
-                        + " to "
-                        + newPoolSize
-                        + "; ignoring to preserve single thread-pool lifecycle.");
-              }
-              Log.info(
-                  "Overlay updated. Successor="
-                      + state.getSuccessor()
-                      + " Predecessor="
-                      + state.getPredecessor()
-                      + " (pool size locked: "
-                      + poolSize
-                      + ") ringSize="
-                      + state.getRingSize());
-            }
-
-            // Initialize load balancer and round aggregator after pool is set up
-            if (roundAggregator == null) {
-              roundAggregator = new RoundAggregator(myId, state);
-            }
-            if (loadBalancer == null) {
-              loadBalancer =
-                  new LoadBalancer(
-                      myId,
-                      taskQueue,
-                      stats,
-                      state,
-                      PUSH_THRESHOLD,
-                      PULL_THRESHOLD,
-                      MIN_BATCH_SIZE);
-              Log.info(
-                  "[INIT] LoadBalancer initialized with pushThreshold="
-                      + PUSH_THRESHOLD
-                      + ", pullThreshold="
-                      + PULL_THRESHOLD);
-            }
+          if (pool == null) {
+            poolSize = newPoolSize;
             System.out.println(
-                "[NODE-OVERLAY] OVERLAY processing complete for "
-                    + myId
-                    + ", pool="
-                    + (pool != null ? "initialized" : "null"));
-          } else {
-            // Backward compatibility: OVERLAY <successor> <maybe-predecessor-or-pool> <maybe-pool>
-            state.setPredecessor(parts.length > 3 ? parts[2] : null);
-            int newPoolSize = Integer.parseInt(parts.length > 3 ? parts[3] : parts[2]);
-
-            if (pool == null) {
-              poolSize = newPoolSize;
-              try {
-                pool = new ThreadPool(poolSize, taskQueue, stats, myId);
-                Log.info(
-                    "Overlay set. Successor="
-                        + state.getSuccessor()
-                        + " Predecessor="
-                        + state.getPredecessor()
-                        + " poolSize="
-                        + poolSize);
-              } catch (IllegalArgumentException e) {
-                Log.error("Invalid pool size: " + e.getMessage());
-                pool = null; // Ensure pool is null if creation failed
-              }
-            } else {
-              if (poolSize != newPoolSize) {
-                Log.warn(
-                    "Overlay requested pool size change from "
-                        + poolSize
-                        + " to "
-                        + newPoolSize
-                        + "; ignoring to preserve single thread-pool lifecycle.");
-              }
+                "[NODE-DEBUG] Creating ThreadPool with size " + poolSize + " for node " + myId);
+            try {
+              pool = new ThreadPool(poolSize, taskQueue, stats, myId);
+              System.out.println("[NODE-DEBUG] ThreadPool created successfully");
               Log.info(
-                  "Overlay updated. Successor="
+                  "Overlay set. Successor="
                       + state.getSuccessor()
                       + " Predecessor="
                       + state.getPredecessor()
-                      + " (pool size locked: "
+                      + " poolSize="
                       + poolSize
-                      + ")");
+                      + " ringSize="
+                      + state.getRingSize());
+            } catch (IllegalArgumentException e) {
+              System.out.println("[NODE-DEBUG] ThreadPool creation failed: " + e.getMessage());
+              Log.error("Invalid pool size: " + e.getMessage());
+              pool = null;
+            } catch (Exception e) {
+              System.out.println(
+                  "[NODE-DEBUG] Unexpected error creating ThreadPool: "
+                      + e.getClass().getName()
+                      + " - "
+                      + e.getMessage());
+              e.printStackTrace(System.out);
+              pool = null;
             }
+          } else {
+
+            if (poolSize != newPoolSize) {
+              Log.warn(
+                  "Overlay requested pool size change from "
+                      + poolSize
+                      + " to "
+                      + newPoolSize
+                      + "; ignoring to preserve single thread-pool lifecycle.");
+            }
+            Log.info(
+                "Overlay updated. Successor="
+                    + state.getSuccessor()
+                    + " Predecessor="
+                    + state.getPredecessor()
+                    + " (pool size locked: "
+                    + poolSize
+                    + ") ringSize="
+                    + state.getRingSize());
           }
+
+          if (roundAggregator == null) {
+            roundAggregator = new RoundAggregator(myId, state);
+          }
+          if (loadBalancer == null) {
+            loadBalancer =
+                new LoadBalancer(
+                    myId, taskQueue, stats, state, PUSH_THRESHOLD, PULL_THRESHOLD, MIN_BATCH_SIZE);
+            Log.info(
+                "[INIT] LoadBalancer initialized with pushThreshold="
+                    + PUSH_THRESHOLD
+                    + ", pullThreshold="
+                    + PULL_THRESHOLD);
+          }
+
+          System.out.println(
+              "[NODE-OVERLAY] OVERLAY processing complete for "
+                  + myId
+                  + ", pool="
+                  + (pool != null ? "initialized" : "null"));
 
         } else if (msg.startsWith(Protocol.START)) {
           int rounds = Integer.parseInt(msg.split(" ")[1]);
@@ -241,6 +207,9 @@ public class ComputeNode {
           WaitUtil.waitUntilDrained(taskQueue, stats);
           WaitUtil.waitForQuiescence(
               () -> taskQueue.size(), () -> stats.getInFlight(), 5000, 60000);
+
+          // Flush stdout to ensure all printed tasks are visible before sending stats
+          System.out.flush();
 
           sendStatsToRegistry();
 

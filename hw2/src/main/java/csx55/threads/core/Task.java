@@ -81,9 +81,9 @@ public class Task implements java.io.Serializable {
 
   @Override
   public String toString() {
-    return ip
-        + ":"
-        + port
+
+    String nodeId = (minedAt != null) ? minedAt : (ip + ":" + port);
+    return nodeId
         + ":"
         + roundNumber
         + ":"
