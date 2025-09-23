@@ -10,6 +10,7 @@ import csx55.threads.util.Protocol;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.ArrayList;
 
 public class Registry {
 
@@ -178,8 +179,20 @@ public class Registry {
             String[] parts = msg.split(" ");
             String nodeId = parts[1];
             Stats stats = (Stats) in.readObject();
+            System.out.println(
+                "[DEBUG] STATS message received from "
+                    + nodeId
+                    + " (nodes.size="
+                    + nodes.size()
+                    + ")");
             aggregator.record(nodeId, stats);
             synchronized (nodes) {
+              System.out.println(
+                  "[DEBUG] Checking if ready to print final stats (have "
+                      + aggregator.size()
+                      + " of "
+                      + nodes.size()
+                      + " nodes)");
               aggregator.printFinalIfReady(new ArrayList<>(nodes));
             }
           }

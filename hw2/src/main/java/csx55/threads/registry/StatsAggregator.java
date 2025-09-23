@@ -19,6 +19,15 @@ public class StatsAggregator {
 
   public void record(String nodeId, Stats stats) {
     statsByNode.put(nodeId, stats);
+
+    int expected = stats.getGenerated() + stats.getPulled() - stats.getPushed();
+    System.out.println("[DEBUG] Stats received from " + nodeId + ":");
+    System.out.println("  Generated: " + stats.getGenerated());
+    System.out.println("  Pulled: " + stats.getPulled());
+    System.out.println("  Pushed: " + stats.getPushed());
+    System.out.println("  Completed: " + stats.getCompleted());
+    System.out.println("  Expected (gen+pulled-pushed): " + expected);
+    System.out.println("  Match: " + (stats.getCompleted() == expected));
   }
 
   public int size() {
@@ -41,6 +50,15 @@ public class StatsAggregator {
     long totalPulled = statsByNode.values().stream().mapToLong(Stats::getPulled).sum();
     long totalPushed = statsByNode.values().stream().mapToLong(Stats::getPushed).sum();
     long totalCompleted = statsByNode.values().stream().mapToLong(Stats::getCompleted).sum();
+
+    long totalExpected = totalGenerated + totalPulled - totalPushed;
+    System.out.println("[DEBUG] Final stats verification:");
+    System.out.println("  Total generated: " + totalGenerated);
+    System.out.println("  Total pulled: " + totalPulled);
+    System.out.println("  Total pushed: " + totalPushed);
+    System.out.println("  Total completed: " + totalCompleted);
+    System.out.println("  Total expected: " + totalExpected);
+    System.out.println("  Totals match: " + (totalCompleted == totalExpected));
 
     for (String node : nodes) {
       Stats s = statsByNode.get(node);

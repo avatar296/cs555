@@ -71,17 +71,19 @@ public class Task implements java.io.Serializable {
     return migrated;
   }
 
+  public String getMinedAt() {
+    return minedAt;
+  }
+
   public byte[] toBytes() {
     return toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
   }
 
   @Override
   public String toString() {
-    String nodeIp = minedAt.split(":")[0];
-    String nodePort = minedAt.split(":")[1];
-    return nodeIp
+    return ip
         + ":"
-        + nodePort
+        + port
         + ":"
         + roundNumber
         + ":"
