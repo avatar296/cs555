@@ -131,8 +131,14 @@ replay:
 spark-consume:
 	docker exec spark-master /opt/spark/bin/spark-submit \
 		--master spark://spark-master:7077 \
-		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
 		--conf spark.jars.ivy=/tmp/.ivy2 \
+		--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+		--conf spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog \
+		--conf spark.sql.catalog.spark_catalog.type=hive \
+		--conf spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.local.type=hadoop \
+		--conf spark.sql.catalog.local.warehouse=s3a://lakehouse/iceberg \
 		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
 		--conf spark.hadoop.fs.s3a.access.key=admin \
 		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
@@ -150,6 +156,17 @@ spark-consume:
 spark-ui:
 	@echo "Opening Spark Master UI..."
 	@open http://localhost:8081 2>/dev/null || xdg-open http://localhost:8081 2>/dev/null || echo "Visit http://localhost:8081"
+
+# -------- DuckDB Query Engine --------
+.PHONY: query-duckdb install-duckdb
+
+install-duckdb:
+	@echo "Installing DuckDB and dependencies..."
+	pip install -r requirements-query.txt
+
+query-duckdb:
+	@echo "Querying Iceberg tables with DuckDB..."
+	python query_duckdb.py
 
 # -------- Clean up --------
 .PHONY: clean clean-checkpoint

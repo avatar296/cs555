@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Spark Streaming Consumer - Kafka -> Parquet (MinIO)
+Spark Streaming Consumer - Kafka -> Iceberg (MinIO)
 - Reads Avro-encoded messages from Kafka (Confluent wire format)
 - Performs windowed aggregations
-- Writes directly to Parquet files (partitioned by date and hour)
+- Writes to Iceberg table (partitioned by date)
 """
 
 from pyspark.sql import SparkSession
@@ -22,8 +22,13 @@ KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "trips.yellow")
 SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://schema-registry:8081")
 SCHEMA_SUBJECT = os.getenv("SCHEMA_SUBJECT", "trips.yellow-value")
 
-# Parquet output path
-PARQUET_PATH = os.getenv("PARQUET_PATH", "s3a://lakehouse/parquet/trips_aggregated")
+# Iceberg catalog configuration
+ICEBERG_CATALOG = os.getenv("ICEBERG_CATALOG", "local")
+ICEBERG_DB = os.getenv("ICEBERG_DB", "db")
+ICEBERG_TABLE = os.getenv("ICEBERG_TABLE", "trips_aggregated")
+TABLE_NAME = f"{ICEBERG_CATALOG}.{ICEBERG_DB}.{ICEBERG_TABLE}"
+
+WAREHOUSE = os.getenv("WAREHOUSE", "s3a://lakehouse/iceberg")
 
 # MinIO / S3A
 S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://minio:9000")
@@ -32,35 +37,27 @@ S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "admin123")
 S3_SSL = os.getenv("S3_SSL", "false").lower()  # "false" for http
 
 # Checkpoints
-CHECKPOINT_PARQUET = os.getenv(
-    "CHECKPOINT_PARQUET", "/opt/spark/work-dir/checkpoint/trips_parquet"
+CHECKPOINT_ICEBERG = os.getenv(
+    "CHECKPOINT_ICEBERG", "/opt/spark/work-dir/checkpoint/trips_iceberg"
 )
 
 # Trigger cadence
 TRIGGER_CONSOLE = os.getenv("TRIGGER_CONSOLE", "10 seconds")
-TRIGGER_PARQUET = os.getenv("TRIGGER_PARQUET", "30 seconds")  # Reduced for testing
+TRIGGER_ICEBERG = os.getenv("TRIGGER_ICEBERG", "30 seconds")
 
 # Stream source sizing
 MAX_OFFSETS_PER_TRIGGER = int(os.getenv("MAX_OFFSETS_PER_TRIGGER", "10000"))
 
 
 def create_spark_session():
-    """Create Spark session with Kafka, Avro, and S3/MinIO configured."""
+    """Create Spark session with Kafka, Avro, Iceberg, and S3/MinIO configured."""
     spark = (
         SparkSession.builder.appName("KafkaStreamingConsumer")
         # Keep logs sane; adaptive is disabled for streaming anyway
         .config("spark.sql.adaptive.enabled", "false")
-        # Use RocksDB state store
-        .config(
-            "spark.sql.streaming.stateStore.providerClass",
-            "org.apache.spark.sql.execution.streaming.state.RocksDBStateStoreProvider",
-        )
-        .config(
-            "spark.sql.streaming.stateStore.rocksdb.changelogCheckpointing.enabled",
-            "true",
-        )
+        # Use default state store provider (HDFSBackedStateStoreProvider)
+        # Removed RocksDB due to compatibility issues with complete output mode
         .config("spark.sql.streaming.stateStore.stateSchemaCheck", "false")
-        .config("spark.sql.streaming.stateStore.rocksdb.compactOnCommit", "true")
         # Session timezone for consistent date/hour derivation
         .config("spark.sql.session.timeZone", "UTC")
         # === Required jars ===
@@ -69,11 +66,19 @@ def create_spark_session():
             ",".join(
                 [
                     "org.apache.spark:spark-avro_2.12:3.5.0",
+                    "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2",
                     "org.apache.hadoop:hadoop-aws:3.3.4",
                     "com.amazonaws:aws-java-sdk-bundle:1.12.262",
                 ]
             ),
         )
+        # === Iceberg catalog ===
+        .config(
+            f"spark.sql.catalog.{ICEBERG_CATALOG}",
+            "org.apache.iceberg.spark.SparkCatalog",
+        )
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.type", "hadoop")
+        .config(f"spark.sql.catalog.{ICEBERG_CATALOG}.warehouse", WAREHOUSE)
         # === MinIO/S3A ===
         .config("spark.hadoop.fs.s3a.endpoint", S3_ENDPOINT)
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
@@ -108,51 +113,32 @@ def fetch_latest_schema(schema_registry_url: str, subject: str) -> str:
         sys.exit(1)
 
 
-def write_parquet_batch(batch_df, batch_id):
-    """Write batch DataFrame to partitioned Parquet files."""
-    print(f"[DEBUG] Batch {batch_id}: foreachBatch called")
+def ensure_db_exists(spark: SparkSession, catalog: str, db: str):
+    """Create Iceberg namespace if it doesn't exist."""
+    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {catalog}.{db}")
 
+
+def ensure_table_exists(spark: SparkSession, full_table_name: str, schema_df):
+    """Create Iceberg table if it doesn't exist, partitioned by date."""
     try:
-        # Check if DataFrame is empty (more efficient than count)
-        if not batch_df.isEmpty():
-            # Persist to avoid recomputation
-            batch_df.persist()
-
-            # Get record count for logging
-            record_count = batch_df.count()
-            print(f"[DEBUG] Batch {batch_id}: Processing {record_count} records")
-
-            # Show sample data for debugging
-            print(f"[DEBUG] Batch {batch_id}: Sample data:")
-            batch_df.show(5, truncate=False)
-
-            # Repartition to control file count (2-4 files per partition)
-            optimized_df = batch_df.coalesce(2)
-
-            # Write to Parquet with partitioning
-            print(f"[DEBUG] Batch {batch_id}: Writing to {PARQUET_PATH}")
-            optimized_df.write \
-                .mode("append") \
-                .partitionBy("date", "hour") \
-                .option("maxRecordsPerFile", 100000) \
-                .parquet(PARQUET_PATH)
-
-            # Log batch write success
-            print(f"✓ Batch {batch_id}: Successfully wrote {record_count} records to {PARQUET_PATH}")
-
-            # Unpersist to free memory
-            batch_df.unpersist()
-        else:
-            print(f"[DEBUG] Batch {batch_id}: Empty batch, skipping write")
-
-    except Exception as e:
-        print(f"✗ Batch {batch_id}: Error writing Parquet: {e}")
-        import traceback
-        traceback.print_exc()
+        spark.table(full_table_name)
+        print(f"Table {full_table_name} already exists")
+    except Exception:
+        print(f"Creating Iceberg table {full_table_name} ...")
+        (
+            spark.createDataFrame([], schema_df.schema)
+            .writeTo(full_table_name)
+            .using("iceberg")
+            .partitionedBy("date")  # Partition by date to avoid small file explosion
+            .tableProperty("write.target-file-size-bytes", "134217728")  # 128MB target
+            .tableProperty("write.distribution-mode", "hash")
+            .createOrReplace()
+        )
+        print(f"✓ Created {full_table_name} (partitioned by date)")
 
 
 def main():
-    print("Starting Kafka Streaming Consumer → Parquet (UTC partitioning by date/hour)")
+    print("Starting Kafka Streaming Consumer → Iceberg (UTC partitioning by date)")
     print("Press Ctrl+C to stop\n")
 
     spark = create_spark_session()
@@ -218,9 +204,10 @@ def main():
         .filter(F.col("event_timestamp").isNotNull())
     )
 
-    # 5) Windowed stats (UTC); watermark tightened to 5 minutes
+    # 5) Windowed stats (UTC); watermark set to 30 seconds for faster results
     windowed_stats = (
-        processed_df.withWatermark("event_timestamp", "5 minutes")
+        processed_df.filter(F.col("event_timestamp").isNotNull())
+        .withWatermark("event_timestamp", "30 seconds")
         .groupBy(
             F.window(F.col("event_timestamp"), "30 seconds", "10 seconds"),
             F.col("distance_category"),
@@ -237,7 +224,7 @@ def main():
             F.date_format(F.col("window.start"), "yyyy-MM-dd").alias(
                 "date"
             ),  # partition key (UTC)
-            F.hour(F.col("window.start")).alias("hour"),  # non-partition column
+            F.hour(F.col("window.start")).alias("hour"),  # hour for analysis, not partitioning
             F.col("distance_category"),
             F.col("trip_count"),
             F.round(F.col("avg_distance"), 2).alias("avg_distance"),
@@ -246,8 +233,9 @@ def main():
         )
     )
 
-    # 6) Parquet output path info
-    print(f"Parquet output path: {PARQUET_PATH}")
+    # 6) Ensure namespace/table exist
+    ensure_db_exists(spark, ICEBERG_CATALOG, ICEBERG_DB)
+    ensure_table_exists(spark, TABLE_NAME, windowed_stats)
 
     # 7) Console sink (visibility)
     console_query = (
@@ -258,36 +246,32 @@ def main():
         .start()
     )
 
-    # 8) Parquet sink using foreachBatch
-    print(f"[DEBUG] Setting up Parquet writer with trigger: {TRIGGER_PARQUET}")
-    parquet_query = (
+    # 8) Iceberg sink (complete mode - writes entire aggregation state)
+    iceberg_query = (
         windowed_stats.writeStream
-        .outputMode("append")
-        .foreachBatch(write_parquet_batch)
-        .option("checkpointLocation", CHECKPOINT_PARQUET)
-        .trigger(processingTime=TRIGGER_PARQUET)
-        .start()
+        .outputMode("complete")  # Complete mode for aggregations with Iceberg
+        .option("checkpointLocation", CHECKPOINT_ICEBERG)
+        .trigger(processingTime=TRIGGER_ICEBERG)
+        .toTable(TABLE_NAME)
     )
-    print(f"[DEBUG] Parquet query started with checkpoint: {CHECKPOINT_PARQUET}")
 
     print("\n" + "=" * 72)
     print(f"Streaming started: reading Kafka topic: {KAFKA_TOPIC}")
-    print("Window: 30s, slide: 10s | Watermark: 5m (UTC)")
-    print(f"Writing to Parquet path: {PARQUET_PATH}")
-    print("Partitioning: by date and hour")
-    print(f"Checkpoint: {CHECKPOINT_PARQUET}")
-    print(f"Trigger interval: {TRIGGER_PARQUET}")
+    print("Window: 30s, slide: 10s | Watermark: 30s (UTC)")
+    print(f"Writing to Iceberg table: {TABLE_NAME} (using complete mode)")
+    print(f"Warehouse: {WAREHOUSE}")
+    print(f"Checkpoint: {CHECKPOINT_ICEBERG}")
     print("Spark UI: http://localhost:8081")
     print("MinIO Console: http://localhost:9001 (admin/admin123)")
     print("=" * 72 + "\n")
 
     try:
         console_query.awaitTermination()
-        parquet_query.awaitTermination()
+        iceberg_query.awaitTermination()
     except KeyboardInterrupt:
         print("\nShutting down ...")
         console_query.stop()
-        parquet_query.stop()
+        iceberg_query.stop()
         spark.stop()
         print("Stopped cleanly")
 
