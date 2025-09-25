@@ -149,8 +149,6 @@ spark-consume:
 		--conf spark.executor.cores=2 \
 		--conf spark.executor.memory=1g \
 		--conf spark.dynamicAllocation.enabled=false \
-		--conf spark.sql.streaming.stateStore.providerClass=org.apache.spark.sql.execution.streaming.state.RocksDBStateStoreProvider \
-		--conf spark.sql.streaming.stateStore.rocksdb.changelogCheckpointing.enabled=true \
 		/opt/spark/work-dir/consumer.py
 
 spark-ui:
