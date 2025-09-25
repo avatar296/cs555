@@ -1,102 +1,79 @@
 # =========================
-# CityScale Makefile
+# CityScale (local Compose)
 # =========================
-# Place this file at: cityscale/Makefile
-# Requires: docker, docker compose
-# Optional: local spark-submit in PATH (for the `stream` target)
 
-# -------- Settings (override via env or CLI: make VAR=val) --------
 COMPOSE        ?= docker compose
 PYTHON         ?= python
 PIP            ?= pip
+VENV_DIR       ?= .venv
 
 # Kafka / Topic
-KAFKA_BROKER   ?= localhost:9092
+KAFKA_BROKER   ?= localhost:9092    # from host; use kafka:9092 inside containers
 TOPIC          ?= trips.yellow
 PARTITIONS     ?= 12
 REPLICATION    ?= 1
 
-# Producer scope & behavior
-DATASET        ?= yellow           # yellow|green|fhv|fhvhv
-YEARS          ?= 2024             # e.g., "2024" or "2023,2024"
-MONTHS         ?= 06,07,08         # blank => all months
-RATE           ?= 2000             # messages/sec
-BATCH          ?= 2000
-SALT_KEYS      ?= 8                # 0 => no salting
-KEY_MODE       ?= pu               # pu|how_pu
-P_LATE         ?= 0.00             # fraction 0..1
-LATE_MIN       ?= 300              # seconds
-LATE_MAX       ?= 1200             # seconds
-
-# MinIO (S3-compatible) sink
-MINIO_HOST     ?= localhost:9000
-MINIO_ACCESS   ?= admin
-MINIO_SECRET   ?= admin12345
-S3_BUCKET      ?= cityscale
-S3A_ENDPOINT   ?= http://minio:9000    # inside containers, service name is "minio"
-
-# Spark & Delta
+# Spark
 SPARK_SUBMIT   ?= spark-submit
+SPARK_MASTER   ?= spark://localhost:7077   # Spark master from host
 SPARK_PACKAGES ?= org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,io.delta:delta-spark_2.12:3.2.0
-DELTA_VER      ?= 3.2.0
 
-# Python venv dir
-VENV_DIR       ?= .venv
+# Producer scope & behavior
+DATASET        ?= yellow
+YEARS          ?= 2024
+MONTHS         ?= 06,07,08
+RATE           ?= 2000
+BATCH          ?= 2000
+SALT_KEYS      ?= 8
+KEY_MODE       ?= pu
+P_LATE         ?= 0.00
+LATE_MIN       ?= 300
+LATE_MAX       ?= 1200
 
-# -----------------------------------------------------------------
-# Help
-# -----------------------------------------------------------------
+# Local output paths (since MinIO is commented out)
+CHK_DIR        ?= /tmp/cityscale/chk
+DELTA_PU       ?= /tmp/cityscale/delta/pu_hour
+DELTA_OD       ?= /tmp/cityscale/delta/od_hour
+
+# -------- Help --------
 .PHONY: help
 help:
+	@echo "Targets:"
+	@echo "  up              - start services"
+	@echo "  up10            - start services and scale to 10 Spark workers"
+	@echo "  down            - stop services"
+	@echo "  logs            - tail compose logs"
+	@echo "  create-topic    - create Kafka topic ($(TOPIC))"
+	@echo "  venv install    - create venv and install replayer deps"
+	@echo "  replay          - run DuckDB->Kafka producer (from host)"
+	@echo "  stream          - run Spark consumer (file:// sink under /tmp)"
+	@echo "  clean           - remove venv and caches"
 	@echo ""
-	@echo "CityScale Makefile — common tasks"
-	@echo "------------------------------------------------------------"
-	@echo "make up                 # start Kafka, Kafka-UI, MinIO"
-	@echo "make down               # stop all containers"
-	@echo "make logs               # tail logs"
-	@echo "make create-topic       # create Kafka topic ($(TOPIC))"
-	@echo "make create-bucket      # create MinIO bucket ($(S3_BUCKET))"
-	@echo "make venv install       # create venv & install replayer deps"
-	@echo "make replay             # run DuckDB -> Kafka producer"
-	@echo "make stream             # run Spark Structured Streaming job (local spark-submit)"
-	@echo "make stream-dry         # print spark-submit command only"
-	@echo "make clean              # remove venv and Python caches"
-	@echo ""
-	@echo "Override defaults: make TOPIC=trips.yellow YEARS=2024 MONTHS=01,02 RATE=5000 replay"
-	@echo ""
+	@echo "Override: make TOPIC=trips.yellow YEARS=2024 MONTHS=01,02 RATE=5000 replay"
 
-# -----------------------------------------------------------------
-# Stack lifecycle
-# -----------------------------------------------------------------
-.PHONY: up down logs reset
+# -------- Compose lifecycle --------
+.PHONY: up up10 down logs
 up:
-	$(COMPOSE) up -d
+	$(COMPOSE) up -d --wait
+
+up10: up
+	$(COMPOSE) up -d --scale spark-worker=10
 
 down:
-	$(COMPOSE) down
+	$(COMPOSE) down -v
 
 logs:
 	$(COMPOSE) logs -f --tail=200
 
-reset: down up
-
-# -----------------------------------------------------------------
-# Infra: topic & bucket
-# -----------------------------------------------------------------
-.PHONY: create-topic create-bucket
+# -------- Kafka topic --------
+.PHONY: create-topic
 create-topic:
 	docker run --rm --network host confluentinc/cp-kafka:7.6.1 \
 	  kafka-topics --bootstrap-server $(KAFKA_BROKER) \
 	  --create --if-not-exists --topic $(TOPIC) \
 	  --partitions $(PARTITIONS) --replication-factor $(REPLICATION)
 
-create-bucket:
-	docker run --rm --network host -e MC_HOST_local=http://$(MINIO_ACCESS):$(MINIO_SECRET)@$(MINIO_HOST) \
-	  minio/mc:latest mb -p local/$(S3_BUCKET) || true
-
-# -----------------------------------------------------------------
-# Python environment for producer
-# -----------------------------------------------------------------
+# -------- Python env (producer) --------
 .PHONY: venv install
 venv:
 	$(PYTHON) -m venv $(VENV_DIR)
@@ -107,9 +84,7 @@ install: venv
 	$(PIP) install --upgrade pip && \
 	$(PIP) install -r replayer/requirements.txt
 
-# -----------------------------------------------------------------
-# Producer (DuckDB -> Kafka)
-# -----------------------------------------------------------------
+# -------- Producer (DuckDB -> Kafka) --------
 .PHONY: replay
 replay:
 	. $(VENV_DIR)/bin/activate && \
@@ -127,37 +102,10 @@ replay:
 	LATE_MAX=$(LATE_MAX) \
 	python replayer/producer.py
 
-# -----------------------------------------------------------------
-# Streaming job (Spark → Delta on MinIO)
-# Assumes you have streaming/spark_job.py implemented to read from Kafka and write Delta
-# -----------------------------------------------------------------
-.PHONY: stream stream-dry
+# -------- Spark consumer (Kafka -> Delta on local disk) --------
+.PHONY: stream
 stream:
 	$(SPARK_SUBMIT) \
+	  --master $(SPARK_MASTER) \
 	  --packages $(SPARK_PACKAGES) \
-	  --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension \
-	  --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog \
-	  --conf spark.hadoop.fs.s3a.endpoint=$(S3A_ENDPOINT) \
-	  --conf spark.hadoop.fs.s3a.access.key=$(MINIO_ACCESS) \
-	  --conf spark.hadoop.fs.s3a.secret.key=$(MINIO_SECRET) \
-	  --conf spark.hadoop.fs.s3a.path.style.access=true \
-	  --conf spark.sql.shuffle.partitions=200 \
-	  streaming/spark_job.py \
-	  --kafka.bootstrap $(KAFKA_BROKER) \
-	  --topic $(TOPIC) \
-	  --checkpoint s3a://$(S3_BUCKET)/chk/pu_hour/ \
-	  --output s3a://$(S3_BUCKET)/delta/pu_hour/
-
-stream-dry:
-	@echo "$(SPARK_SUBMIT) --packages $(SPARK_PACKAGES) ..." && \
-	echo "  --conf spark.hadoop.fs.s3a.endpoint=$(S3A_ENDPOINT)" && \
-	echo "  --conf spark.hadoop.fs.s3a.access.key=$(MINIO_ACCESS)" && \
-	echo "  --conf spark.hadoop.fs.s3a.secret.key=$(MINIO_SECRET)" && \
-	echo "  streaming/spark_job.py --kafka.bootstrap $(KAFKA_BROKER) --topic $(TOPIC) --checkpoint s3a://$(S3_BUCKET)/chk/pu_hour/ --output s3a://$(S3_BUCKET)/delta/pu_hour/"
-
-# -----------------------------------------------------------------
-# Utilities
-# -----------------------------------------------------------------
-.PHONY: clean
-clean:
-	rm -rf $(VENV_DIR) **/__pycache__ **/*.pyc .pytest_cache
+	  --conf spark.sql.extensions=io
