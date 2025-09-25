@@ -4,7 +4,8 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 
 public final class Log {
-  private Log() {}
+  private Log() {
+  }
 
   private static final boolean QUIET = !Boolean.getBoolean("cs555.verbose");
 
@@ -17,15 +18,16 @@ public final class Log {
   }
 
   public static void info(String msg) {
-    if (!QUIET) System.out.println("[INFO] " + ts() + " [" + thread() + "] " + msg);
+    if (!QUIET)
+      System.out.println("[INFO] " + ts() + " [" + thread() + "] " + msg);
   }
 
   public static void warn(String msg) {
-    if (!QUIET) System.out.println("[WARN] " + ts() + " [" + thread() + "] " + msg);
+    if (!QUIET)
+      System.out.println("[WARN] " + ts() + " [" + thread() + "] " + msg);
   }
 
   public static void error(String msg) {
-    // Always print errors regardless of QUIET setting
     System.out.println("[ERROR] " + ts() + " [" + thread() + "] " + msg);
   }
 }
