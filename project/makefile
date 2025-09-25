@@ -29,16 +29,17 @@ LATE_MAX       ?= 1200
 .PHONY: help
 help:
 	@echo "Targets:"
-	@echo "  up              - start Kafka services"
+	@echo "  up              - start Kafka and Spark services"
 	@echo "  down            - stop services and remove volumes"
 	@echo "  logs            - tail compose logs"
 	@echo "  kafka-topics    - list all Kafka topics"
 	@echo "  kafka-describe  - describe topic details (default: trips.yellow)"
-	@echo "  kafka-consume   - sample 10 messages from topic"
 	@echo "  kafka-offsets   - show partition offsets for topic"
 	@echo "  kafka-delete-topic - delete a topic"
 	@echo "  install         - create venv and install producer dependencies"
 	@echo "  replay          - run DuckDB->Kafka producer (from host)"
+	@echo "  spark-consume   - run Spark streaming consumer"
+	@echo "  spark-ui        - open Spark Master UI in browser"
 	@echo "  clean           - remove venv and caches"
 	@echo ""
 	@echo "Override: make TOPIC=trips.yellow YEARS=2024 MONTHS=01,02 RATE=5000 replay"
@@ -55,7 +56,7 @@ logs:
 	$(COMPOSE) logs -f --tail=200
 
 # -------- Kafka utilities --------
-.PHONY: kafka-topics kafka-describe kafka-consume kafka-offsets kafka-delete-topic
+.PHONY: kafka-topics kafka-describe kafka-offsets kafka-delete-topic
 
 kafka-topics:
 	docker exec kafka /opt/bitnami/kafka/bin/kafka-topics.sh \
@@ -66,18 +67,12 @@ kafka-describe:
 		--bootstrap-server localhost:9092 \
 		--describe --topic $(TOPIC)
 
-kafka-consume:
-	docker exec kafka /opt/bitnami/kafka/bin/kafka-console-consumer.sh \
-		--bootstrap-server localhost:9092 \
-		--topic $(TOPIC) \
-		--from-beginning \
-		--max-messages 10
-
 kafka-offsets:
-	docker exec kafka /opt/bitnami/kafka/bin/kafka-run-class.sh \
-		kafka.tools.GetOffsetShell \
-		--broker-list localhost:9092 \
-		--topic $(TOPIC)
+	@echo "Getting consumer groups and offsets..."
+	@docker exec kafka /opt/bitnami/kafka/bin/kafka-consumer-groups.sh \
+		--bootstrap-server localhost:9092 \
+		--all-groups \
+		--describe || echo "No active consumer groups found"
 
 kafka-delete-topic:
 	docker exec kafka /opt/bitnami/kafka/bin/kafka-topics.sh \
@@ -112,6 +107,32 @@ replay:
 	LATE_MIN=$(LATE_MIN) \
 	LATE_MAX=$(LATE_MAX) \
 	python replayer/producer.py
+
+# -------- Spark streaming --------
+.PHONY: spark-consume spark-ui
+
+spark-consume:
+	docker exec spark-master /opt/spark/bin/spark-submit \
+		--master spark://spark-master:7077 \
+		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
+		--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+		--conf spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog \
+		--conf spark.sql.catalog.spark_catalog.type=hive \
+		--conf spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.local.type=hadoop \
+		--conf spark.sql.catalog.local.warehouse=/tmp/iceberg/warehouse \
+		--conf spark.executor.instances=2 \
+		--conf spark.executor.cores=2 \
+		--conf spark.executor.memory=1g \
+		--conf spark.dynamicAllocation.enabled=false \
+		--conf spark.sql.streaming.stateStore.providerClass=org.apache.spark.sql.execution.streaming.state.RocksDBStateStoreProvider \
+		--conf spark.sql.streaming.stateStore.rocksdb.changelogCheckpointing.enabled=true \
+		/opt/spark/work-dir/consumer.py
+
+spark-ui:
+	@echo "Opening Spark Master UI..."
+	@open http://localhost:8081 2>/dev/null || xdg-open http://localhost:8081 2>/dev/null || echo "Visit http://localhost:8081"
 
 # -------- Clean up --------
 .PHONY: clean
