@@ -11,18 +11,21 @@ Deps: pip install confluent-kafka duckdb pyarrow
 import os
 import sys
 import time
-import json
 import signal
 import random
 import duckdb
 from datetime import datetime, timedelta
 from confluent_kafka import Producer
+from confluent_kafka.serialization import SerializationContext, MessageField
+from confluent_kafka.schema_registry import SchemaRegistryClient
+from confluent_kafka.schema_registry.avro import AvroSerializer
 
 # -----------------------
 # Config (env or defaults)
 # -----------------------
 BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
 TOPIC = os.getenv("TOPIC", "trips.yellow")
+SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8082")
 
 # Replay scope
 DATASET = os.getenv("DATASET", "yellow")  # yellow | green | fhv | fhvhv
@@ -68,6 +71,20 @@ def build_urls(dataset: str, years: str, months: str):
         for m in range(1, 13)
     ]
 
+
+# Load Avro schema from file
+def load_schema():
+    """Load the Avro schema from file (required)."""
+    import pathlib
+    schema_path = pathlib.Path(__file__).parent.parent / "schemas" / "trip_event.avsc"
+
+    if schema_path.exists():
+        with open(schema_path, 'r') as f:
+            return f.read()
+    else:
+        print(f"✗ Schema file not found: {schema_path}", file=sys.stderr)
+        print("  Please ensure schemas/trip_event.avsc exists", file=sys.stderr)
+        sys.exit(1)
 
 def make_producer():
     conf = {
@@ -130,6 +147,27 @@ def main():
 
     prod = make_producer()
 
+    # Setup Schema Registry and Avro serializer (required)
+    schema_str = load_schema()
+
+    try:
+        schema_registry_conf = {'url': SCHEMA_REGISTRY_URL}
+        schema_registry_client = SchemaRegistryClient(schema_registry_conf)
+
+        # Auto-register schema if not exists
+        avro_serializer = AvroSerializer(
+            schema_registry_client,
+            schema_str,
+            conf={'auto.register.schemas': True}
+        )
+        print(f"✓ Connected to Schema Registry at {SCHEMA_REGISTRY_URL}", file=sys.stderr)
+        print(f"✓ Using Avro serialization with schema evolution support", file=sys.stderr)
+    except Exception as e:
+        print(f"✗ Failed to connect to Schema Registry: {e}", file=sys.stderr)
+        print(f"  Please ensure Schema Registry is running at {SCHEMA_REGISTRY_URL}", file=sys.stderr)
+        print("  Run: make up", file=sys.stderr)
+        sys.exit(1)
+
     # metrics
     stats = {"sent": 0, "delivered": 0, "failed": 0, "start": time.time()}
     stop = {"flag": False}
@@ -148,8 +186,11 @@ def main():
 
     def send_buf():
         for k, v in buf:
+            # Encode key and value appropriately
+            key_bytes = k.encode("utf-8") if k else None
+            val_bytes = v if isinstance(v, bytes) else v.encode("utf-8")
             prod.produce(
-                TOPIC, key=k, value=v, callback=lambda e, m: delivery_cb(e, m, stats)
+                TOPIC, key=key_bytes, value=val_bytes, callback=lambda e, m: delivery_cb(e, m, stats)
             )
         prod.flush()  # enforce backpressure per batch
         buf.clear()
@@ -178,7 +219,13 @@ def main():
                 "do": int(do or 0),
                 "dist": float(dist or 0.0),
             }
-            buf.append((key, json.dumps(payload)))
+
+            # Serialize with Avro
+            val = avro_serializer(
+                payload, SerializationContext(TOPIC, MessageField.VALUE)
+            )
+
+            buf.append((key, val))
             stats["sent"] += 1
 
             if len(buf) >= BATCH:

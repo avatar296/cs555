@@ -1,0 +1,28 @@
+{
+  "type": "record",
+  "name": "TripEvent",
+  "namespace": "com.cityscale.events",
+  "doc": "NYC TLC trip event with pickup, dropoff, and distance information",
+  "fields": [
+    {
+      "name": "ts",
+      "type": "string",
+      "doc": "Event timestamp in ISO-8601 format"
+    },
+    {
+      "name": "pu",
+      "type": "int",
+      "doc": "Pickup location ID"
+    },
+    {
+      "name": "do",
+      "type": "int",
+      "doc": "Dropoff location ID"
+    },
+    {
+      "name": "dist",
+      "type": "double",
+      "doc": "Trip distance in miles"
+    }
+  ]
+}

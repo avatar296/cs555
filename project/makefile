@@ -36,18 +36,24 @@ help:
 	@echo "  kafka-describe  - describe topic details (default: trips.yellow)"
 	@echo "  kafka-offsets   - show partition offsets for topic"
 	@echo "  kafka-delete-topic - delete a topic"
+	@echo "  schema-register - register/update Avro schemas in Schema Registry"
+	@echo "  schema-list     - list all registered schemas"
 	@echo "  install         - create venv and install producer dependencies"
 	@echo "  replay          - run DuckDB->Kafka producer (from host)"
 	@echo "  spark-consume   - run Spark streaming consumer"
 	@echo "  spark-ui        - open Spark Master UI in browser"
 	@echo "  clean           - remove venv and caches"
+	@echo "  clean-checkpoint - remove Spark checkpoint and state data"
 	@echo ""
 	@echo "Override: make TOPIC=trips.yellow YEARS=2024 MONTHS=01,02 RATE=5000 replay"
 
 # -------- Compose lifecycle --------
 .PHONY: up down logs
 up:
-	$(COMPOSE) up -d --wait
+	$(COMPOSE) up -d --wait --wait-timeout 30 || true
+	@echo "Waiting for Schema Registry to be ready..."
+	@sleep 5
+	$(MAKE) schema-register
 
 down:
 	$(COMPOSE) down -v
@@ -78,6 +84,17 @@ kafka-delete-topic:
 	docker exec kafka /opt/bitnami/kafka/bin/kafka-topics.sh \
 		--bootstrap-server localhost:9092 \
 		--delete --topic $(TOPIC)
+
+# -------- Schema Registry --------
+.PHONY: schema-register schema-list
+
+schema-register:
+	. $(VENV_DIR)/bin/activate && \
+	python schemas/register_schemas.py
+
+schema-list:
+	@echo "Registered schemas:"
+	@curl -s http://localhost:8082/subjects | python -m json.tool || echo "Schema Registry not available"
 
 # -------- Python env (producer) --------
 .PHONY: venv install
@@ -114,14 +131,14 @@ replay:
 spark-consume:
 	docker exec spark-master /opt/spark/bin/spark-submit \
 		--master spark://spark-master:7077 \
-		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2 \
+		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.hadoop:hadoop-aws:3.3.4 \
 		--conf spark.jars.ivy=/tmp/.ivy2 \
-		--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
-		--conf spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog \
-		--conf spark.sql.catalog.spark_catalog.type=hive \
-		--conf spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog \
-		--conf spark.sql.catalog.local.type=hadoop \
-		--conf spark.sql.catalog.local.warehouse=/tmp/iceberg/warehouse \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		--conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+		--conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
 		--conf spark.executor.instances=2 \
 		--conf spark.executor.cores=2 \
 		--conf spark.executor.memory=1g \
@@ -135,8 +152,16 @@ spark-ui:
 	@open http://localhost:8081 2>/dev/null || xdg-open http://localhost:8081 2>/dev/null || echo "Visit http://localhost:8081"
 
 # -------- Clean up --------
-.PHONY: clean
+.PHONY: clean clean-checkpoint
+
 clean:
 	rm -rf $(VENV_DIR)
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+
+clean-checkpoint:
+	@echo "Cleaning Spark checkpoint and state data..."
+	docker exec spark-master rm -rf /opt/spark/work-dir/checkpoint/* 2>/dev/null || true
+	docker exec spark-master rm -rf /tmp/checkpoint/* 2>/dev/null || true
+	docker exec spark-master rm -rf /tmp/state-store/* 2>/dev/null || true
+	@echo "Checkpoint data cleared"
