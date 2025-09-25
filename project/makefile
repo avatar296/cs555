@@ -3,20 +3,15 @@
 # =========================
 
 COMPOSE        ?= docker compose
-PYTHON         ?= python
+PYTHON         ?= python3
 PIP            ?= pip
 VENV_DIR       ?= .venv
 
 # Kafka / Topic
-KAFKA_BROKER   ?= localhost:9092    # from host; use kafka:9092 inside containers
+KAFKA_BROKER   ?= localhost:29092    # from host; use kafka:9092 inside containers
 TOPIC          ?= trips.yellow
 PARTITIONS     ?= 12
 REPLICATION    ?= 1
-
-# Spark
-SPARK_SUBMIT   ?= spark-submit
-SPARK_MASTER   ?= spark://localhost:7077   # Spark master from host
-SPARK_PACKAGES ?= org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,io.delta:delta-spark_2.12:3.2.0
 
 # Producer scope & behavior
 DATASET        ?= yellow
@@ -30,34 +25,28 @@ P_LATE         ?= 0.00
 LATE_MIN       ?= 300
 LATE_MAX       ?= 1200
 
-# Local output paths (since MinIO is commented out)
-CHK_DIR        ?= /tmp/cityscale/chk
-DELTA_PU       ?= /tmp/cityscale/delta/pu_hour
-DELTA_OD       ?= /tmp/cityscale/delta/od_hour
-
 # -------- Help --------
 .PHONY: help
 help:
 	@echo "Targets:"
-	@echo "  up              - start services"
-	@echo "  up10            - start services and scale to 10 Spark workers"
-	@echo "  down            - stop services"
+	@echo "  up              - start Kafka services"
+	@echo "  down            - stop services and remove volumes"
 	@echo "  logs            - tail compose logs"
-	@echo "  create-topic    - create Kafka topic ($(TOPIC))"
-	@echo "  venv install    - create venv and install replayer deps"
+	@echo "  kafka-topics    - list all Kafka topics"
+	@echo "  kafka-describe  - describe topic details (default: trips.yellow)"
+	@echo "  kafka-consume   - sample 10 messages from topic"
+	@echo "  kafka-offsets   - show partition offsets for topic"
+	@echo "  kafka-delete-topic - delete a topic"
+	@echo "  install         - create venv and install producer dependencies"
 	@echo "  replay          - run DuckDB->Kafka producer (from host)"
-	@echo "  stream          - run Spark consumer (file:// sink under /tmp)"
 	@echo "  clean           - remove venv and caches"
 	@echo ""
 	@echo "Override: make TOPIC=trips.yellow YEARS=2024 MONTHS=01,02 RATE=5000 replay"
 
 # -------- Compose lifecycle --------
-.PHONY: up up10 down logs
+.PHONY: up down logs
 up:
 	$(COMPOSE) up -d --wait
-
-up10: up
-	$(COMPOSE) up -d --scale spark-worker=10
 
 down:
 	$(COMPOSE) down -v
@@ -65,13 +54,35 @@ down:
 logs:
 	$(COMPOSE) logs -f --tail=200
 
-# -------- Kafka topic --------
-.PHONY: create-topic
-create-topic:
-	docker run --rm --network host confluentinc/cp-kafka:7.6.1 \
-	  kafka-topics --bootstrap-server $(KAFKA_BROKER) \
-	  --create --if-not-exists --topic $(TOPIC) \
-	  --partitions $(PARTITIONS) --replication-factor $(REPLICATION)
+# -------- Kafka utilities --------
+.PHONY: kafka-topics kafka-describe kafka-consume kafka-offsets kafka-delete-topic
+
+kafka-topics:
+	docker exec kafka /opt/bitnami/kafka/bin/kafka-topics.sh \
+		--bootstrap-server localhost:9092 --list
+
+kafka-describe:
+	docker exec kafka /opt/bitnami/kafka/bin/kafka-topics.sh \
+		--bootstrap-server localhost:9092 \
+		--describe --topic $(TOPIC)
+
+kafka-consume:
+	docker exec kafka /opt/bitnami/kafka/bin/kafka-console-consumer.sh \
+		--bootstrap-server localhost:9092 \
+		--topic $(TOPIC) \
+		--from-beginning \
+		--max-messages 10
+
+kafka-offsets:
+	docker exec kafka /opt/bitnami/kafka/bin/kafka-run-class.sh \
+		kafka.tools.GetOffsetShell \
+		--broker-list localhost:9092 \
+		--topic $(TOPIC)
+
+kafka-delete-topic:
+	docker exec kafka /opt/bitnami/kafka/bin/kafka-topics.sh \
+		--bootstrap-server localhost:9092 \
+		--delete --topic $(TOPIC)
 
 # -------- Python env (producer) --------
 .PHONY: venv install
@@ -102,10 +113,9 @@ replay:
 	LATE_MAX=$(LATE_MAX) \
 	python replayer/producer.py
 
-# -------- Spark consumer (Kafka -> Delta on local disk) --------
-.PHONY: stream
-stream:
-	$(SPARK_SUBMIT) \
-	  --master $(SPARK_MASTER) \
-	  --packages $(SPARK_PACKAGES) \
-	  --conf spark.sql.extensions=io
+# -------- Clean up --------
+.PHONY: clean
+clean:
+	rm -rf $(VENV_DIR)
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true

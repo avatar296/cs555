@@ -116,17 +116,17 @@ def main():
 
     query = f"""
     SELECT
-      tpepPickupDatetime      AS ts,
+      tpep_pickup_datetime    AS ts,
       PULocationID            AS pu,
       DOLocationID            AS do,
       trip_distance           AS dist
     FROM read_parquet(?, filename=true)
     WHERE trip_distance BETWEEN {MIN_DIST} AND {MAX_DIST}
-      AND tpepDropoffDatetime > tpepPickupDatetime
+      AND tpep_dropoff_datetime > tpep_pickup_datetime
     ORDER BY ts
     """
 
-    cur = con.execute(query, [urls]).cursor
+    result = con.execute(query, [urls])
 
     prod = make_producer()
 
@@ -155,7 +155,7 @@ def main():
         buf.clear()
 
     while not stop["flag"]:
-        rows = cur.fetchmany(CHUNK_ROWS)
+        rows = result.fetchmany(CHUNK_ROWS)
         if not rows:
             break
         for ts, pu, do, dist in rows:
