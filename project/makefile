@@ -15,7 +15,7 @@ REPLICATION    ?= 1
 
 # Producer scope & behavior
 DATASET        ?= yellow
-YEARS          ?= 2024
+YEARS          ?= 2023
 MONTHS         ?= 06,07,08
 RATE           ?= 2000
 BATCH          ?= 2000
@@ -24,6 +24,10 @@ KEY_MODE       ?= pu
 P_LATE         ?= 0.00
 LATE_MIN       ?= 300
 LATE_MAX       ?= 1200
+
+# Synthetic data configuration
+SYNTHETIC_MODE ?= fallback    # none|fallback|mixed|synthetic
+SYNTHETIC_RATIO ?= 0.2        # For mixed mode: ratio of synthetic data
 
 # -------- Help --------
 .PHONY: help
@@ -39,7 +43,12 @@ help:
 	@echo "  schema-register - register/update Avro schemas in Schema Registry"
 	@echo "  schema-list     - list all registered schemas"
 	@echo "  install         - create venv and install producer dependencies"
-	@echo "  replay          - run DuckDB->Kafka producer (from host)"
+	@echo "  produce-trips   - run taxi trips producer"
+	@echo "  produce-weather - run weather data producer"
+	@echo "  produce-events  - run events data producer"
+	@echo "  start-producers - start all producers in background"
+	@echo "  stop-producers  - stop all running producers"
+	@echo "  producer-status - show status of running producers"
 	@echo "  spark-consume   - run Spark streaming consumer"
 	@echo "  spark-ui        - open Spark Master UI in browser"
 	@echo "  clean           - remove venv and caches"
@@ -105,11 +114,12 @@ venv:
 install: venv
 	. $(VENV_DIR)/bin/activate && \
 	$(PIP) install --upgrade pip && \
-	$(PIP) install -r replayer/requirements.txt
+	$(PIP) install -r requirements.txt
 
-# -------- Producer (DuckDB -> Kafka) --------
-.PHONY: replay
-replay:
+# -------- Data Producers --------
+.PHONY: produce-trips produce-weather produce-events start-producers stop-producers producer-status
+
+produce-trips:
 	. $(VENV_DIR)/bin/activate && \
 	KAFKA_BOOTSTRAP=$(KAFKA_BROKER) \
 	TOPIC=$(TOPIC) \
@@ -123,7 +133,50 @@ replay:
 	P_LATE=$(P_LATE) \
 	LATE_MIN=$(LATE_MIN) \
 	LATE_MAX=$(LATE_MAX) \
-	python replayer/producer.py
+	SYNTHETIC_MODE=$(SYNTHETIC_MODE) \
+	SYNTHETIC_RATIO=$(SYNTHETIC_RATIO) \
+	python data/producers/trips_producer.py
+
+produce-weather:
+	. $(VENV_DIR)/bin/activate && \
+	KAFKA_BOOTSTRAP=$(KAFKA_BROKER) \
+	TOPIC=weather.updates \
+	YEAR=$(YEARS) \
+	MONTHS="$(MONTHS)" \
+	python data/producers/weather_producer.py
+
+produce-events:
+	. $(VENV_DIR)/bin/activate && \
+	KAFKA_BOOTSTRAP=$(KAFKA_BROKER) \
+	TOPIC=events.calendar \
+	YEAR=$(YEARS) \
+	MONTHS="$(MONTHS)" \
+	python data/producers/events_producer.py
+
+start-producers:
+	@echo "Starting all data producers..."
+	$(MAKE) produce-trips &
+	$(MAKE) produce-weather &
+	$(MAKE) produce-events &
+	@echo "All producers started in background"
+	@echo "Use 'make producer-status' to see running producers"
+	@echo "Use 'make stop-producers' to stop all producers"
+
+stop-producers:
+	@echo "Stopping all Python producers..."
+	@pkill -f "python data/producers/trips_producer.py" || true
+	@pkill -f "python data/producers/weather_producer.py" || true
+	@pkill -f "python data/producers/events_producer.py" || true
+	@echo "All producers stopped"
+
+producer-status:
+	@echo "Active Python producers:"
+	@ps aux | grep -E "python data/producers/(trips|weather|events)_producer.py" | grep -v grep || echo "No producers running"
+	@echo ""
+	@echo "Kafka topic status:"
+	@docker exec kafka /opt/bitnami/kafka/bin/kafka-consumer-groups.sh \
+		--bootstrap-server localhost:9092 \
+		--all-groups --describe 2>/dev/null | head -20 || echo "No active consumers"
 
 # -------- Spark streaming --------
 .PHONY: spark-consume spark-ui

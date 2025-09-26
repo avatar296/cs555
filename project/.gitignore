@@ -39,7 +39,10 @@ iceberg-warehouse/
 # Data files (if storing locally)
 *.parquet
 *.csv
-data/
+data/zones/taxi_zone_lookup.csv
+data/zones/taxi_zones.geojson
+data/zones/*.csv
+data/zones/*.json
 
 # Temporary files
 tmp/
