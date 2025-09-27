@@ -199,6 +199,17 @@ public class ComputeNode {
 
         } else if (msg.startsWith(Protocol.START)) {
           int rounds = Integer.parseInt(msg.split(" ")[1]);
+
+          if (pool == null && poolSize > 0) {
+            try {
+              pool = new ThreadPool(poolSize, taskQueue, stats, myId);
+              Log.info("Thread pool recreated with size " + poolSize);
+            } catch (IllegalArgumentException e) {
+              Log.error("Cannot recreate thread pool: " + e.getMessage());
+              return;
+            }
+          }
+
           if (pool == null) {
             Log.error("Cannot start rounds: thread pool not initialized (invalid pool size?)");
             return;
@@ -210,6 +221,11 @@ public class ComputeNode {
           WaitUtil.waitUntilDrained(taskQueue, stats);
           WaitUtil.waitForQuiescence(
               () -> taskQueue.size(), () -> stats.getInFlight(), 5000, 60000);
+
+          if (pool != null) {
+            pool.shutdown();
+            pool = null;
+          }
 
           System.out.flush();
 
