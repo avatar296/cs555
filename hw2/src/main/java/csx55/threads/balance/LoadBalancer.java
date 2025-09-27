@@ -51,8 +51,7 @@ public class LoadBalancer {
       int migrateCount = Math.max(minBatchSize, myOutstanding / 2);
       Log.info("[PUSH] Attempting to push " + migrateCount + " tasks to " + successor);
       List<Task> raw = taskQueue.removeBatch(migrateCount);
-      if (raw == null || raw.isEmpty())
-        return;
+      if (raw == null || raw.isEmpty()) return;
 
       for (Task t : raw) {
         t.markMigrated();
@@ -106,8 +105,7 @@ public class LoadBalancer {
         List<Task> toShare = taskQueue.removeBatch(shareCount);
         if (toShare != null && !toShare.isEmpty()) {
           for (Task t : toShare) {
-            if (!t.isMigrated())
-              t.markMigrated();
+            if (!t.isMigrated()) t.markMigrated();
           }
           try {
             NetworkUtil.sendTasks(requestingNode, toShare);

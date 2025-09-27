@@ -32,7 +32,8 @@ public class ComputeNode {
   private static final int PUSH_THRESHOLD = Config.getInt("cs555.pushThreshold", 100);
   private static final int PULL_THRESHOLD = Config.getInt("cs555.pullThreshold", 30);
   private static final int MIN_BATCH_SIZE = Config.getInt("cs555.minBatchSize", 50);
-  private static final long BALANCE_CHECK_INTERVAL = Config.getLong("cs555.balanceCheckInterval", 100);
+  private static final long BALANCE_CHECK_INTERVAL =
+      Config.getLong("cs555.balanceCheckInterval", 100);
 
   private final String registryHost;
   private final int registryPort;
@@ -48,6 +49,7 @@ public class ComputeNode {
   private final OverlayState state = new OverlayState();
   private volatile RoundAggregator roundAggregator;
   private volatile LoadBalancer loadBalancer;
+  private volatile boolean acceptingTasks = true;
 
   public ComputeNode(String registryHost, int registryPort) {
     this.registryHost = registryHost;
@@ -85,22 +87,22 @@ public class ComputeNode {
     }
 
     new Thread(
-        () -> {
-          System.out.println("[NODE-START] Accept thread started for " + myId);
-          try {
-            while (running) {
-              Socket sock = serverSocket.accept();
-              new Thread(() -> handleMessage(sock)).start();
-            }
-          } catch (IOException e) {
-            if (running) {
-              System.out.println("[NODE-ERROR] Accept thread died: " + e.getMessage());
-              e.printStackTrace(System.out);
-            }
-          }
-          System.out.println("[NODE-START] Accept thread exiting for " + myId);
-        },
-        "ComputeNode-AcceptLoop")
+            () -> {
+              System.out.println("[NODE-START] Accept thread started for " + myId);
+              try {
+                while (running) {
+                  Socket sock = serverSocket.accept();
+                  new Thread(() -> handleMessage(sock)).start();
+                }
+              } catch (IOException e) {
+                if (running) {
+                  System.out.println("[NODE-ERROR] Accept thread died: " + e.getMessage());
+                  e.printStackTrace(System.out);
+                }
+              }
+              System.out.println("[NODE-START] Accept thread exiting for " + myId);
+            },
+            "ComputeNode-AcceptLoop")
         .start();
   }
 
@@ -108,14 +110,12 @@ public class ComputeNode {
     try {
       PushbackInputStream pin = new PushbackInputStream(sock.getInputStream());
       int first = pin.read();
-      if (first == -1)
-        return;
+      if (first == -1) return;
       pin.unread(first);
 
       try (ObjectInputStream in = new ObjectInputStream(pin)) {
         Object obj = in.readObject();
-        if (!(obj instanceof String))
-          return;
+        if (!(obj instanceof String)) return;
 
         String msg = (String) obj;
 
@@ -181,8 +181,9 @@ public class ComputeNode {
             roundAggregator = new RoundAggregator(myId, state);
           }
           if (loadBalancer == null) {
-            loadBalancer = new LoadBalancer(
-                myId, taskQueue, stats, state, PUSH_THRESHOLD, PULL_THRESHOLD, MIN_BATCH_SIZE);
+            loadBalancer =
+                new LoadBalancer(
+                    myId, taskQueue, stats, state, PUSH_THRESHOLD, PULL_THRESHOLD, MIN_BATCH_SIZE);
             Log.info(
                 "[INIT] LoadBalancer initialized with pushThreshold="
                     + PUSH_THRESHOLD
@@ -204,6 +205,8 @@ public class ComputeNode {
           }
           runRounds(rounds);
 
+          acceptingTasks = false;
+
           WaitUtil.waitUntilDrained(taskQueue, stats);
           WaitUtil.waitForQuiescence(
               () -> taskQueue.size(), () -> stats.getInFlight(), 5000, 60000);
@@ -212,23 +215,30 @@ public class ComputeNode {
 
           sendStatsToRegistry();
 
+          acceptingTasks = true;
+
         } else if (msg.startsWith(Protocol.TASKS)) {
+          if (!acceptingTasks) {
+            Log.warn("Ignoring TASKS message - not accepting tasks after rounds complete");
+            return;
+          }
           @SuppressWarnings("unchecked")
           java.util.List<Task> batch = (java.util.List<Task>) in.readObject();
-          for (Task t : batch)
-            t.markMigrated();
+          for (Task t : batch) t.markMigrated();
           taskQueue.addBatch(batch);
           stats.incrementPulled(batch.size());
 
         } else if (msg.startsWith(Protocol.PULL_REQUEST)) {
+          if (!acceptingTasks) {
+            Log.warn("Ignoring PULL_REQUEST - not accepting tasks after rounds complete");
+            return;
+          }
           String[] parts = msg.split(" ");
           String requestingNode = parts[1];
           int capacity = Integer.parseInt(parts[2]);
-          if (loadBalancer != null)
-            loadBalancer.handlePullRequest(requestingNode, capacity);
+          if (loadBalancer != null) loadBalancer.handlePullRequest(requestingNode, capacity);
         } else if (msg.startsWith(Protocol.GEN)) {
-          if (roundAggregator != null)
-            roundAggregator.handleGenMessage(msg);
+          if (roundAggregator != null) roundAggregator.handleGenMessage(msg);
         }
       }
     } catch (EOFException e) {
@@ -276,7 +286,6 @@ public class ComputeNode {
           loadBalancer.balanceThresholdBased();
         }
       }
-
     }
 
     WaitUtil.waitUntilDrained(taskQueue, stats);
@@ -287,6 +296,11 @@ public class ComputeNode {
     while (!Thread.currentThread().isInterrupted()) {
       try {
         Thread.sleep(BALANCE_CHECK_INTERVAL);
+
+        // Skip load balancing if not accepting tasks
+        if (!acceptingTasks) {
+          continue;
+        }
 
         int queueSize = taskQueue.size();
         int inFlight = stats.getInFlight();
