@@ -19,6 +19,7 @@ YEARS          ?= 2023        # Used by all producers (standardized)
 MONTHS         ?= 06,07,08    # Used by all producers (standardized)
 RATE           ?= 2000        # Messages per second (all producers)
 BATCH          ?= 2000        # Batch size (all producers)
+BURST_MODE     ?= false       # Set to true for max throughput (no realistic delays)
 SALT_KEYS      ?= 8           # Key salting for partitioning (all producers)
 KEY_MODE       ?= default     # Key generation mode (all producers)
 P_LATE         ?= 0.00        # Lateness injection probability (all producers)
@@ -126,6 +127,7 @@ install: venv
 
 produce-trips:
 	. $(VENV_DIR)/bin/activate && \
+	cd data && \
 	KAFKA_BOOTSTRAP=$(KAFKA_BROKER) \
 	TOPIC=$(TOPIC) \
 	DATASET=$(DATASET) \
@@ -133,6 +135,7 @@ produce-trips:
 	MONTHS="$(MONTHS)" \
 	RATE=$(RATE) \
 	BATCH=$(BATCH) \
+	BURST_MODE=$(BURST_MODE) \
 	SALT_KEYS=$(SALT_KEYS) \
 	KEY_MODE=$(KEY_MODE) \
 	P_LATE=$(P_LATE) \
@@ -140,16 +143,18 @@ produce-trips:
 	LATE_MAX=$(LATE_MAX) \
 	SYNTHETIC_MODE=$(SYNTHETIC_MODE) \
 	SYNTHETIC_RATIO=$(SYNTHETIC_RATIO) \
-	python data/producers/run_producer.py trips
+	python -m producers.run_producer trips
 
 produce-weather:
 	. $(VENV_DIR)/bin/activate && \
+	cd data && \
 	KAFKA_BOOTSTRAP=$(KAFKA_BROKER) \
 	TOPIC=weather.updates \
 	YEARS="$(YEARS)" \
 	MONTHS="$(MONTHS)" \
 	RATE=$(RATE) \
 	BATCH=$(BATCH) \
+	BURST_MODE=$(BURST_MODE) \
 	SALT_KEYS=$(SALT_KEYS) \
 	KEY_MODE=$(KEY_MODE) \
 	P_LATE=$(P_LATE) \
@@ -157,16 +162,18 @@ produce-weather:
 	LATE_MAX=$(LATE_MAX) \
 	SYNTHETIC_MODE=$(SYNTHETIC_MODE) \
 	SYNTHETIC_RATIO=$(SYNTHETIC_RATIO) \
-	python data/producers/run_producer.py weather
+	python -m producers.run_producer weather
 
 produce-events:
 	. $(VENV_DIR)/bin/activate && \
+	cd data && \
 	KAFKA_BOOTSTRAP=$(KAFKA_BROKER) \
 	TOPIC=events.calendar \
 	YEARS="$(YEARS)" \
 	MONTHS="$(MONTHS)" \
 	RATE=$(RATE) \
 	BATCH=$(BATCH) \
+	BURST_MODE=$(BURST_MODE) \
 	SALT_KEYS=$(SALT_KEYS) \
 	KEY_MODE=$(KEY_MODE) \
 	P_LATE=$(P_LATE) \
@@ -174,7 +181,7 @@ produce-events:
 	LATE_MAX=$(LATE_MAX) \
 	SYNTHETIC_MODE=$(SYNTHETIC_MODE) \
 	SYNTHETIC_RATIO=$(SYNTHETIC_RATIO) \
-	python data/producers/run_producer.py events
+	python -m producers.run_producer events
 
 start-producers:
 	@echo "Starting all data producers..."
@@ -187,14 +194,14 @@ start-producers:
 
 stop-producers:
 	@echo "Stopping all Python producers..."
-	@pkill -f "python data/producers/run_producer.py trips" || true
-	@pkill -f "python data/producers/run_producer.py weather" || true
-	@pkill -f "python data/producers/run_producer.py events" || true
+	@pkill -f "python -m producers.run_producer trips" || true
+	@pkill -f "python -m producers.run_producer weather" || true
+	@pkill -f "python -m producers.run_producer events" || true
 	@echo "All producers stopped"
 
 producer-status:
 	@echo "Active Python producers:"
-	@ps aux | grep -E "python data/producers/run_producer.py (trips|weather|events)" | grep -v grep || echo "No producers running"
+	@ps aux | grep -E "python -m producers.run_producer (trips|weather|events)" | grep -v grep || echo "No producers running"
 	@echo ""
 	@echo "Kafka topic status:"
 	@docker exec kafka /opt/bitnami/kafka/bin/kafka-consumer-groups.sh \

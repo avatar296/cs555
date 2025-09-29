@@ -114,6 +114,10 @@ class NYCTLCDataSource(TripDataSource, DatabaseSourceMixin):
 class SyntheticTripSource(TripDataSource, SyntheticSourceMixin):
     """Synthetic trip data generator."""
 
+    def is_available(self) -> bool:
+        """Synthetic data is always available."""
+        return True
+
     def fetch(self) -> Generator:
         """Generate synthetic trip data."""
         dates = generate_date_list(
@@ -126,6 +130,7 @@ class SyntheticTripSource(TripDataSource, SyntheticSourceMixin):
 
     def _generate_day_trips(self, date) -> Generator:
         """Generate trips for a single day."""
+        import time
         weather = self.scenarios.generate_weather_conditions(date)
         weather_impact = self.scenarios.WEATHER_IMPACTS.get(
             weather["conditions"],
@@ -142,12 +147,28 @@ class SyntheticTripSource(TripDataSource, SyntheticSourceMixin):
                 min_val=0
             ))
 
+            trips_this_hour = []
             for _ in range(num_trips):
-                yield self._generate_single_trip(
+                trip = self._generate_single_trip(
                     timestamp,
                     hour,
                     weather_impact
                 )
+                trips_this_hour.append(trip)
+
+            # Sort trips by dropoff time for realistic ordering
+            trips_this_hour.sort(key=lambda x: x.get('dropoff_datetime', ''))
+
+            # Yield trips with realistic timing
+            for i, trip in enumerate(trips_this_hour):
+                yield trip
+
+                # Add small delays to simulate trips completing throughout the hour
+                if not self.config.burst_mode and i < len(trips_this_hour) - 1:
+                    # Distribute trips across the hour (compressed time)
+                    # With ~100-500 trips per hour, use 1-5ms delays
+                    delay = 0.5 / max(len(trips_this_hour), 1)  # 500ms spread across all trips
+                    time.sleep(min(delay, 0.005))  # Cap at 5ms per trip
 
     def _generate_single_trip(self, timestamp, hour, weather_impact):
         """Generate a single trip record."""

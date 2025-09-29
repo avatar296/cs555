@@ -112,6 +112,21 @@ def get_weather_data_source(config) -> WeatherDataSource:
     Returns:
         Appropriate WeatherDataSource implementation
     """
+    # Check synthetic_mode configuration
+    if config.synthetic_mode == "synthetic":
+        return SyntheticWeatherSource(config)
+
+    # For fallback mode, test if data actually exists
+    # This will fall back to synthetic if NOAA has no data
+    if config.synthetic_mode == "fallback":
+        return get_data_source_with_fallback(
+            NOAAWeatherSource,
+            SyntheticWeatherSource,
+            config,
+            "weather data",
+            test_fetch=True  # Test that data actually exists
+        )
+
     return get_data_source_with_fallback(
         NOAAWeatherSource,
         SyntheticWeatherSource,
@@ -130,13 +145,21 @@ def get_event_data_source(config) -> EventDataSource:
     Returns:
         Appropriate EventDataSource implementation
     """
-    return get_data_source_with_fallback(
-        NYCOpenDataEventSource,
-        SyntheticEventSource,
-        config,
-        "events",
-        test_fetch=True  # Events need fetch testing due to year limitations
-    )
+    # Check synthetic_mode configuration
+    mode = getattr(config, 'synthetic_mode', 'fallback')
+
+    if mode == "synthetic":
+        return SyntheticEventSource(config)
+    elif mode == "none":
+        return NYCOpenDataEventSource(config)
+    else:  # fallback
+        return get_data_source_with_fallback(
+            NYCOpenDataEventSource,
+            SyntheticEventSource,
+            config,
+            "events",
+            test_fetch=True  # Events need fetch testing due to year limitations
+        )
 
 
 # Registry pattern for dynamic source lookup

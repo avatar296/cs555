@@ -71,7 +71,8 @@ class BaseProducer(ABC):
 
     def load_schema(self) -> str:
         """Load Avro schema from file."""
-        schema_path = Path(__file__).parent.parent.parent / "schemas" / self.schema_file
+        # Go up from producers/core/base.py to project root, then to schemas
+        schema_path = Path(__file__).parent.parent.parent.parent / "schemas" / self.schema_file
 
         if schema_path.exists():
             with open(schema_path, 'r') as f:
@@ -167,14 +168,31 @@ class BaseProducer(ABC):
         # Convert headers to list of tuples for Kafka
         kafka_headers = [(k, v.encode('utf-8') if v else b'') for k, v in default_headers.items()]
 
-        self.producer.produce(
-            self.topic,
-            key=key,
-            value=value,
-            headers=kafka_headers,
-            callback=self.delivery_callback
-        )
-        self.stats["sent"] += 1
+        try:
+            self.producer.produce(
+                self.topic,
+                key=key,
+                value=value,
+                headers=kafka_headers,
+                callback=self.delivery_callback
+            )
+            self.stats["sent"] += 1
+            # Poll to trigger any available callbacks
+            self.producer.poll(0)
+        except BufferError:
+            # Internal queue is full, need to wait for messages to be delivered
+            print(f"[WARNING] Producer buffer full, flushing...", file=sys.stderr)
+            self.producer.flush(timeout=5)
+            # Retry after flush
+            self.producer.produce(
+                self.topic,
+                key=key,
+                value=value,
+                headers=kafka_headers,
+                callback=self.delivery_callback
+            )
+            self.stats["sent"] += 1
+            self.producer.poll(0)
 
     def send_batch(self, records: list):
         """
@@ -190,7 +208,14 @@ class BaseProducer(ABC):
             else:
                 key, value = record
                 self.send_record(key, value)
-        self.producer.flush()
+
+        # Flush with timeout and check for unsent messages
+        remaining = self.producer.flush(timeout=10)
+        if remaining > 0:
+            print(f"[WARNING] {remaining} messages still in queue after flush", file=sys.stderr)
+
+        # Process any remaining callbacks
+        self.producer.poll(0)
 
     def print_metrics(self, additional_info: str = ""):
         """Print standardized metrics."""
@@ -254,7 +279,9 @@ class BaseProducer(ABC):
     def cleanup(self):
         """Cleanup producer resources."""
         if self.producer:
-            self.producer.flush()
+            remaining = self.producer.flush(timeout=30)
+            if remaining > 0:
+                print(f"[WARNING] {remaining} messages were not sent during cleanup", file=sys.stderr)
         self.print_summary(self.get_summary_info())
 
     def get_data_source_info(self) -> Tuple[str, bool]:
@@ -423,8 +450,10 @@ class BaseProducer(ABC):
 
         # Process loop
         last_print = time.time()
+        last_flush = time.time()
         batch = []
         batch_start = time.time()
+        messages_in_batch = 0
 
         for record in data_generator:
             if self.stop_flag:
@@ -439,21 +468,40 @@ class BaseProducer(ABC):
                 key, value = result
                 batch.append((key, value))
 
-            # Send batch when full
-            if len(batch) >= self.batch_size:
+            messages_in_batch += 1
+
+            # Debug output for first few messages
+            if self.stats["sent"] + messages_in_batch <= 5:
+                print(f"[DEBUG] Added message {self.stats['sent'] + messages_in_batch} to batch (batch size: {len(batch)})", file=sys.stderr)
+
+            # Check for periodic flush FIRST (before batch full check)
+            now = time.time()
+            if now - last_flush >= 2.0 and batch:
+                print(f"[DEBUG] Periodic flush: sending {len(batch)} messages", file=sys.stderr)
                 self.send_batch(batch)
                 self.rate_limit(len(batch), batch_start)
                 batch = []
+                messages_in_batch = 0
                 batch_start = time.time()
+                last_flush = now
+            # Send batch when full
+            elif len(batch) >= self.batch_size:
+                print(f"[DEBUG] Sending full batch of {len(batch)} messages", file=sys.stderr)
+                self.send_batch(batch)
+                self.rate_limit(len(batch), batch_start)
+                batch = []
+                messages_in_batch = 0
+                batch_start = time.time()
+                last_flush = time.time()
 
             # Periodic metrics
-            now = time.time()
             if now - last_print >= 10.0:
                 self.print_metrics()
                 last_print = now
 
         # Send remaining batch
         if batch:
+            print(f"[DEBUG] Final flush: sending {len(batch)} messages", file=sys.stderr)
             self.send_batch(batch)
 
         self.cleanup()

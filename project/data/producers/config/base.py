@@ -20,6 +20,7 @@ class BaseConfig:
     rate: float = 1000.0  # messages per second
     batch_size: int = 1000
     continuous_mode: bool = True  # Continue generating data when exhausted
+    burst_mode: bool = False  # If True, disable realistic timing delays
 
     # Synthetic data configuration (standardized across all producers)
     synthetic_mode: str = "fallback"  # none, fallback, synthetic, mixed
@@ -72,6 +73,7 @@ class BaseConfig:
             'rate': ('RATE', float, cls.rate if hasattr(cls, 'rate') else 1000.0),
             'batch_size': ('BATCH', int, cls.batch_size if hasattr(cls, 'batch_size') else 1000),
             'continuous_mode': ('CONTINUOUS', lambda x: x.lower() == "true", True),
+            'burst_mode': ('BURST_MODE', lambda x: x.lower() == "true", False),
             'synthetic_mode': ('SYNTHETIC_MODE', str, "fallback"),
             'synthetic_ratio': ('SYNTHETIC_RATIO', float, 0.2),
             'years': ('YEARS', str, "2023"),

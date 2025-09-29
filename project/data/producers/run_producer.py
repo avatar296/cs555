@@ -17,8 +17,8 @@ import sys
 import os
 import argparse
 
-from core import TripsProducer, WeatherProducer, EventsProducer
-from config import TripsConfig, WeatherConfig, EventsConfig
+from producers.core import TripsProducer, WeatherProducer, EventsProducer
+from producers.config import TripsConfig, WeatherConfig, EventsConfig
 
 
 def get_producer_class_and_config(producer_type: str):

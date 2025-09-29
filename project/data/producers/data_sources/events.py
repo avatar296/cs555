@@ -14,7 +14,8 @@ from .base import (
     DataSource,
     ConfigurableDataSource,
     DatabaseSourceMixin,
-    SyntheticSourceMixin
+    SyntheticSourceMixin,
+    ContinuousDataMixin
 )
 
 from ..utils import generate_date_list
@@ -31,7 +32,7 @@ class EventDataSource(ConfigurableDataSource, DataSource):
     pass
 
 
-class NYCOpenDataEventSource(EventDataSource, DatabaseSourceMixin):
+class NYCOpenDataEventSource(EventDataSource, DatabaseSourceMixin, ContinuousDataMixin):
     """Real NYC Open Data event source."""
 
     def is_available(self) -> bool:
@@ -52,9 +53,14 @@ class NYCOpenDataEventSource(EventDataSource, DatabaseSourceMixin):
 
     def fetch(self) -> Generator:
         """Fetch NYC event data."""
+        # Use first year from years list
+        years = self.config.years
+        year = years[0] if isinstance(years, list) else years
+        year = str(year).strip()
+
         query = f"""
         SELECT * FROM read_json_auto(
-            '{NYC_EVENTS_URL}?$limit=1000&$where=date_extract_y(start_date_time)={self.config.year}',
+            '{NYC_EVENTS_URL}?$limit=1000&$where=date_extract_y(start_date_time)={year}',
             maximum_object_size=100000000
         )
         """
@@ -66,7 +72,7 @@ class NYCOpenDataEventSource(EventDataSource, DatabaseSourceMixin):
         )
 
         if not result:
-            print(f"No NYC Open Data events found for year {self.config.year}",
+            print(f"No NYC Open Data events found for year {year}",
                   file=sys.stderr)
             print("NYC Open Data only has events for 2024-2026",
                   file=sys.stderr)
@@ -111,7 +117,7 @@ class NYCOpenDataEventSource(EventDataSource, DatabaseSourceMixin):
         return lat, lon
 
 
-class SyntheticEventSource(EventDataSource, SyntheticSourceMixin):
+class SyntheticEventSource(EventDataSource, SyntheticSourceMixin, ContinuousDataMixin):
     """Synthetic event data generator."""
 
     def __init__(self, config):
@@ -119,16 +125,54 @@ class SyntheticEventSource(EventDataSource, SyntheticSourceMixin):
         super().__init__(config)
         self.event_counter = 0
 
+    def is_available(self) -> bool:
+        """Synthetic data is always available."""
+        return True
+
     def fetch(self) -> Generator:
         """Generate synthetic event data."""
-        dates = generate_date_list(self.config.year)
+        import time
+        dates = generate_date_list(
+            self.config.years,
+            self.get_config_value('months', '')
+        )
 
-        for date in dates:
-            # Generate special events
-            yield from self._generate_special_events(date)
+        while True:
+            for date in dates:
+                # Collect all events for the day
+                daily_events = []
 
-            # Generate regular venue events
-            yield from self._generate_venue_events(date)
+                # Generate special events
+                for event in self._generate_special_events(date):
+                    daily_events.append(event)
+
+                # Generate regular venue events
+                for event in self._generate_venue_events(date):
+                    daily_events.append(event)
+
+                # Sort events by start time for realistic ordering
+                daily_events.sort(key=lambda x: x.get('start_time', ''))
+
+                # Yield events with realistic timing
+                for i, event in enumerate(daily_events):
+                    yield event
+
+                    # Add delays to simulate event announcements throughout the day
+                    if not self.config.burst_mode and i < len(daily_events) - 1:
+                        # Events are typically announced throughout the day
+                        # Use 100-200ms between event announcements
+                        time.sleep(0.15)
+
+                # Add delay between days
+                if not self.config.burst_mode and date != dates[-1]:
+                    time.sleep(0.5)  # 500ms between days
+
+            # Check if should continue
+            if not self.should_continue(self.config):
+                break
+
+            # Advance dates for next cycle
+            dates = [date + timedelta(days=365) for date in dates]
 
     def _generate_special_events(self, date) -> Generator:
         """Generate special events for specific dates."""
@@ -139,9 +183,10 @@ class SyntheticEventSource(EventDataSource, SyntheticSourceMixin):
 
     def _is_special_event_date(self, date, special_event) -> bool:
         """Check if date matches special event."""
+        # Use the year from the date we're checking
         special_date = special_event["date"].replace(
             "2023",
-            str(self.config.year)
+            str(date.year)
         )
         return date.strftime("%Y-%m-%d") == special_date
 

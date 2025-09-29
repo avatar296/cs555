@@ -61,7 +61,9 @@ class WeatherProducer(BaseProducer):
 
     def fetch_data(self) -> Generator:
         """Fetch weather data from configured source, respecting synthetic_mode."""
+        import time
         print(f"Data mode: {self.config.synthetic_mode}", file=sys.stderr)
+        print(f"[DEBUG] Starting fetch_data, data_source type: {type(self.data_source).__name__}", file=sys.stderr)
 
         # Check if source is available
         if (
@@ -71,19 +73,41 @@ class WeatherProducer(BaseProducer):
             print("Primary data source unavailable, using fallback", file=sys.stderr)
 
         # Get raw weather observations
+        count = 0
+        yielded = 0
+        print(f"[DEBUG] About to call data_source.fetch()", file=sys.stderr)
         for station_id, observation in self.data_source.fetch():
+            count += 1
+            if count == 1:
+                print(f"[DEBUG] First station_id from data source: {station_id}", file=sys.stderr)
+                print(f"[DEBUG] Sample station from mapper: {self.mapper.get_weather_station_for_zone(1)}", file=sys.stderr)
+                print(f"[DEBUG] Observation data: {observation}", file=sys.stderr)
+
             # Parse the observation
             base_weather = self.parse_observation(observation)
 
             # Generate weather for all zones associated with this station
+            zones_matched = 0
+            zones_for_batch = []
             for zone_id in range(1, 264):
                 if self.mapper.get_weather_station_for_zone(zone_id) == station_id:
+                    zones_matched += 1
                     weather_event = self.generate_zone_weather(
                         base_weather,
                         zone_id,
                         station_id
                     )
-                    yield weather_event
+                    zones_for_batch.append(weather_event)
+
+            # Yield zones with small delays to allow periodic flushes
+            for weather_event in zones_for_batch:
+                yielded += 1
+                if yielded <= 2:
+                    print(f"[DEBUG] Yielding weather event #{yielded} for zone {weather_event['zone_id']}", file=sys.stderr)
+                yield weather_event
+
+            if count == 1:
+                print(f"[DEBUG] Zones matched for station {station_id}: {zones_matched}", file=sys.stderr)
 
     def parse_observation(self, obs) -> dict:
         """
