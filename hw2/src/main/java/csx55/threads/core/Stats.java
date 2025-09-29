@@ -28,7 +28,6 @@ public class Stats implements Serializable {
     completed.incrementAndGet();
   }
 
-  // In-flight tracking used by workers
   public void incInFlight() {
     inFlight.incrementAndGet();
   }

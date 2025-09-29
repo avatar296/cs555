@@ -8,7 +8,6 @@ import csx55.threads.core.Task;
 import csx55.threads.core.TaskQueue;
 import csx55.threads.core.ThreadPool;
 import csx55.threads.util.Config;
-import csx55.threads.util.Log;
 import csx55.threads.util.NetworkUtil;
 import csx55.threads.util.NodeId;
 import csx55.threads.util.Protocol;
@@ -61,7 +60,6 @@ public class ComputeNode {
     String ip = InetAddress.getLocalHost().getHostAddress();
     int port = serverSocket.getLocalPort();
     myId = ip + ":" + port;
-    System.out.println("[NODE-START] ComputeNode started at " + myId);
 
     Runtime.getRuntime()
         .addShutdownHook(
@@ -74,21 +72,16 @@ public class ComputeNode {
                 },
                 "StdoutFlusher"));
 
-    System.out.println(
-        "[NODE-START] Registering with Registry at " + registryHost + ":" + registryPort);
     try (Socket sock = new Socket(registryHost, registryPort);
         ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream())) {
       out.writeObject(Protocol.REGISTER + " " + ip + " " + port);
       out.flush();
-      System.out.println("[NODE-START] Registration sent successfully");
     } catch (IOException e) {
-      System.out.println("[NODE-ERROR] Failed to register with Registry: " + e.getMessage());
       throw e;
     }
 
     new Thread(
             () -> {
-              System.out.println("[NODE-START] Accept thread started for " + myId);
               try {
                 while (running) {
                   Socket sock = serverSocket.accept();
@@ -96,11 +89,9 @@ public class ComputeNode {
                 }
               } catch (IOException e) {
                 if (running) {
-                  System.out.println("[NODE-ERROR] Accept thread died: " + e.getMessage());
-                  e.printStackTrace(System.out);
+                  e.printStackTrace();
                 }
               }
-              System.out.println("[NODE-START] Accept thread exiting for " + myId);
             },
             "ComputeNode-AcceptLoop")
         .start();
@@ -129,52 +120,17 @@ public class ComputeNode {
 
           if (pool == null) {
             poolSize = newPoolSize;
-            System.out.println(
-                "[NODE-DEBUG] Creating ThreadPool with size " + poolSize + " for node " + myId);
             try {
               pool = new ThreadPool(poolSize, taskQueue, stats, myId);
-              System.out.println("[NODE-DEBUG] ThreadPool created successfully");
-              Log.info(
-                  "Overlay set. Successor="
-                      + state.getSuccessor()
-                      + " Predecessor="
-                      + state.getPredecessor()
-                      + " poolSize="
-                      + poolSize
-                      + " ringSize="
-                      + state.getRingSize());
             } catch (IllegalArgumentException e) {
-              System.out.println("[NODE-DEBUG] ThreadPool creation failed: " + e.getMessage());
-              Log.error("Invalid pool size: " + e.getMessage());
               pool = null;
             } catch (Exception e) {
-              System.out.println(
-                  "[NODE-DEBUG] Unexpected error creating ThreadPool: "
-                      + e.getClass().getName()
-                      + " - "
-                      + e.getMessage());
-              e.printStackTrace(System.out);
+              e.printStackTrace();
               pool = null;
             }
           } else {
 
-            if (poolSize != newPoolSize) {
-              Log.warn(
-                  "Overlay requested pool size change from "
-                      + poolSize
-                      + " to "
-                      + newPoolSize
-                      + "; ignoring to preserve single thread-pool lifecycle.");
-            }
-            Log.info(
-                "Overlay updated. Successor="
-                    + state.getSuccessor()
-                    + " Predecessor="
-                    + state.getPredecessor()
-                    + " (pool size locked: "
-                    + poolSize
-                    + ") ringSize="
-                    + state.getRingSize());
+            if (poolSize != newPoolSize) {}
           }
 
           if (roundAggregator == null) {
@@ -184,18 +140,7 @@ public class ComputeNode {
             loadBalancer =
                 new LoadBalancer(
                     myId, taskQueue, stats, state, PUSH_THRESHOLD, PULL_THRESHOLD, MIN_BATCH_SIZE);
-            Log.info(
-                "[INIT] LoadBalancer initialized with pushThreshold="
-                    + PUSH_THRESHOLD
-                    + ", pullThreshold="
-                    + PULL_THRESHOLD);
           }
-
-          System.out.println(
-              "[NODE-OVERLAY] OVERLAY processing complete for "
-                  + myId
-                  + ", pool="
-                  + (pool != null ? "initialized" : "null"));
 
         } else if (msg.startsWith(Protocol.START)) {
           int rounds = Integer.parseInt(msg.split(" ")[1]);
@@ -203,15 +148,12 @@ public class ComputeNode {
           if (pool == null && poolSize > 0) {
             try {
               pool = new ThreadPool(poolSize, taskQueue, stats, myId);
-              Log.info("Thread pool recreated with size " + poolSize);
             } catch (IllegalArgumentException e) {
-              Log.error("Cannot recreate thread pool: " + e.getMessage());
               return;
             }
           }
 
           if (pool == null) {
-            Log.error("Cannot start rounds: thread pool not initialized (invalid pool size?)");
             return;
           }
           runRounds(rounds);
@@ -235,7 +177,6 @@ public class ComputeNode {
 
         } else if (msg.startsWith(Protocol.TASKS)) {
           if (!acceptingTasks) {
-            Log.warn("Ignoring TASKS message - not accepting tasks after rounds complete");
             return;
           }
           @SuppressWarnings("unchecked")
@@ -246,7 +187,6 @@ public class ComputeNode {
 
         } else if (msg.startsWith(Protocol.PULL_REQUEST)) {
           if (!acceptingTasks) {
-            Log.warn("Ignoring PULL_REQUEST - not accepting tasks after rounds complete");
             return;
           }
           String[] parts = msg.split(" ");
@@ -258,14 +198,8 @@ public class ComputeNode {
         }
       }
     } catch (EOFException e) {
-      System.out.println("[NODE-ERROR] EOF exception in handleMessage: " + e.getMessage());
     } catch (Exception e) {
-      System.out.println(
-          "[NODE-ERROR] Exception in handleMessage: "
-              + e.getClass().getName()
-              + " - "
-              + e.getMessage());
-      e.printStackTrace(System.out);
+      e.printStackTrace();
     } finally {
       try {
         sock.close();
@@ -313,7 +247,6 @@ public class ComputeNode {
       try {
         Thread.sleep(BALANCE_CHECK_INTERVAL);
 
-        // Skip load balancing if not accepting tasks
         if (!acceptingTasks) {
           continue;
         }
@@ -321,33 +254,11 @@ public class ComputeNode {
         int queueSize = taskQueue.size();
         int inFlight = stats.getInFlight();
 
-        Log.info(
-            "[BALANCE_CHECK] Queue: "
-                + queueSize
-                + ", InFlight: "
-                + inFlight
-                + ", PushThreshold: "
-                + PUSH_THRESHOLD
-                + ", PullThreshold: "
-                + PULL_THRESHOLD
-                + ", LoadBalancer: "
-                + (loadBalancer != null ? "initialized" : "null"));
-
         if (queueSize > PUSH_THRESHOLD && loadBalancer != null) {
-          Log.info(
-              "[BALANCE_CHECK] Triggering push - queue "
-                  + queueSize
-                  + " > threshold "
-                  + PUSH_THRESHOLD);
           loadBalancer.balanceThresholdBased();
         }
 
         if (queueSize < PULL_THRESHOLD && inFlight < poolSize / 2 && loadBalancer != null) {
-          Log.info(
-              "[BALANCE_CHECK] Triggering pull - queue "
-                  + queueSize
-                  + " < threshold "
-                  + PULL_THRESHOLD);
           loadBalancer.sendPullRequestIfIdle();
         }
       } catch (InterruptedException e) {
@@ -366,7 +277,6 @@ public class ComputeNode {
   }
 
   private void shutdown() {
-    Log.info("Shutting down ComputeNode...");
     running = false;
 
     try {
@@ -380,8 +290,6 @@ public class ComputeNode {
       WaitUtil.waitUntilDrained(taskQueue, stats);
       pool.shutdown();
     }
-
-    Log.info("ComputeNode shutdown complete.");
   }
 
   public static void main(String[] args) throws Exception {
@@ -396,13 +304,9 @@ public class ComputeNode {
         .addShutdownHook(
             new Thread(
                 () -> {
-                  System.out.println("[NODE-DEBUG] ComputeNode shutdown hook triggered!");
-                  Thread.dumpStack();
-                  Log.info("Shutdown signal received.");
                   node.shutdown();
                 }));
 
-    Log.info("ComputeNode started. Type 'quit' to shutdown gracefully.");
     try (BufferedReader console = new BufferedReader(new InputStreamReader(System.in))) {
       String line;
       while ((line = console.readLine()) != null) {
@@ -410,7 +314,6 @@ public class ComputeNode {
           node.shutdown();
           System.exit(0);
         } else if (!line.trim().isEmpty()) {
-          Log.warn("Unknown command: " + line + " | Available: quit");
         }
       }
     }

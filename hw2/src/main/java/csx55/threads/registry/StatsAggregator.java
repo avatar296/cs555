@@ -1,7 +1,6 @@
 package csx55.threads.registry;
 
 import csx55.threads.core.Stats;
-import csx55.threads.util.Log;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -19,15 +18,6 @@ public class StatsAggregator {
 
   public void record(String nodeId, Stats stats) {
     statsByNode.put(nodeId, stats);
-
-    int expected = stats.getGenerated() + stats.getPulled() - stats.getPushed();
-    System.out.println("[DEBUG] Stats received from " + nodeId + ":");
-    System.out.println("  Generated: " + stats.getGenerated());
-    System.out.println("  Pulled: " + stats.getPulled());
-    System.out.println("  Pushed: " + stats.getPushed());
-    System.out.println("  Completed: " + stats.getCompleted());
-    System.out.println("  Expected (gen+pulled-pushed): " + expected);
-    System.out.println("  Match: " + (stats.getCompleted() == expected));
   }
 
   public int size() {
@@ -51,28 +41,9 @@ public class StatsAggregator {
     long totalPushed = statsByNode.values().stream().mapToLong(Stats::getPushed).sum();
     long totalCompleted = statsByNode.values().stream().mapToLong(Stats::getCompleted).sum();
 
-    long totalExpected = totalGenerated + totalPulled - totalPushed;
-    System.out.println("[DEBUG] Final stats verification:");
-    System.out.println("  Total generated: " + totalGenerated);
-    System.out.println("  Total pulled: " + totalPulled);
-    System.out.println("  Total pushed: " + totalPushed);
-    System.out.println("  Total completed: " + totalCompleted);
-    System.out.println("  Total expected: " + totalExpected);
-    System.out.println("  Totals match: " + (totalCompleted == totalExpected));
-
     for (String node : nodes) {
       Stats s = statsByNode.get(node);
       if (s == null) continue;
-      int expectedCompleted = s.getGenerated() + s.getPulled() - s.getPushed();
-      if (s.getCompleted() != expectedCompleted) {
-        Log.warn(
-            "Stats invariant mismatch for "
-                + node
-                + ": completed="
-                + s.getCompleted()
-                + ", expected="
-                + expectedCompleted);
-      }
       double percent = (totalCompleted == 0) ? 0.0 : (100.0 * s.getCompleted()) / totalCompleted;
       System.out.printf(
           Locale.US,

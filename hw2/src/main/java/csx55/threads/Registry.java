@@ -3,7 +3,6 @@ package csx55.threads;
 import csx55.threads.core.Stats;
 import csx55.threads.registry.RegistryCommands;
 import csx55.threads.registry.StatsAggregator;
-import csx55.threads.util.Log;
 import csx55.threads.util.NetworkUtil;
 import csx55.threads.util.NodeId;
 import csx55.threads.util.Protocol;
@@ -35,12 +34,10 @@ public class Registry {
 
   public void start() throws IOException {
     serverSocket = new ServerSocket(port);
-    Log.info("Registry listening on port " + port);
 
     acceptThread =
         new Thread(
             () -> {
-              System.out.println("[REGISTRY-START] Accept thread started on port " + port);
               try {
                 while (running) {
                   Socket socket = serverSocket.accept();
@@ -48,11 +45,9 @@ public class Registry {
                 }
               } catch (IOException e) {
                 if (running) {
-                  System.out.println("[REGISTRY-ERROR] Accept thread died: " + e.getMessage());
-                  e.printStackTrace(System.out);
+                  e.printStackTrace();
                 }
               }
-              System.out.println("[REGISTRY-START] Accept thread exiting");
             });
     acceptThread.start();
 
@@ -76,66 +71,27 @@ public class Registry {
           };
 
       String line;
-      System.out.println("[DEBUG] Console reader ready, waiting for commands");
-      int loopCount = 0;
       while (true) {
-        System.out.println(
-            "[DEBUG] Console loop iteration " + (++loopCount) + ", about to read from console...");
         line = console.readLine();
         if (line == null) {
-          System.out.println("[DEBUG] Console readLine returned null (EOF detected)");
           break;
         }
-        System.out.println("[DEBUG] Console received line: '" + line + "'");
         boolean continueProcessing = false;
         try {
           continueProcessing = RegistryCommands.process(line, actions);
-          System.out.println(
-              "[DEBUG] Command processed, continue="
-                  + continueProcessing
-                  + ", current state="
-                  + state);
         } catch (Exception e) {
-          System.out.println(
-              "[DEBUG] Exception in command processing: "
-                  + e.getClass().getName()
-                  + " - "
-                  + e.getMessage());
-          e.printStackTrace(System.out);
+          e.printStackTrace();
         }
         if (!continueProcessing) {
-          System.out.println("[DEBUG] Breaking out of console loop");
           break;
         }
-        System.out.println(
-            "[DEBUG] Waiting for next command... (state="
-                + state
-                + ", accept thread alive="
-                + isAcceptThreadAlive()
-                + ")");
       }
-      System.out.println(
-          "[DEBUG] Console loop ended, line=" + (line == null ? "null (EOF)" : "'" + line + "'"));
-      System.out.println(
-          "[DEBUG] Final state="
-              + state
-              + ", running="
-              + running
-              + ", accept thread alive="
-              + isAcceptThreadAlive());
     } catch (Exception e) {
-      System.out.println(
-          "[DEBUG] Exception in console handling: "
-              + e.getClass().getName()
-              + " - "
-              + e.getMessage());
-      e.printStackTrace(System.out);
+      e.printStackTrace();
     }
   }
 
   private void handleConnection(Socket socket) {
-    System.out.println(
-        "[DEBUG] New connection from " + socket.getRemoteSocketAddress() + " at state=" + state);
     try {
       PushbackInputStream pin = new PushbackInputStream(socket.getInputStream());
       int first = pin.read();
@@ -149,13 +105,6 @@ public class Registry {
         Object obj = in.readObject();
         if (obj instanceof String) {
           String msg = (String) obj;
-          System.out.println(
-              "[DEBUG] Message received: '"
-                  + msg.substring(0, Math.min(msg.length(), 50))
-                  + "'"
-                  + (msg.length() > 50 ? "..." : "")
-                  + " at state="
-                  + state);
           if (msg.startsWith(Protocol.REGISTER)) {
             String[] parts = msg.split(" ");
             String ip = parts[1];
@@ -163,66 +112,35 @@ public class Registry {
             String id = NodeId.toId(ip, port);
             synchronized (nodes) {
               if (state != State.ACCEPTING) {
-                System.out.println(
-                    "[DEBUG] Late registration rejected for " + id + " (overlay already built)");
-                Log.warn("Late registration rejected for " + id + " (overlay already built)");
                 return;
               }
               if (!nodes.contains(id)) {
                 nodes.add(id);
-                System.out.println(
-                    "[DEBUG] Node registered: " + id + ", Total nodes: " + nodes.size());
               }
             }
-            Log.info("Node registered: " + id);
           } else if (msg.startsWith(Protocol.STATS)) {
             String[] parts = msg.split(" ");
             String nodeId = parts[1];
             Stats stats = (Stats) in.readObject();
-            System.out.println(
-                "[DEBUG] STATS message received from "
-                    + nodeId
-                    + " (nodes.size="
-                    + nodes.size()
-                    + ")");
             aggregator.record(nodeId, stats);
             synchronized (nodes) {
-              System.out.println(
-                  "[DEBUG] Checking if ready to print final stats (have "
-                      + aggregator.size()
-                      + " of "
-                      + nodes.size()
-                      + " nodes)");
               aggregator.printFinalIfReady(new ArrayList<>(nodes));
             }
           }
         }
       }
     } catch (EOFException e) {
-      System.out.println("[DEBUG] EOF on connection");
     } catch (Exception e) {
-      System.out.println(
-          "[DEBUG] Exception in handleConnection: "
-              + e.getClass().getName()
-              + " - "
-              + e.getMessage());
-      e.printStackTrace(System.out);
+      e.printStackTrace();
     } finally {
-      System.out.println(
-          "[DEBUG] Connection handler completed for " + socket.getRemoteSocketAddress());
     }
   }
 
   private void setupOverlay(int poolSize) {
     try {
-      System.out.println("[DEBUG] Setup-overlay started with pool size: " + poolSize);
       List<String> alive = new ArrayList<>();
       synchronized (nodes) {
-        System.out.println(
-            "[DEBUG] Current state: " + state + ", Registered nodes: " + nodes.size());
         if (state != State.ACCEPTING) {
-          System.out.println("[DEBUG] Overlay already built, ignoring setup-overlay command");
-          Log.warn("Overlay already built, ignoring setup-overlay command");
           return;
         }
         for (String node : nodes) {
@@ -231,16 +149,12 @@ public class Registry {
             probe.connect(new InetSocketAddress(nid.host(), nid.port()), 500);
             alive.add(node);
           } catch (IOException e) {
-            Log.warn("Pruning unreachable node: " + node);
           }
         }
         nodes.clear();
         nodes.addAll(alive);
-        System.out.println("[DEBUG] Alive nodes after probe: " + nodes.size());
 
         if (nodes.size() < 2) {
-          System.out.println("[DEBUG] Not enough alive nodes: " + nodes.size() + " (need >= 2)");
-          Log.warn("Not enough alive nodes to form a ring (need >= 2).");
           return;
         }
 
@@ -254,17 +168,9 @@ public class Registry {
                 node,
                 Protocol.OVERLAY + " " + successor + " " + predecessor + " " + poolSize + " " + n);
           } catch (IOException e) {
-            Log.warn(
-                "Failed to send OVERLAY to " + node + " (will remain in list): " + e.getMessage());
           }
         }
         state = State.OVERLAY_BUILT;
-        System.out.println("[DEBUG] Overlay messages sent to all nodes");
-      }
-      System.out.println("[DEBUG] Overlay setup complete");
-      Log.info("Overlay setup complete with pool size " + poolSize + ". Members:");
-      synchronized (nodes) {
-        for (String m : nodes) Log.info(" - " + m);
       }
     } catch (Exception e) {
       System.out.println(
@@ -276,7 +182,6 @@ public class Registry {
   private void startRounds(int rounds) {
     synchronized (nodes) {
       if (state != State.OVERLAY_BUILT) {
-        Log.warn("Cannot start rounds - overlay not built");
         return;
       }
       state = State.RUNNING;
@@ -292,7 +197,6 @@ public class Registry {
         }
       }
     }
-    Log.info("Start command sent to all nodes for " + rounds + " rounds.");
   }
 
   private void shutdown() {
@@ -303,18 +207,8 @@ public class Registry {
     }
   }
 
-  private boolean isAcceptThreadAlive() {
-    return acceptThread != null && acceptThread.isAlive();
-  }
-
   public static void main(String[] args) throws Exception {
-    Runtime.getRuntime()
-        .addShutdownHook(
-            new Thread(
-                () -> {
-                  System.out.println("[DEBUG] Registry shutdown hook triggered!");
-                  Thread.dumpStack();
-                }));
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {}));
 
     if (args.length != 1) {
       System.err.println("Usage: java csx55.threads.Registry <port>");
