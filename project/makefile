@@ -52,6 +52,12 @@ help:
 	@echo "  producer-status - show status of running producers"
 	@echo "  spark-consume   - run Spark streaming consumer"
 	@echo "  spark-ui        - open Spark Master UI in browser"
+	@echo "  bronze-trips    - run bronze layer trips consumer"
+	@echo "  bronze-weather  - run bronze layer weather consumer"
+	@echo "  bronze-events   - run bronze layer events consumer"
+	@echo "  bronze-all      - run all bronze consumers in parallel"
+	@echo "  bronze-status   - check bronze consumer and table status"
+	@echo "  bronze-clean    - clean bronze layer data and checkpoints"
 	@echo "  clean           - remove venv and caches"
 	@echo "  clean-checkpoint - remove Spark checkpoint and state data"
 	@echo ""
@@ -237,6 +243,113 @@ spark-consume:
 spark-ui:
 	@echo "Opening Spark Master UI..."
 	@open http://localhost:8081 2>/dev/null || xdg-open http://localhost:8081 2>/dev/null || echo "Visit http://localhost:8081"
+
+# -------- Bronze Layer Consumers (Medallion Architecture) --------
+.PHONY: bronze-trips bronze-weather bronze-events bronze-all bronze-status bronze-clean
+
+# Bronze consumer configuration (can be overridden)
+BRONZE_KAFKA_BOOTSTRAP ?= kafka:9092
+BRONZE_SCHEMA_REGISTRY ?= http://schema-registry:8081
+BRONZE_STARTING_OFFSETS ?= latest
+BRONZE_TRIGGER_INTERVAL ?= 30 seconds
+BRONZE_MAX_OFFSETS ?= 10000
+
+bronze-trips:
+	@echo "Starting Bronze Trips Consumer..."
+	docker exec -it spark-master spark-submit \
+		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.sql.adaptive.enabled=false \
+		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
+		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.bronze.type=hadoop \
+		--conf spark.sql.catalog.bronze.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		/opt/spark/work-dir/consumers/run_bronze_consumer.py \
+		--source trips \
+		--kafka-bootstrap $(BRONZE_KAFKA_BOOTSTRAP) \
+		--schema-registry $(BRONZE_SCHEMA_REGISTRY) \
+		--starting-offsets $(BRONZE_STARTING_OFFSETS)
+
+bronze-weather:
+	@echo "Starting Bronze Weather Consumer..."
+	docker exec -it spark-master spark-submit \
+		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.sql.adaptive.enabled=false \
+		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
+		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.bronze.type=hadoop \
+		--conf spark.sql.catalog.bronze.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		/opt/spark/work-dir/consumers/run_bronze_consumer.py \
+		--source weather \
+		--kafka-bootstrap $(BRONZE_KAFKA_BOOTSTRAP) \
+		--schema-registry $(BRONZE_SCHEMA_REGISTRY) \
+		--starting-offsets $(BRONZE_STARTING_OFFSETS)
+
+bronze-events:
+	@echo "Starting Bronze Events Consumer..."
+	docker exec -it spark-master spark-submit \
+		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.sql.adaptive.enabled=false \
+		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
+		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.bronze.type=hadoop \
+		--conf spark.sql.catalog.bronze.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		/opt/spark/work-dir/consumers/run_bronze_consumer.py \
+		--source events \
+		--kafka-bootstrap $(BRONZE_KAFKA_BOOTSTRAP) \
+		--schema-registry $(BRONZE_SCHEMA_REGISTRY) \
+		--starting-offsets $(BRONZE_STARTING_OFFSETS)
+
+bronze-all:
+	@echo "Starting All Bronze Consumers in Parallel..."
+	docker exec -it spark-master spark-submit \
+		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.sql.adaptive.enabled=false \
+		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
+		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.bronze.type=hadoop \
+		--conf spark.sql.catalog.bronze.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		--conf spark.executor.instances=3 \
+		--conf spark.executor.cores=2 \
+		/opt/spark/work-dir/consumers/run_bronze_consumer.py \
+		--all \
+		--kafka-bootstrap $(BRONZE_KAFKA_BOOTSTRAP) \
+		--schema-registry $(BRONZE_SCHEMA_REGISTRY) \
+		--starting-offsets $(BRONZE_STARTING_OFFSETS) \
+		--parallel
+
+bronze-status:
+	@echo "Checking bronze consumer status..."
+	@echo ""
+	@echo "Kafka consumer groups:"
+	@docker exec kafka /opt/bitnami/kafka/bin/kafka-consumer-groups.sh \
+		--bootstrap-server localhost:9092 \
+		--all-groups \
+		--describe 2>/dev/null | grep -E "bronze|GROUP" || echo "No bronze consumers found"
+	@echo ""
+	@echo "MinIO Iceberg bronze tables:"
+	@docker exec minio mc ls minio/lakehouse/iceberg/bronze/ 2>/dev/null || echo "No bronze tables found"
+
+bronze-clean:
+	@echo "Cleaning bronze layer checkpoints and data..."
+	@docker exec spark-master rm -rf /tmp/checkpoint/bronze/* 2>/dev/null || true
+	@docker exec minio mc rm -r minio/lakehouse/iceberg/bronze/ 2>/dev/null || true
+	@echo "Bronze layer cleaned"
 
 # -------- DuckDB Query Engine --------
 .PHONY: query-duckdb install-duckdb
