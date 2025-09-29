@@ -145,19 +145,24 @@ class BaseProducer(ABC):
 
     def send_record(self, key: bytes, value: bytes, headers: Dict[str, str] = None):
         """
-        Send a single record to Kafka with headers.
+        Send a single record to Kafka with headers and timestamp.
 
         Args:
             key: Record key (already encoded)
             value: Record value (already serialized)
             headers: Optional additional headers
         """
+        # Capture timestamp once for consistency
+        current_time = datetime.now()
+        current_time_iso = current_time.isoformat()
+        current_time_ms = int(current_time.timestamp() * 1000)  # Kafka uses milliseconds
+
         # Build default headers
         default_headers = {
             'producer-id': self.producer_id,
             'producer-name': self.name,
             'producer-version': self.producer_version,
-            'processing-time': datetime.now().isoformat(),
+            'processing-time': current_time_iso,
             'hostname': self.hostname
         }
 
@@ -174,6 +179,7 @@ class BaseProducer(ABC):
                 key=key,
                 value=value,
                 headers=kafka_headers,
+                timestamp=current_time_ms,  # Set explicit Kafka timestamp
                 callback=self.delivery_callback
             )
             self.stats["sent"] += 1
@@ -183,12 +189,13 @@ class BaseProducer(ABC):
             # Internal queue is full, need to wait for messages to be delivered
             print(f"[WARNING] Producer buffer full, flushing...", file=sys.stderr)
             self.producer.flush(timeout=5)
-            # Retry after flush
+            # Retry after flush with same timestamp
             self.producer.produce(
                 self.topic,
                 key=key,
                 value=value,
                 headers=kafka_headers,
+                timestamp=current_time_ms,  # Use same timestamp for retry
                 callback=self.delivery_callback
             )
             self.stats["sent"] += 1
