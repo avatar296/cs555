@@ -40,6 +40,15 @@ from .urls import (
     ensure_directory
 )
 
+# Zone utilities
+from .zones import (
+    ZoneMapper,
+    get_mapper,
+    map_point_to_zone,
+    find_affected_zones,
+    get_zone_weather_station
+)
+
 __all__ = [
     # Database
     'get_duckdb_connection',
@@ -66,5 +75,12 @@ __all__ = [
     # URLs
     'build_parquet_urls',
     'get_schema_path',
-    'ensure_directory'
+    'ensure_directory',
+
+    # Zones
+    'ZoneMapper',
+    'get_mapper',
+    'map_point_to_zone',
+    'find_affected_zones',
+    'get_zone_weather_station'
 ]

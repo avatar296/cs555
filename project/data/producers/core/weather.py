@@ -8,19 +8,20 @@ This version uses clean architecture with configuration injection.
 
 import sys
 import random
-from pathlib import Path
 from typing import Generator, Tuple, Any, Dict, Optional
 from datetime import datetime
 
-# Add parent directory to path for zone_mapper import
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
 from .base import BaseProducer
-from zone_mapper import ZoneMapper  # This is in data directory
+from ..utils.zones import ZoneMapper
 
 from ..config.weather import WeatherConfig
 from ..common import SCHEMAS, celsius_to_fahrenheit
 from ..data_sources.factories import get_weather_data_source
+from ..utils import (
+    add_lateness,
+    generate_salted_key,
+    normalize_timestamp
+)
 
 
 class WeatherProducer(BaseProducer):
@@ -59,8 +60,15 @@ class WeatherProducer(BaseProducer):
         }
 
     def fetch_data(self) -> Generator:
-        """Fetch and process weather data for all zones."""
-        print("Fetching weather data...", file=sys.stderr)
+        """Fetch weather data from configured source, respecting synthetic_mode."""
+        print(f"Data mode: {self.config.synthetic_mode}", file=sys.stderr)
+
+        # Check if source is available
+        if (
+            not self.data_source.is_available()
+            and self.config.synthetic_mode != "synthetic"
+        ):
+            print("Primary data source unavailable, using fallback", file=sys.stderr)
 
         # Get raw weather observations
         for station_id, observation in self.data_source.fetch():
@@ -183,11 +191,41 @@ class WeatherProducer(BaseProducer):
         Returns:
             Tuple of (key_bytes, value_bytes, headers)
         """
-        # Key is zone ID
-        key = str(record['zone_id'])
+        # Extract timestamp for potential lateness injection
+        ts_str = record.get("observation_time", datetime.now().isoformat())
+        ts_dt = normalize_timestamp(ts_str)
+        original_ts = ts_dt
 
-        # Payload is the record itself (metadata will be added by base class)
+        # Add lateness if configured
+        ts_out = add_lateness(
+            ts_dt, self.config.p_late, self.config.late_min, self.config.late_max
+        )
+
+        # Calculate lateness in milliseconds
+        lateness_ms = (
+            int((ts_out - original_ts).total_seconds() * 1000)
+            if ts_out != original_ts
+            else None
+        )
+
+        # Generate key based on configuration
+        if self.config.key_mode == "station":
+            base_key = record.get('station_id', 'unknown')
+        elif self.config.key_mode == "zone":
+            base_key = str(record['zone_id'])
+        else:
+            # Default: zone ID
+            base_key = str(record['zone_id'])
+
+        # Apply salting if configured
+        key = generate_salted_key(base_key, self.config.salt_keys)
+
+        # Create payload with updated timestamp and lateness
         payload = record.copy()
+        if ts_out != original_ts:
+            payload["observation_time"] = ts_out.isoformat()
+        if lateness_ms is not None:
+            payload["lateness_ms"] = lateness_ms
 
         # Producer-specific headers
         additional_headers = {
@@ -202,9 +240,9 @@ class WeatherProducer(BaseProducer):
         """Get additional summary information."""
         data_source, is_synthetic = self.get_data_source_info()
         if is_synthetic:
-            return "(synthetic data)"
+            return f"[synthetic: {self.config.synthetic_mode}]"
         elif data_source == "NOAA":
-            return "(NOAA data)"
+            return "[NOAA weather]"
         return ""
 
 

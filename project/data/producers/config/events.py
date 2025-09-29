@@ -11,12 +11,11 @@ from .base import BaseConfig
 class EventsConfig(BaseConfig):
     """Configuration for events producer."""
 
-    # Data configuration
-    year: str = "2023"
-
     # Override defaults for events (slower rate)
     rate: float = 10.0
     batch_size: int = 50
+
+    # Note: years, months, synthetic_mode, synthetic_ratio inherited from BaseConfig
 
     @classmethod
     def from_env(cls):
@@ -25,7 +24,6 @@ class EventsConfig(BaseConfig):
         events_mappings = {
             'rate': ('RATE', float, 10.0),  # Events have slower default rate
             'batch_size': ('BATCH', int, 50),  # Smaller batch for events
-            'year': ('YEAR', str, cls.year)
         }
 
         return super().from_env(name="events", env_mappings=events_mappings)

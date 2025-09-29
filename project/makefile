@@ -13,21 +13,21 @@ TOPIC          ?= trips.yellow
 PARTITIONS     ?= 12
 REPLICATION    ?= 1
 
-# Producer scope & behavior
-DATASET        ?= yellow
-YEARS          ?= 2023
-MONTHS         ?= 06,07,08
-RATE           ?= 2000
-BATCH          ?= 2000
-SALT_KEYS      ?= 8
-KEY_MODE       ?= pu
-P_LATE         ?= 0.00
-LATE_MIN       ?= 300
-LATE_MAX       ?= 1200
+# Producer scope & behavior (unified configuration for all producers)
+DATASET        ?= yellow      # For trips producer
+YEARS          ?= 2023        # Used by all producers (standardized)
+MONTHS         ?= 06,07,08    # Used by all producers (standardized)
+RATE           ?= 2000        # Messages per second (all producers)
+BATCH          ?= 2000        # Batch size (all producers)
+SALT_KEYS      ?= 8           # Key salting for partitioning (all producers)
+KEY_MODE       ?= default     # Key generation mode (all producers)
+P_LATE         ?= 0.00        # Lateness injection probability (all producers)
+LATE_MIN       ?= 300         # Min lateness seconds (all producers)
+LATE_MAX       ?= 1200        # Max lateness seconds (all producers)
 
-# Synthetic data configuration
-SYNTHETIC_MODE ?= fallback    # none|fallback|mixed|synthetic
-SYNTHETIC_RATIO ?= 0.2        # For mixed mode: ratio of synthetic data
+# Synthetic data configuration (unified for all producers)
+SYNTHETIC_MODE ?= fallback    # none|fallback|mixed|synthetic (all producers)
+SYNTHETIC_RATIO ?= 0.2        # For mixed mode: ratio of synthetic data (all producers)
 
 # -------- Help --------
 .PHONY: help
@@ -43,9 +43,9 @@ help:
 	@echo "  schema-register - register/update Avro schemas in Schema Registry"
 	@echo "  schema-list     - list all registered schemas"
 	@echo "  install         - create venv and install producer dependencies"
-	@echo "  produce-trips   - run taxi trips producer"
-	@echo "  produce-weather - run weather data producer"
-	@echo "  produce-events  - run events data producer"
+	@echo "  produce-trips   - run taxi trips producer (unified config)"
+	@echo "  produce-weather - run weather data producer (unified config)"
+	@echo "  produce-events  - run events data producer (unified config)"
 	@echo "  start-producers - start all producers in background"
 	@echo "  stop-producers  - stop all running producers"
 	@echo "  producer-status - show status of running producers"
@@ -54,7 +54,12 @@ help:
 	@echo "  clean           - remove venv and caches"
 	@echo "  clean-checkpoint - remove Spark checkpoint and state data"
 	@echo ""
-	@echo "Override: make TOPIC=trips.yellow YEARS=2024 MONTHS=01,02 RATE=5000 replay"
+	@echo "Examples:"
+	@echo "  make produce-trips SYNTHETIC_MODE=synthetic"
+	@echo "  make produce-weather YEARS=2024 MONTHS=01,02 RATE=500"
+	@echo "  make produce-events P_LATE=0.1 SALT_KEYS=10"
+	@echo ""
+	@echo "Override: make TOPIC=trips.yellow YEARS=2024 MONTHS=01,02 RATE=5000 produce-trips"
 
 # -------- Compose lifecycle --------
 .PHONY: up down logs
@@ -135,23 +140,41 @@ produce-trips:
 	LATE_MAX=$(LATE_MAX) \
 	SYNTHETIC_MODE=$(SYNTHETIC_MODE) \
 	SYNTHETIC_RATIO=$(SYNTHETIC_RATIO) \
-	python data/producers/trips_producer.py
+	python data/producers/run_producer.py trips
 
 produce-weather:
 	. $(VENV_DIR)/bin/activate && \
 	KAFKA_BOOTSTRAP=$(KAFKA_BROKER) \
 	TOPIC=weather.updates \
-	YEAR=$(YEARS) \
+	YEARS="$(YEARS)" \
 	MONTHS="$(MONTHS)" \
-	python data/producers/weather_producer.py
+	RATE=$(RATE) \
+	BATCH=$(BATCH) \
+	SALT_KEYS=$(SALT_KEYS) \
+	KEY_MODE=$(KEY_MODE) \
+	P_LATE=$(P_LATE) \
+	LATE_MIN=$(LATE_MIN) \
+	LATE_MAX=$(LATE_MAX) \
+	SYNTHETIC_MODE=$(SYNTHETIC_MODE) \
+	SYNTHETIC_RATIO=$(SYNTHETIC_RATIO) \
+	python data/producers/run_producer.py weather
 
 produce-events:
 	. $(VENV_DIR)/bin/activate && \
 	KAFKA_BOOTSTRAP=$(KAFKA_BROKER) \
 	TOPIC=events.calendar \
-	YEAR=$(YEARS) \
+	YEARS="$(YEARS)" \
 	MONTHS="$(MONTHS)" \
-	python data/producers/events_producer.py
+	RATE=$(RATE) \
+	BATCH=$(BATCH) \
+	SALT_KEYS=$(SALT_KEYS) \
+	KEY_MODE=$(KEY_MODE) \
+	P_LATE=$(P_LATE) \
+	LATE_MIN=$(LATE_MIN) \
+	LATE_MAX=$(LATE_MAX) \
+	SYNTHETIC_MODE=$(SYNTHETIC_MODE) \
+	SYNTHETIC_RATIO=$(SYNTHETIC_RATIO) \
+	python data/producers/run_producer.py events
 
 start-producers:
 	@echo "Starting all data producers..."
@@ -164,14 +187,14 @@ start-producers:
 
 stop-producers:
 	@echo "Stopping all Python producers..."
-	@pkill -f "python data/producers/trips_producer.py" || true
-	@pkill -f "python data/producers/weather_producer.py" || true
-	@pkill -f "python data/producers/events_producer.py" || true
+	@pkill -f "python data/producers/run_producer.py trips" || true
+	@pkill -f "python data/producers/run_producer.py weather" || true
+	@pkill -f "python data/producers/run_producer.py events" || true
 	@echo "All producers stopped"
 
 producer-status:
 	@echo "Active Python producers:"
-	@ps aux | grep -E "python data/producers/(trips|weather|events)_producer.py" | grep -v grep || echo "No producers running"
+	@ps aux | grep -E "python data/producers/run_producer.py (trips|weather|events)" | grep -v grep || echo "No producers running"
 	@echo ""
 	@echo "Kafka topic status:"
 	@docker exec kafka /opt/bitnami/kafka/bin/kafka-consumer-groups.sh \

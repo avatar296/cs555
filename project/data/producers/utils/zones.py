@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Zone mapper utility for mapping coordinates to NYC TLC zones.
-Downloads and caches zone data for spatial operations.
+Zone utilities for NYC taxi zone operations.
+
+Provides zone mapping, spatial operations, and weather station assignments.
 """
 
 import os
@@ -13,17 +14,22 @@ from pathlib import Path
 
 
 class ZoneMapper:
+    """
+    Maps coordinates to NYC TLC zones and provides zone-related utilities.
+
+    Handles zone data caching, spatial operations, and weather station mapping.
+    """
+
     def __init__(self):
-        self.data_dir = Path(__file__).parent / "zones"
-        self.data_dir.mkdir(exist_ok=True)
+        """Initialize zone mapper with data paths."""
+        # Use a data directory within the producers package
+        self.data_dir = Path(__file__).parent.parent / "data" / "zones"
+        self.data_dir.mkdir(parents=True, exist_ok=True)
 
         self.zone_lookup_file = self.data_dir / "taxi_zone_lookup.csv"
         self.zone_geojson_file = self.data_dir / "taxi_zones.geojson"
 
-        # Zone centroids for weather mapping (simplified - using representative points)
-        # Manhattan zones generally use Central Park station
-        # Queens zones use LaGuardia station
-        # Brooklyn/SI zones use JFK station
+        # Zone to weather station mapping
         self.zone_to_station = self._init_zone_stations()
 
         # Download zone data if not present
@@ -31,7 +37,12 @@ class ZoneMapper:
             self._download_zone_data()
 
     def _init_zone_stations(self) -> dict:
-        """Map zones to nearest weather station based on borough."""
+        """
+        Map zones to nearest weather station based on borough.
+
+        Returns:
+            Dict mapping zone IDs to weather station IDs
+        """
         # Simplified mapping - in production would use actual distance calculations
         manhattan_zones = list(range(1, 100))  # Approximate Manhattan zones
         queens_zones = list(range(100, 200))   # Approximate Queens zones
@@ -49,7 +60,7 @@ class ZoneMapper:
         return station_map
 
     def _download_zone_data(self):
-        """Download zone lookup table and boundaries."""
+        """Download zone lookup table and boundaries from NYC Open Data."""
         con = duckdb.connect()
 
         print("Downloading NYC TLC zone data...")
@@ -68,13 +79,13 @@ class ZoneMapper:
             print(f"✓ Downloaded zone lookup to {self.zone_lookup_file}")
         except Exception as e:
             print(f"Warning: Could not download zone lookup: {e}")
-            # Create a minimal lookup file
+            # Create a minimal lookup file for testing
             self._create_minimal_lookup()
 
         con.close()
 
     def _create_minimal_lookup(self):
-        """Create a minimal zone lookup for testing."""
+        """Create a minimal zone lookup for testing when download fails."""
         with open(self.zone_lookup_file, 'w') as f:
             f.write("LocationID,Borough,Zone,service_zone\n")
             # Add some sample zones
@@ -87,7 +98,15 @@ class ZoneMapper:
     def get_zone_for_point(self, lat: float, lon: float) -> int:
         """
         Find which zone a lat/lon point belongs to.
+
         Simplified implementation - returns approximate zone based on coordinates.
+
+        Args:
+            lat: Latitude
+            lon: Longitude
+
+        Returns:
+            Zone ID (1-263)
         """
         # For demo purposes, use a simple grid mapping
         # In production, would use actual polygon boundaries
@@ -109,7 +128,16 @@ class ZoneMapper:
     def get_zones_in_radius(self, lat: float, lon: float, radius_miles: float) -> List[int]:
         """
         Find all zones within radius of a point.
+
         Returns list of zone IDs that fall within the specified radius.
+
+        Args:
+            lat: Center latitude
+            lon: Center longitude
+            radius_miles: Search radius in miles
+
+        Returns:
+            List of affected zone IDs
         """
         affected_zones = []
 
@@ -138,7 +166,12 @@ class ZoneMapper:
     def get_zone_centroid(self, zone_id: int) -> Tuple[float, float]:
         """
         Get the centroid (center point) of a zone.
-        Returns (lat, lon) tuple.
+
+        Args:
+            zone_id: NYC TLC zone ID
+
+        Returns:
+            Tuple of (lat, lon)
         """
         # Simplified calculation for demo
         lat = 40.4 + (zone_id % 20) * 0.03
@@ -146,28 +179,101 @@ class ZoneMapper:
         return (lat, lon)
 
     def get_weather_station_for_zone(self, zone_id: int) -> str:
-        """Get the nearest weather station ID for a given zone."""
+        """
+        Get the nearest weather station ID for a given zone.
+
+        Args:
+            zone_id: NYC TLC zone ID
+
+        Returns:
+            NOAA weather station ID
+        """
         return self.zone_to_station.get(zone_id, "72505394728")  # Default to Central Park
 
     def get_all_zones(self) -> List[int]:
-        """Return list of all zone IDs."""
+        """
+        Return list of all zone IDs.
+
+        Returns:
+            List of all NYC TLC zone IDs (1-263)
+        """
         return list(range(1, 264))
 
+    def get_zone_info(self, zone_id: int) -> Optional[dict]:
+        """
+        Get detailed information about a zone.
 
-# Module-level convenience functions
+        Args:
+            zone_id: NYC TLC zone ID
+
+        Returns:
+            Dict with zone details or None if not found
+        """
+        if not (1 <= zone_id <= 263):
+            return None
+
+        # Basic info (would read from CSV in production)
+        return {
+            'zone_id': zone_id,
+            'centroid': self.get_zone_centroid(zone_id),
+            'weather_station': self.get_weather_station_for_zone(zone_id)
+        }
+
+
+# Module-level singleton instance
 _mapper = None
 
+
 def get_mapper() -> ZoneMapper:
-    """Get or create singleton mapper instance."""
+    """
+    Get or create singleton mapper instance.
+
+    Returns:
+        ZoneMapper singleton instance
+    """
     global _mapper
     if _mapper is None:
         _mapper = ZoneMapper()
     return _mapper
 
+
 def map_point_to_zone(lat: float, lon: float) -> int:
-    """Convenience function to map a point to a zone."""
+    """
+    Convenience function to map a point to a zone.
+
+    Args:
+        lat: Latitude
+        lon: Longitude
+
+    Returns:
+        Zone ID
+    """
     return get_mapper().get_zone_for_point(lat, lon)
 
+
 def find_affected_zones(lat: float, lon: float, radius: float = 0.3) -> List[int]:
-    """Convenience function to find zones within radius (default 0.3 miles)."""
+    """
+    Convenience function to find zones within radius.
+
+    Args:
+        lat: Center latitude
+        lon: Center longitude
+        radius: Search radius in miles (default 0.3)
+
+    Returns:
+        List of affected zone IDs
+    """
     return get_mapper().get_zones_in_radius(lat, lon, radius)
+
+
+def get_zone_weather_station(zone_id: int) -> str:
+    """
+    Convenience function to get weather station for a zone.
+
+    Args:
+        zone_id: NYC TLC zone ID
+
+    Returns:
+        NOAA weather station ID
+    """
+    return get_mapper().get_weather_station_for_zone(zone_id)

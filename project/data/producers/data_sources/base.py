@@ -141,7 +141,7 @@ class SyntheticSourceMixin:
             Scenarios instance
         """
         if SyntheticSourceMixin._scenarios is None:
-            from synthetic_scenarios import get_scenarios
+            from ..scenarios import get_scenarios
             SyntheticSourceMixin._scenarios = get_scenarios()
         return SyntheticSourceMixin._scenarios
 
