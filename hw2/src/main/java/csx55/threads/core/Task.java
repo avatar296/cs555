@@ -81,9 +81,7 @@ public class Task implements java.io.Serializable {
 
   @Override
   public String toString() {
-    return ip
-        + ":"
-        + port
+    return minedAt
         + ":"
         + roundNumber
         + ":"
