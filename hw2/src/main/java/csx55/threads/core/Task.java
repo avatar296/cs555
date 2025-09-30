@@ -18,6 +18,7 @@ public class Task implements java.io.Serializable {
   private long threadId;
   private int nonce;
   private boolean migrated = false;
+  private byte[] cachedPrefix = null;
 
   public Task(String ip, int port, int roundNumber, int payload) {
     this.ip = ip;
@@ -30,20 +31,50 @@ public class Task implements java.io.Serializable {
     this.migrated = false;
   }
 
+  public void mineWithProvided(MessageDigest sha256, Random random) {
+    this.threadId = Thread.currentThread().getId();
+    this.timestamp = System.currentTimeMillis();
+
+    String prefix = ip
+        + ":"
+        + port
+        + ":"
+        + roundNumber
+        + ":"
+        + payload
+        + ":"
+        + timestamp
+        + ":"
+        + threadId
+        + ":";
+    cachedPrefix = prefix.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+    while (true) {
+      this.nonce = random.nextInt();
+      byte[] taskBytes = toBytesOptimized();
+      sha256.reset();
+      byte[] hash = sha256.digest(taskBytes);
+      if (hasLeadingZeroBits(hash, DIFFICULTY_BITS)) {
+        return;
+      }
+    }
+  }
+
+  private byte[] toBytesOptimized() {
+    String nonceStr = String.valueOf(nonce);
+    byte[] nonceB = nonceStr.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+    byte[] result = new byte[cachedPrefix.length + nonceB.length];
+    System.arraycopy(cachedPrefix, 0, result, 0, cachedPrefix.length);
+    System.arraycopy(nonceB, 0, result, cachedPrefix.length, nonceB.length);
+    return result;
+  }
+
   public void mine() {
     try {
       MessageDigest sha256 = MessageDigest.getInstance("SHA3-256");
-      this.threadId = Thread.currentThread().getId();
       Random random = new Random();
-
-      while (true) {
-        this.timestamp = System.currentTimeMillis();
-        this.nonce = random.nextInt();
-        byte[] hash = sha256.digest(toBytes());
-        if (hasLeadingZeroBits(hash, DIFFICULTY_BITS)) {
-          return;
-        }
-      }
+      mineWithProvided(sha256, random);
     } catch (NoSuchAlgorithmException e) {
       throw new RuntimeException(e);
     }
@@ -51,8 +82,11 @@ public class Task implements java.io.Serializable {
 
   private static boolean hasLeadingZeroBits(byte[] hash, int bits) {
     int full = bits / 8, rem = bits % 8;
-    for (int i = 0; i < full; i++) if (hash[i] != 0) return false;
-    if (rem == 0) return true;
+    for (int i = 0; i < full; i++)
+      if (hash[i] != 0)
+        return false;
+    if (rem == 0)
+      return true;
     int mask = 0xFF << (8 - rem);
     return (hash[full] & mask) == 0;
   }

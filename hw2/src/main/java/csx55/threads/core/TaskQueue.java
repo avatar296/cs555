@@ -22,7 +22,24 @@ public class TaskQueue {
 
   public List<Task> removeBatch(int n) {
     List<Task> res = new ArrayList<>(n);
-    q.drainTo(res, n);
+    List<Task> temp = new ArrayList<>(n * 2);
+    q.drainTo(temp, n * 2);
+
+    List<Task> alreadyMigrated = new ArrayList<>();
+    for (Task t : temp) {
+      if (t.isMigrated()) {
+        alreadyMigrated.add(t);
+      } else if (res.size() < n) {
+        res.add(t);
+      } else {
+        q.add(t);
+      }
+    }
+
+    for (Task t : alreadyMigrated) {
+      q.add(t);
+    }
+
     return res;
   }
 

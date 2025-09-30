@@ -40,7 +40,7 @@ public class LoadBalancer {
     int myOutstanding = taskQueue.size();
     String successor = state.getSuccessor();
     if (myOutstanding > pushThreshold && successor != null) {
-      int migrateCount = Math.max(minBatchSize, myOutstanding / 2);
+      int migrateCount = Math.max(minBatchSize, (myOutstanding - pushThreshold) / 2);
       List<Task> raw = taskQueue.removeBatch(migrateCount);
       if (raw == null || raw.isEmpty()) return;
 

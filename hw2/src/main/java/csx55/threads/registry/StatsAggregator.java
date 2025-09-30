@@ -24,18 +24,18 @@ public class StatsAggregator {
     return statsByNode.size();
   }
 
-  public void printFinalIfReady(List<String> nodes) {
+  public void printFinalIfReady(List<String> nodes, long startTime) {
     if (printed.get()) return;
     if (statsByNode.size() != nodes.size()) return;
     synchronized (this) {
       if (printed.get()) return;
       if (statsByNode.size() != nodes.size()) return;
-      printFinal(nodes);
+      printFinal(nodes, startTime);
       printed.set(true);
     }
   }
 
-  private void printFinal(List<String> nodes) {
+  private void printFinal(List<String> nodes, long startTime) {
     long totalGenerated = statsByNode.values().stream().mapToLong(Stats::getGenerated).sum();
     long totalPulled = statsByNode.values().stream().mapToLong(Stats::getPulled).sum();
     long totalPushed = statsByNode.values().stream().mapToLong(Stats::getPushed).sum();
@@ -64,5 +64,11 @@ public class StatsAggregator {
         totalPushed,
         totalCompleted,
         totalCompleted == 0 ? 0.0 : 100.0);
+
+    if (startTime > 0) {
+      long endTime = System.currentTimeMillis();
+      double durationSeconds = (endTime - startTime) / 1000.0;
+      System.out.printf(Locale.US, "%nExecution time: %.2f seconds%n", durationSeconds);
+    }
   }
 }

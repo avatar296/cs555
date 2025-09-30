@@ -28,11 +28,10 @@ public class ComputeNode {
 
   private static final int MAX_TASKS_PER_ROUND = Config.getInt("cs555.maxTasksPerRound", 1000);
 
-  private static final int PUSH_THRESHOLD = Config.getInt("cs555.pushThreshold", 100);
-  private static final int PULL_THRESHOLD = Config.getInt("cs555.pullThreshold", 30);
-  private static final int MIN_BATCH_SIZE = Config.getInt("cs555.minBatchSize", 50);
-  private static final long BALANCE_CHECK_INTERVAL =
-      Config.getLong("cs555.balanceCheckInterval", 100);
+  private static final int PUSH_THRESHOLD = Config.getInt("cs555.pushThreshold", 2000);
+  private static final int PULL_THRESHOLD = Config.getInt("cs555.pullThreshold", 100);
+  private static final int MIN_BATCH_SIZE = Config.getInt("cs555.minBatchSize", 20);
+  private static final long BALANCE_CHECK_INTERVAL = Config.getLong("cs555.balanceCheckInterval", 3000);
 
   private final String registryHost;
   private final int registryPort;
@@ -81,19 +80,19 @@ public class ComputeNode {
     }
 
     new Thread(
-            () -> {
-              try {
-                while (running) {
-                  Socket sock = serverSocket.accept();
-                  new Thread(() -> handleMessage(sock)).start();
-                }
-              } catch (IOException e) {
-                if (running) {
-                  e.printStackTrace();
-                }
-              }
-            },
-            "ComputeNode-AcceptLoop")
+        () -> {
+          try {
+            while (running) {
+              Socket sock = serverSocket.accept();
+              new Thread(() -> handleMessage(sock)).start();
+            }
+          } catch (IOException e) {
+            if (running) {
+              e.printStackTrace();
+            }
+          }
+        },
+        "ComputeNode-AcceptLoop")
         .start();
   }
 
@@ -101,12 +100,14 @@ public class ComputeNode {
     try {
       PushbackInputStream pin = new PushbackInputStream(sock.getInputStream());
       int first = pin.read();
-      if (first == -1) return;
+      if (first == -1)
+        return;
       pin.unread(first);
 
       try (ObjectInputStream in = new ObjectInputStream(pin)) {
         Object obj = in.readObject();
-        if (!(obj instanceof String)) return;
+        if (!(obj instanceof String))
+          return;
 
         String msg = (String) obj;
 
@@ -130,16 +131,16 @@ public class ComputeNode {
             }
           } else {
 
-            if (poolSize != newPoolSize) {}
+            if (poolSize != newPoolSize) {
+            }
           }
 
           if (roundAggregator == null) {
             roundAggregator = new RoundAggregator(myId, state);
           }
           if (loadBalancer == null) {
-            loadBalancer =
-                new LoadBalancer(
-                    myId, taskQueue, stats, state, PUSH_THRESHOLD, PULL_THRESHOLD, MIN_BATCH_SIZE);
+            loadBalancer = new LoadBalancer(
+                myId, taskQueue, stats, state, PUSH_THRESHOLD, PULL_THRESHOLD, MIN_BATCH_SIZE);
           }
 
         } else if (msg.startsWith(Protocol.START)) {
@@ -181,7 +182,8 @@ public class ComputeNode {
           }
           @SuppressWarnings("unchecked")
           java.util.List<Task> batch = (java.util.List<Task>) in.readObject();
-          for (Task t : batch) t.markMigrated();
+          for (Task t : batch)
+            t.markMigrated();
           taskQueue.addBatch(batch);
           stats.incrementPulled(batch.size());
 
@@ -192,9 +194,11 @@ public class ComputeNode {
           String[] parts = msg.split(" ");
           String requestingNode = parts[1];
           int capacity = Integer.parseInt(parts[2]);
-          if (loadBalancer != null) loadBalancer.handlePullRequest(requestingNode, capacity);
+          if (loadBalancer != null)
+            loadBalancer.handlePullRequest(requestingNode, capacity);
         } else if (msg.startsWith(Protocol.GEN)) {
-          if (roundAggregator != null) roundAggregator.handleGenMessage(msg);
+          if (roundAggregator != null)
+            roundAggregator.handleGenMessage(msg);
         }
       }
     } catch (EOFException e) {
@@ -228,13 +232,6 @@ public class ComputeNode {
 
       if (roundAggregator != null) {
         roundAggregator.announceRoundGeneration(r, toGen);
-        int totalForRound = roundAggregator.awaitRoundTotal(r, 5000);
-        if (totalForRound > 0 && state.getRingSize() > 0 && loadBalancer != null) {
-          int target = (int) Math.round((double) totalForRound / (double) state.getRingSize());
-          loadBalancer.rebalanceTowardsTarget(target);
-        } else if (loadBalancer != null) {
-          loadBalancer.balanceThresholdBased();
-        }
       }
     }
 
@@ -252,13 +249,12 @@ public class ComputeNode {
         }
 
         int queueSize = taskQueue.size();
-        int inFlight = stats.getInFlight();
 
         if (queueSize > PUSH_THRESHOLD && loadBalancer != null) {
           loadBalancer.balanceThresholdBased();
         }
 
-        if (queueSize < PULL_THRESHOLD && inFlight < poolSize / 2 && loadBalancer != null) {
+        if (queueSize < PULL_THRESHOLD && loadBalancer != null) {
           loadBalancer.sendPullRequestIfIdle();
         }
       } catch (InterruptedException e) {

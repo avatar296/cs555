@@ -27,6 +27,7 @@ public class Registry {
   private Thread acceptThread;
   private volatile boolean running = true;
   private volatile State state = State.ACCEPTING;
+  private volatile long startTime = 0;
 
   public Registry(int port) {
     this.port = port;
@@ -124,7 +125,7 @@ public class Registry {
             Stats stats = (Stats) in.readObject();
             aggregator.record(nodeId, stats);
             synchronized (nodes) {
-              aggregator.printFinalIfReady(new ArrayList<>(nodes));
+              aggregator.printFinalIfReady(new ArrayList<>(nodes), startTime);
             }
           }
         }
@@ -187,6 +188,7 @@ public class Registry {
       state = State.RUNNING;
     }
     aggregator.clear();
+    startTime = System.currentTimeMillis();
 
     synchronized (nodes) {
       for (String node : nodes) {
