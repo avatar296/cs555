@@ -35,18 +35,19 @@ public class Task implements java.io.Serializable {
     this.threadId = Thread.currentThread().getId();
     this.timestamp = System.currentTimeMillis();
 
-    String prefix = ip
-        + ":"
-        + port
-        + ":"
-        + roundNumber
-        + ":"
-        + payload
-        + ":"
-        + timestamp
-        + ":"
-        + threadId
-        + ":";
+    String prefix =
+        ip
+            + ":"
+            + port
+            + ":"
+            + roundNumber
+            + ":"
+            + payload
+            + ":"
+            + timestamp
+            + ":"
+            + threadId
+            + ":";
     cachedPrefix = prefix.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
     while (true) {
@@ -82,11 +83,8 @@ public class Task implements java.io.Serializable {
 
   private static boolean hasLeadingZeroBits(byte[] hash, int bits) {
     int full = bits / 8, rem = bits % 8;
-    for (int i = 0; i < full; i++)
-      if (hash[i] != 0)
-        return false;
-    if (rem == 0)
-      return true;
+    for (int i = 0; i < full; i++) if (hash[i] != 0) return false;
+    if (rem == 0) return true;
     int mask = 0xFF << (8 - rem);
     return (hash[full] & mask) == 0;
   }

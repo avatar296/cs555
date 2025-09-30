@@ -55,8 +55,7 @@ public class Worker implements Runnable {
     while (running.get()) {
       try {
         Task task = queue.take();
-        if (task == null)
-          continue;
+        if (task == null) continue;
 
         stats.incInFlight();
         try {
@@ -75,13 +74,12 @@ public class Worker implements Runnable {
         }
 
       } catch (InterruptedException e) {
-        if (!running.get())
-          break;
+        if (!running.get()) break;
       } catch (Throwable t) {
         t.printStackTrace();
       }
     }
-    // Flush any remaining buffered output
+
     if (!printBuffer.isEmpty()) {
       flushBuffer();
     }
