@@ -9,14 +9,12 @@ public class Worker implements Runnable {
 
   private final TaskQueue queue;
   private final Stats stats;
-  private final String nodeId;
   private final AtomicBoolean running = new AtomicBoolean(true);
   private final Thread thread;
 
   public Worker(int id, TaskQueue queue, Stats stats, String nodeId) {
     this.queue = queue;
     this.stats = stats;
-    this.nodeId = nodeId;
     this.thread = new Thread(this, "Worker-" + id);
   }
 
@@ -46,7 +44,6 @@ public class Worker implements Runnable {
 
         stats.incInFlight();
         try {
-          task.setMinedAt(nodeId);
           task.mine();
 
           if (PRINT_TASKS) {

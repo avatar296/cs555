@@ -18,7 +18,6 @@ public class Task implements java.io.Serializable {
   private long threadId;
   private int nonce;
   private boolean migrated = false;
-  private String minedAt;
 
   public Task(String ip, int port, int roundNumber, int payload) {
     this.ip = ip;
@@ -29,7 +28,6 @@ public class Task implements java.io.Serializable {
     this.threadId = 0L;
     this.nonce = 0;
     this.migrated = false;
-    this.minedAt = ip + ":" + port;
   }
 
   public void mine() {
@@ -59,10 +57,6 @@ public class Task implements java.io.Serializable {
     return (hash[full] & mask) == 0;
   }
 
-  public void setMinedAt(String nodeId) {
-    this.minedAt = nodeId;
-  }
-
   public void markMigrated() {
     this.migrated = true;
   }
@@ -71,17 +65,15 @@ public class Task implements java.io.Serializable {
     return migrated;
   }
 
-  public String getMinedAt() {
-    return minedAt;
-  }
-
   public byte[] toBytes() {
     return toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
   }
 
   @Override
   public String toString() {
-    return minedAt
+    return ip
+        + ":"
+        + port
         + ":"
         + roundNumber
         + ":"
