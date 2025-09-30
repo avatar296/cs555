@@ -58,6 +58,9 @@ help:
 	@echo "  bronze-all      - run all bronze consumers in parallel"
 	@echo "  bronze-status   - check bronze consumer and table status"
 	@echo "  bronze-clean    - clean bronze layer data and checkpoints"
+	@echo "  silver-trips    - run silver layer trips consumer"
+	@echo "  silver-status   - check silver consumer and table status"
+	@echo "  silver-clean    - clean silver layer data and checkpoints"
 	@echo "  clean           - remove venv and caches"
 	@echo "  clean-checkpoint - remove Spark checkpoint and state data"
 	@echo ""
@@ -66,7 +69,12 @@ help:
 	@echo "  make produce-weather YEARS=2024 MONTHS=01,02 RATE=500"
 	@echo "  make produce-events P_LATE=0.1 SALT_KEYS=10"
 	@echo ""
-	@echo "Override: make TOPIC=trips.yellow YEARS=2024 MONTHS=01,02 RATE=5000 produce-trips"
+	@echo "Real-time Pipeline (default):"
+	@echo "  Bronze: 2 second triggers (Kafka -> Iceberg)"
+	@echo "  Silver: 5 second triggers (Iceberg -> Iceberg)"
+	@echo "  End-to-end latency: 5-10 seconds"
+	@echo ""
+	@echo "Override for batch-like: make SILVER_TRIGGER_INTERVAL='60 seconds' silver-trips"
 
 # -------- Compose lifecycle --------
 .PHONY: up down logs
@@ -251,7 +259,7 @@ spark-ui:
 BRONZE_KAFKA_BOOTSTRAP ?= kafka:9092
 BRONZE_SCHEMA_REGISTRY ?= http://schema-registry:8081
 BRONZE_STARTING_OFFSETS ?= latest
-BRONZE_TRIGGER_INTERVAL ?= 30 seconds
+BRONZE_TRIGGER_INTERVAL ?= 2 seconds  # Real-time: very low latency from Kafka
 BRONZE_MAX_OFFSETS ?= 10000
 
 bronze-trips:
@@ -354,6 +362,62 @@ bronze-clean:
 	@docker exec spark-master rm -rf /tmp/checkpoint/bronze/* 2>/dev/null || true
 	@docker exec minio mc rm -r minio/lakehouse/iceberg/bronze/ 2>/dev/null || true
 	@echo "Bronze layer cleaned"
+
+# -------- Silver Layer Consumers (Medallion Architecture) --------
+.PHONY: silver-trips silver-weather silver-events silver-status silver-clean
+
+# Silver consumer configuration (can be overridden)
+# Real-time configuration: 5 second triggers, 10 minute watermarks
+SILVER_QUALITY_THRESHOLD ?= 0.7
+SILVER_TRIGGER_INTERVAL ?= 5 seconds   # Real-time: 5-10 second latency
+SILVER_WATERMARK ?= 10 minutes         # Real-time: shorter watermark for late data
+SILVER_STARTING_OFFSETS ?= latest
+
+silver-trips:
+	@echo "Starting Silver Trips Consumer..."
+	docker exec -it spark-master /opt/spark/bin/spark-submit \
+		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
+		--conf spark.sql.adaptive.enabled=false \
+		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
+		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.bronze.type=hadoop \
+		--conf spark.sql.catalog.bronze.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.sql.catalog.silver=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.silver.type=hadoop \
+		--conf spark.sql.catalog.silver.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		/opt/spark/work-dir/consumers/run_silver_consumer.py \
+		--source trips \
+		--quality-threshold $(SILVER_QUALITY_THRESHOLD) \
+		--trigger-interval "$(SILVER_TRIGGER_INTERVAL)" \
+		--starting-offsets $(SILVER_STARTING_OFFSETS)
+
+silver-weather:
+	@echo "Silver Weather Consumer - Not Yet Implemented"
+	@echo "To implement: Create data/consumers/silver/weather.py"
+
+silver-events:
+	@echo "Silver Events Consumer - Not Yet Implemented"
+	@echo "To implement: Create data/consumers/silver/events.py"
+
+silver-status:
+	@echo "Checking silver consumer status..."
+	@echo ""
+	@echo "Silver checkpoint status:"
+	@docker exec spark-master ls -la /tmp/checkpoint/silver/ 2>/dev/null || echo "No silver checkpoints found"
+	@echo ""
+	@echo "MinIO Iceberg silver tables:"
+	@docker exec minio mc ls minio/lakehouse/iceberg/silver/ 2>/dev/null || echo "No silver tables found"
+
+silver-clean:
+	@echo "Cleaning silver layer checkpoints and data..."
+	@docker exec spark-master rm -rf /tmp/checkpoint/silver/* 2>/dev/null || true
+	@docker exec minio mc rm -r minio/lakehouse/iceberg/silver/ 2>/dev/null || true
+	@echo "Silver layer cleaned"
 
 # -------- DuckDB Query Engine --------
 .PHONY: query-duckdb install-duckdb
