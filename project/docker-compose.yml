@@ -66,7 +66,7 @@ services:
     build: ./spark
     image: project-spark:3.5.0
     container_name: spark-master
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    command: bash -c "mkdir -p /tmp/checkpoint/bronze && chmod -R 777 /tmp/checkpoint && /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master"
     environment:
       - SPARK_MASTER_HOST=spark-master
       - SPARK_MASTER_PORT=7077
@@ -77,8 +77,8 @@ services:
       - "7077:7077"  # Spark Master Port
     volumes:
       - ./streaming:/opt/spark/work-dir
+      - ./data/consumers:/opt/spark/work-dir/consumers
       - spark-logs:/opt/spark/logs
-      - spark-checkpoint:/tmp/checkpoint
       - spark-state:/tmp/state-store
 
   # Spark Worker 1
@@ -86,7 +86,7 @@ services:
     build: ./spark
     image: project-spark:3.5.0
     container_name: spark-worker-1
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    command: bash -c "mkdir -p /tmp/checkpoint/bronze && chmod -R 777 /tmp/checkpoint && /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077"
     depends_on:
       - spark-master
     environment:
@@ -95,8 +95,8 @@ services:
       - SPARK_NO_DAEMONIZE=true
     volumes:
       - ./streaming:/opt/spark/work-dir
+      - ./data/consumers:/opt/spark/work-dir/consumers
       - spark-logs:/opt/spark/logs
-      - spark-checkpoint:/tmp/checkpoint
       - spark-state:/tmp/state-store
 
   # Spark Worker 2
@@ -104,7 +104,7 @@ services:
     build: ./spark
     image: project-spark:3.5.0
     container_name: spark-worker-2
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    command: bash -c "mkdir -p /tmp/checkpoint/bronze && chmod -R 777 /tmp/checkpoint && /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077"
     depends_on:
       - spark-master
     environment:
@@ -113,8 +113,8 @@ services:
       - SPARK_NO_DAEMONIZE=true
     volumes:
       - ./streaming:/opt/spark/work-dir
+      - ./data/consumers:/opt/spark/work-dir/consumers
       - spark-logs:/opt/spark/logs
-      - spark-checkpoint:/tmp/checkpoint
       - spark-state:/tmp/state-store
 
   # MinIO Object Storage
@@ -155,6 +155,5 @@ services:
 volumes:
   kafka-data:
   spark-logs:
-  spark-checkpoint:
   spark-state:
   minio-data:

@@ -256,8 +256,9 @@ BRONZE_MAX_OFFSETS ?= 10000
 
 bronze-trips:
 	@echo "Starting Bronze Trips Consumer..."
-	docker exec -it spark-master spark-submit \
+	docker exec -it spark-master /opt/spark/bin/spark-submit \
 		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
 		--conf spark.sql.adaptive.enabled=false \
 		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
 		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \
@@ -275,8 +276,9 @@ bronze-trips:
 
 bronze-weather:
 	@echo "Starting Bronze Weather Consumer..."
-	docker exec -it spark-master spark-submit \
+	docker exec -it spark-master /opt/spark/bin/spark-submit \
 		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
 		--conf spark.sql.adaptive.enabled=false \
 		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
 		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \
@@ -294,8 +296,9 @@ bronze-weather:
 
 bronze-events:
 	@echo "Starting Bronze Events Consumer..."
-	docker exec -it spark-master spark-submit \
+	docker exec -it spark-master /opt/spark/bin/spark-submit \
 		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
 		--conf spark.sql.adaptive.enabled=false \
 		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
 		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \
@@ -313,8 +316,9 @@ bronze-events:
 
 bronze-all:
 	@echo "Starting All Bronze Consumers in Parallel..."
-	docker exec -it spark-master spark-submit \
+	docker exec -it spark-master /opt/spark/bin/spark-submit \
 		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
 		--conf spark.sql.adaptive.enabled=false \
 		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
 		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \

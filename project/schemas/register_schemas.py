@@ -90,14 +90,18 @@ def main():
         schema_str = json.dumps(schema_dict)
 
         # Derive subject name from filename
-        # Convention: trip_event.avsc -> trips.yellow-value
+        # Map schema files to their correct Kafka topic subjects
         if "trip_event" in schema_file.stem:
             subjects = [
                 ("trips.yellow-value", "BACKWARD"),
                 ("trips.green-value", "BACKWARD"),
             ]
+        elif "weather_event" in schema_file.stem:
+            subjects = [("weather.updates-value", "BACKWARD")]
+        elif "event_calendar" in schema_file.stem:
+            subjects = [("events.calendar-value", "BACKWARD")]
         else:
-            # Default naming convention
+            # Default naming convention for any other schemas
             subjects = [(f"{schema_file.stem}-value", "BACKWARD")]
 
         for subject, compatibility in subjects:

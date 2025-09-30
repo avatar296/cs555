@@ -16,8 +16,9 @@ class EventsConsumerConfig(BaseConsumerConfig):
     """Configuration for bronze events consumer."""
 
     # Override base defaults for events
-    source_topic: str = "events.nyc"
+    source_topic: str = "events.calendar"
     target_table: str = "bronze.events"
     consumer_name: str = "bronze-events"
+    checkpoint_location: str = "/tmp/checkpoint/bronze/bronze-events"
     trigger_interval: str = "60 seconds"
     max_offsets_per_trigger: int = 5000

@@ -19,5 +19,6 @@ class TripsConsumerConfig(BaseConsumerConfig):
     source_topic: str = "trips.yellow"
     target_table: str = "bronze.trips"
     consumer_name: str = "bronze-trips"
+    checkpoint_location: str = "/tmp/checkpoint/bronze/bronze-trips"
     trigger_interval: str = "30 seconds"
     max_offsets_per_trigger: int = 10000
