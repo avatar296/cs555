@@ -33,7 +33,8 @@ public class ComputeNode {
   private static final int PUSH_THRESHOLD = Config.getInt("cs555.pushThreshold", 2000);
   private static final int PULL_THRESHOLD = Config.getInt("cs555.pullThreshold", 100);
   private static final int MIN_BATCH_SIZE = Config.getInt("cs555.minBatchSize", 20);
-  private static final long BALANCE_CHECK_INTERVAL = Config.getLong("cs555.balanceCheckInterval", 3000);
+  private static final long BALANCE_CHECK_INTERVAL =
+      Config.getLong("cs555.balanceCheckInterval", 3000);
 
   private final String registryHost;
   private final int registryPort;
@@ -51,7 +52,8 @@ public class ComputeNode {
   private volatile LoadBalancer loadBalancer;
   private volatile boolean acceptingTasks = true;
 
-  private static final int MESSAGE_HANDLER_THREADS = Config.getInt("cs555.messageHandlerThreads", 5);
+  private static final int MESSAGE_HANDLER_THREADS =
+      Config.getInt("cs555.messageHandlerThreads", 5);
   private ExecutorService messageHandlerPool;
 
   public ComputeNode(String registryHost, int registryPort) {
@@ -82,25 +84,23 @@ public class ComputeNode {
         ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream())) {
       out.writeObject(Protocol.REGISTER + " " + ip + " " + port);
       out.flush();
-    } catch (IOException e) {
-      throw e;
     }
 
     new Thread(
-        () -> {
-          try {
-            while (running) {
-              Socket sock = serverSocket.accept();
+            () -> {
+              try {
+                while (running) {
+                  Socket sock = serverSocket.accept();
 
-              messageHandlerPool.execute(() -> handleMessage(sock));
-            }
-          } catch (IOException e) {
-            if (running) {
-              e.printStackTrace();
-            }
-          }
-        },
-        "ComputeNode-AcceptLoop")
+                  messageHandlerPool.execute(() -> handleMessage(sock));
+                }
+              } catch (IOException e) {
+                if (running) {
+                  e.printStackTrace();
+                }
+              }
+            },
+            "ComputeNode-AcceptLoop")
         .start();
   }
 
@@ -108,14 +108,12 @@ public class ComputeNode {
     try {
       PushbackInputStream pin = new PushbackInputStream(sock.getInputStream());
       int first = pin.read();
-      if (first == -1)
-        return;
+      if (first == -1) return;
       pin.unread(first);
 
       try (ObjectInputStream in = new ObjectInputStream(pin)) {
         Object obj = in.readObject();
-        if (!(obj instanceof String))
-          return;
+        if (!(obj instanceof String)) return;
 
         String msg = (String) obj;
 
@@ -137,18 +135,15 @@ public class ComputeNode {
               e.printStackTrace();
               pool = null;
             }
-          } else {
-
-            if (poolSize != newPoolSize) {
-            }
           }
 
           if (roundAggregator == null) {
             roundAggregator = new RoundAggregator(myId, state);
           }
           if (loadBalancer == null) {
-            loadBalancer = new LoadBalancer(
-                myId, taskQueue, stats, state, PUSH_THRESHOLD, PULL_THRESHOLD, MIN_BATCH_SIZE);
+            loadBalancer =
+                new LoadBalancer(
+                    myId, taskQueue, stats, state, PUSH_THRESHOLD, PULL_THRESHOLD, MIN_BATCH_SIZE);
           }
 
         } else if (msg.startsWith(Protocol.START)) {
@@ -190,8 +185,7 @@ public class ComputeNode {
           }
           @SuppressWarnings("unchecked")
           java.util.List<Task> batch = (java.util.List<Task>) in.readObject();
-          for (Task t : batch)
-            t.markMigrated();
+          for (Task t : batch) t.markMigrated();
           taskQueue.addBatch(batch);
           stats.incrementPulled(batch.size());
 
@@ -202,11 +196,9 @@ public class ComputeNode {
           String[] parts = msg.split(" ");
           String requestingNode = parts[1];
           int capacity = Integer.parseInt(parts[2]);
-          if (loadBalancer != null)
-            loadBalancer.handlePullRequest(requestingNode, capacity);
+          if (loadBalancer != null) loadBalancer.handlePullRequest(requestingNode, capacity);
         } else if (msg.startsWith(Protocol.GEN)) {
-          if (roundAggregator != null)
-            roundAggregator.handleGenMessage(msg);
+          if (roundAggregator != null) roundAggregator.handleGenMessage(msg);
         }
       }
     } catch (EOFException e) {
@@ -329,7 +321,6 @@ public class ComputeNode {
         if (line.trim().equalsIgnoreCase("quit")) {
           node.shutdown();
           System.exit(0);
-        } else if (!line.trim().isEmpty()) {
         }
       }
     }

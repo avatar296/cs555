@@ -70,13 +70,11 @@ public class LoadBalancer {
         for (Task t : raw) {
           t.markMigrated();
         }
-        if (!raw.isEmpty()) {
-          try {
-            NetworkUtil.sendTasks(successor, raw);
-            stats.incrementPushed(raw.size());
-          } catch (IOException e) {
-            taskQueue.addBatch(raw);
-          }
+        try {
+          NetworkUtil.sendTasks(successor, raw);
+          stats.incrementPushed(raw.size());
+        } catch (IOException e) {
+          taskQueue.addBatch(raw);
         }
       }
     } else if (predecessor != null && currentOutstanding < targetQueue) {

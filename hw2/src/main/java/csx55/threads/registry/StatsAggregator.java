@@ -20,10 +20,6 @@ public class StatsAggregator {
     statsByNode.put(nodeId, stats);
   }
 
-  public int size() {
-    return statsByNode.size();
-  }
-
   public void printFinalIfReady(List<String> nodes, long startTime) {
     if (printed.get()) return;
     if (statsByNode.size() != nodes.size()) return;

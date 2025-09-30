@@ -16,8 +16,6 @@ public final class NetworkUtil {
         ObjectOutputStream out = new ObjectOutputStream(sock.getOutputStream())) {
       out.writeObject(msg);
       out.flush();
-    } catch (IOException e) {
-      throw e;
     }
   }
 

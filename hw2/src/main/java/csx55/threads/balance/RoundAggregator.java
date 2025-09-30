@@ -19,31 +19,9 @@ public class RoundAggregator {
 
   private static class RoundInfo {
     final Set<String> seen = ConcurrentHashMap.newKeySet();
-    int total = 0;
-    volatile boolean complete = false;
 
     synchronized void add(String origin, int count, int expectedSize) {
-      if (seen.add(origin)) {
-        total += count;
-        if (seen.size() >= expectedSize) {
-          complete = true;
-          notifyAll();
-        }
-      }
-    }
-
-    synchronized void awaitComplete(long maxWaitMs, int expectedSize) {
-      long deadline = System.currentTimeMillis() + maxWaitMs;
-      while (!complete && seen.size() < expectedSize && System.currentTimeMillis() < deadline) {
-        long remaining = deadline - System.currentTimeMillis();
-        if (remaining <= 0) break;
-        try {
-          wait(Math.min(remaining, 100));
-        } catch (InterruptedException ignored) {
-          Thread.currentThread().interrupt();
-          break;
-        }
-      }
+      seen.add(origin);
     }
   }
 
@@ -52,12 +30,6 @@ public class RoundAggregator {
     info.add(myId, generated, Math.max(1, state.getRingSize()));
     String msg = Protocol.GEN + " " + round + " " + myId + " " + generated;
     forwardToSuccessor(msg);
-  }
-
-  public int awaitRoundTotal(int round, long maxWaitMs) {
-    RoundInfo info = roundInfoMap.computeIfAbsent(round, k -> new RoundInfo());
-    info.awaitComplete(maxWaitMs, Math.max(1, state.getRingSize()));
-    return info.total;
   }
 
   public void handleGenMessage(String msg) {

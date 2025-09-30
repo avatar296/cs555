@@ -97,10 +97,6 @@ public class Task implements java.io.Serializable {
     return migrated;
   }
 
-  public byte[] toBytes() {
-    return toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-  }
-
   @Override
   public String toString() {
     return ip

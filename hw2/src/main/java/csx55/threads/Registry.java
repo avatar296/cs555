@@ -9,7 +9,6 @@ import csx55.threads.util.Protocol;
 import java.io.*;
 import java.net.*;
 import java.util.*;
-import java.util.ArrayList;
 
 public class Registry {
 
@@ -133,7 +132,6 @@ public class Registry {
     } catch (EOFException e) {
     } catch (Exception e) {
       e.printStackTrace();
-    } finally {
     }
   }
 
@@ -210,8 +208,6 @@ public class Registry {
   }
 
   public static void main(String[] args) throws Exception {
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> {}));
-
     if (args.length != 1) {
       System.err.println("Usage: java csx55.threads.Registry <port>");
       System.exit(1);

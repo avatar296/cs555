@@ -32,8 +32,6 @@ echo -e "${YELLOW}Available commands:${NC}"
 echo "  setup-overlay <thread-pool-size>"
 echo "  start <number-of-rounds>"
 echo "  quit"
-echo ""
-echo "Thread pool size must be between 2 and 16"
 echo "========================================="
 echo ""
 
