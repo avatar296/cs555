@@ -59,6 +59,10 @@ help:
 	@echo "  bronze-status   - check bronze consumer and table status"
 	@echo "  bronze-clean    - clean bronze layer data and checkpoints"
 	@echo "  silver-trips    - run silver layer trips consumer"
+	@echo "  silver-weather  - run silver layer weather consumer"
+	@echo "  silver-events   - run silver layer events consumer"
+	@echo "  silver-zones    - load zone dimension table (one-time)"
+	@echo "  silver-all      - run all silver consumers in parallel"
 	@echo "  silver-status   - check silver consumer and table status"
 	@echo "  silver-clean    - clean silver layer data and checkpoints"
 	@echo "  clean           - remove venv and caches"
@@ -280,7 +284,8 @@ bronze-trips:
 		--source trips \
 		--kafka-bootstrap $(BRONZE_KAFKA_BOOTSTRAP) \
 		--schema-registry $(BRONZE_SCHEMA_REGISTRY) \
-		--starting-offsets $(BRONZE_STARTING_OFFSETS)
+		--starting-offsets $(BRONZE_STARTING_OFFSETS) \
+		--trigger-interval "$(BRONZE_TRIGGER_INTERVAL)"
 
 bronze-weather:
 	@echo "Starting Bronze Weather Consumer..."
@@ -300,7 +305,8 @@ bronze-weather:
 		--source weather \
 		--kafka-bootstrap $(BRONZE_KAFKA_BOOTSTRAP) \
 		--schema-registry $(BRONZE_SCHEMA_REGISTRY) \
-		--starting-offsets $(BRONZE_STARTING_OFFSETS)
+		--starting-offsets $(BRONZE_STARTING_OFFSETS) \
+		--trigger-interval "$(BRONZE_TRIGGER_INTERVAL)"
 
 bronze-events:
 	@echo "Starting Bronze Events Consumer..."
@@ -320,7 +326,8 @@ bronze-events:
 		--source events \
 		--kafka-bootstrap $(BRONZE_KAFKA_BOOTSTRAP) \
 		--schema-registry $(BRONZE_SCHEMA_REGISTRY) \
-		--starting-offsets $(BRONZE_STARTING_OFFSETS)
+		--starting-offsets $(BRONZE_STARTING_OFFSETS) \
+		--trigger-interval "$(BRONZE_TRIGGER_INTERVAL)"
 
 bronze-all:
 	@echo "Starting All Bronze Consumers in Parallel..."
@@ -343,6 +350,7 @@ bronze-all:
 		--kafka-bootstrap $(BRONZE_KAFKA_BOOTSTRAP) \
 		--schema-registry $(BRONZE_SCHEMA_REGISTRY) \
 		--starting-offsets $(BRONZE_STARTING_OFFSETS) \
+		--trigger-interval "$(BRONZE_TRIGGER_INTERVAL)" \
 		--parallel
 
 bronze-status:
@@ -364,14 +372,18 @@ bronze-clean:
 	@echo "Bronze layer cleaned"
 
 # -------- Silver Layer Consumers (Medallion Architecture) --------
-.PHONY: silver-trips silver-weather silver-events silver-status silver-clean
+.PHONY: silver-trips silver-weather silver-events silver-zones silver-all silver-status silver-clean
 
 # Silver consumer configuration (can be overridden)
-# Real-time configuration: 5 second triggers, 10 minute watermarks
+# Real-time demo configuration: unified watermark for simplicity
 SILVER_QUALITY_THRESHOLD ?= 0.7
-SILVER_TRIGGER_INTERVAL ?= 5 seconds   # Real-time: 5-10 second latency
-SILVER_WATERMARK ?= 10 minutes         # Real-time: shorter watermark for late data
 SILVER_STARTING_OFFSETS ?= latest
+SILVER_WATERMARK ?= 5 minutes  # Unified watermark for all consumers
+
+# Trigger intervals (different frequencies based on data type)
+SILVER_TRIPS_TRIGGER_INTERVAL ?= 5 seconds    # Trips: most frequent
+SILVER_WEATHER_TRIGGER_INTERVAL ?= 60 seconds # Weather: hourly updates
+SILVER_EVENTS_TRIGGER_INTERVAL ?= 300 seconds # Events: every 5 minutes
 
 silver-trips:
 	@echo "Starting Silver Trips Consumer..."
@@ -392,17 +404,75 @@ silver-trips:
 		--conf spark.hadoop.fs.s3a.path.style.access=true \
 		/opt/spark/work-dir/consumers/run_silver_consumer.py \
 		--source trips \
-		--quality-threshold $(SILVER_QUALITY_THRESHOLD) \
-		--trigger-interval "$(SILVER_TRIGGER_INTERVAL)" \
-		--starting-offsets $(SILVER_STARTING_OFFSETS)
+		--trigger-interval "$(SILVER_TRIPS_TRIGGER_INTERVAL)" \
+		--watermark "$(SILVER_WATERMARK)"
 
 silver-weather:
-	@echo "Silver Weather Consumer - Not Yet Implemented"
-	@echo "To implement: Create data/consumers/silver/weather.py"
+	@echo "Starting Silver Weather Consumer..."
+	docker exec -it spark-master /opt/spark/bin/spark-submit \
+		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
+		--conf spark.sql.adaptive.enabled=false \
+		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
+		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.bronze.type=hadoop \
+		--conf spark.sql.catalog.bronze.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.sql.catalog.silver=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.silver.type=hadoop \
+		--conf spark.sql.catalog.silver.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		/opt/spark/work-dir/consumers/run_silver_consumer.py \
+		--source weather \
+		--trigger-interval "$(SILVER_WEATHER_TRIGGER_INTERVAL)" \
+		--watermark "$(SILVER_WATERMARK)"
 
 silver-events:
-	@echo "Silver Events Consumer - Not Yet Implemented"
-	@echo "To implement: Create data/consumers/silver/events.py"
+	@echo "Starting Silver Events Consumer..."
+	docker exec -it spark-master /opt/spark/bin/spark-submit \
+		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.spark:spark-avro_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
+		--conf spark.sql.adaptive.enabled=false \
+		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
+		--conf spark.sql.catalog.bronze=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.bronze.type=hadoop \
+		--conf spark.sql.catalog.bronze.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.sql.catalog.silver=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.silver.type=hadoop \
+		--conf spark.sql.catalog.silver.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		/opt/spark/work-dir/consumers/run_silver_consumer.py \
+		--source events \
+		--trigger-interval "$(SILVER_EVENTS_TRIGGER_INTERVAL)" \
+		--watermark "$(SILVER_WATERMARK)"
+
+silver-zones:
+	@echo "Loading Zone Dimension Table..."
+	docker exec spark-master /opt/spark/bin/spark-submit \
+		--packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
+		--conf spark.sql.catalog.silver=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.silver.type=hadoop \
+		--conf spark.sql.catalog.silver.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		/opt/spark/work-dir/consumers/silver/zones_loader.py
+
+silver-all:
+	@echo "Starting All Silver Consumers in Parallel..."
+	@echo "Note: Run silver-zones first to load zone dimension"
+	@$(MAKE) silver-trips &
+	@$(MAKE) silver-weather &
+	@$(MAKE) silver-events &
+	@echo "All silver consumers started in background"
+	@echo "Use 'make silver-status' to check status"
 
 silver-status:
 	@echo "Checking silver consumer status..."
