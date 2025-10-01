@@ -65,6 +65,12 @@ help:
 	@echo "  silver-all      - run all silver consumers in parallel"
 	@echo "  silver-status   - check silver consumer and table status"
 	@echo "  silver-clean    - clean silver layer data and checkpoints"
+	@echo "  gold-zone-metrics - run gold layer zone metrics consumer (simple)"
+	@echo "  gold-od-flows   - run gold layer OD flows consumer (medium)"
+	@echo "  gold-demand-context - run gold layer demand context consumer (complex)"
+	@echo "  gold-all        - run all gold consumers in parallel"
+	@echo "  gold-status     - check gold consumer and table status"
+	@echo "  gold-clean      - clean gold layer data and checkpoints"
 	@echo "  clean           - remove venv and caches"
 	@echo "  clean-checkpoint - remove Spark checkpoint and state data"
 	@echo ""
@@ -488,6 +494,125 @@ silver-clean:
 	@docker exec spark-master rm -rf /tmp/checkpoint/silver/* 2>/dev/null || true
 	@docker exec minio mc rm -r minio/lakehouse/iceberg/silver/ 2>/dev/null || true
 	@echo "Silver layer cleaned"
+
+# -------- Gold Layer (Business Aggregations) --------
+.PHONY: gold-zone-metrics gold-od-flows gold-demand-context gold-all gold-status gold-clean
+
+# Gold consumer configuration
+GOLD_WINDOW ?= 15 minutes  # POC: Fast feedback
+GOLD_WATERMARK ?= 5 minutes  # POC: Minimal latency
+GOLD_TRIGGER_INTERVAL ?= 5 seconds  # POC: Rapid updates
+
+# Advanced watermarks for complex consumer
+GOLD_TRIPS_WATERMARK ?= 5 minutes
+GOLD_WEATHER_WATERMARK ?= 5 minutes
+GOLD_EVENTS_WATERMARK ?= 1 hour
+GOLD_EVENT_PROXIMITY ?= 1.0  # miles
+
+gold-zone-metrics:
+	@echo "Starting Gold Zone Metrics Hourly Consumer (SIMPLE PATTERN)..."
+	@echo "  Pattern: Standard windowed aggregation"
+	@echo "  Source: silver.trips"
+	docker exec -it spark-master /opt/spark/bin/spark-submit \
+		--packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
+		--conf spark.sql.adaptive.enabled=false \
+		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
+		--conf spark.sql.catalog.silver=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.silver.type=hadoop \
+		--conf spark.sql.catalog.silver.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.sql.catalog.gold=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.gold.type=hadoop \
+		--conf spark.sql.catalog.gold.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		/opt/spark/work-dir/consumers/run_gold_consumer.py \
+		--table zone_metrics_hourly \
+		--window "$(GOLD_WINDOW)" \
+		--watermark "$(GOLD_WATERMARK)" \
+		--trigger-interval "$(GOLD_TRIGGER_INTERVAL)"
+
+gold-od-flows:
+	@echo "Starting Gold OD Flows Enriched Hourly Consumer (MEDIUM COMPLEXITY)..."
+	@echo "  Pattern: Aggregation + dual dimension joins"
+	@echo "  Source: silver.trips + silver.zones"
+	docker exec -it spark-master /opt/spark/bin/spark-submit \
+		--packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
+		--conf spark.sql.adaptive.enabled=false \
+		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
+		--conf spark.sql.catalog.silver=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.silver.type=hadoop \
+		--conf spark.sql.catalog.silver.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.sql.catalog.gold=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.gold.type=hadoop \
+		--conf spark.sql.catalog.gold.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		/opt/spark/work-dir/consumers/run_gold_consumer.py \
+		--table od_flows_enriched_hourly \
+		--window "$(GOLD_WINDOW)" \
+		--watermark "$(GOLD_WATERMARK)" \
+		--trigger-interval "$(GOLD_TRIGGER_INTERVAL)"
+
+gold-demand-context:
+	@echo "Starting Gold Zone Demand Context Hourly Consumer (MAXIMUM COMPLEXITY)..."
+	@echo "  Pattern: Triple stream join + temporal + spatial alignment"
+	@echo "  Sources: silver.trips + silver.weather + silver.events"
+	@echo "  This is graduate-level streaming architecture!"
+	docker exec -it spark-master /opt/spark/bin/spark-submit \
+		--packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,org.apache.hadoop:hadoop-aws:3.3.4 \
+		--conf spark.jars.ivy=/tmp/.ivy2 \
+		--conf spark.sql.adaptive.enabled=false \
+		--conf spark.sql.streaming.stateStore.stateSchemaCheck=false \
+		--conf spark.sql.catalog.silver=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.silver.type=hadoop \
+		--conf spark.sql.catalog.silver.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.sql.catalog.gold=org.apache.iceberg.spark.SparkCatalog \
+		--conf spark.sql.catalog.gold.type=hadoop \
+		--conf spark.sql.catalog.gold.warehouse=s3a://lakehouse/iceberg \
+		--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+		--conf spark.hadoop.fs.s3a.access.key=admin \
+		--conf spark.hadoop.fs.s3a.secret.key=admin123 \
+		--conf spark.hadoop.fs.s3a.path.style.access=true \
+		/opt/spark/work-dir/consumers/run_gold_consumer.py \
+		--table zone_demand_context_hourly \
+		--window "$(GOLD_WINDOW)" \
+		--trips-watermark "$(GOLD_TRIPS_WATERMARK)" \
+		--weather-watermark "$(GOLD_WEATHER_WATERMARK)" \
+		--events-watermark "$(GOLD_EVENTS_WATERMARK)" \
+		--event-proximity "$(GOLD_EVENT_PROXIMITY)" \
+		--trigger-interval "$(GOLD_TRIGGER_INTERVAL)"
+
+gold-all:
+	@echo "Starting All Gold Consumers in Parallel..."
+	@echo "  1. Simple: zone_metrics_hourly"
+	@echo "  2. Medium: od_flows_enriched_hourly"
+	@echo "  3. Complex: zone_demand_context_hourly"
+	@$(MAKE) gold-zone-metrics &
+	@$(MAKE) gold-od-flows &
+	@$(MAKE) gold-demand-context &
+	@echo "All gold consumers started in background"
+	@echo "Use 'make gold-status' to check status"
+
+gold-status:
+	@echo "Checking gold consumer status..."
+	@echo ""
+	@echo "Gold checkpoint status:"
+	@docker exec spark-master ls -la /tmp/checkpoint/gold/ 2>/dev/null || echo "No gold checkpoints found"
+	@echo ""
+	@echo "MinIO Iceberg gold tables:"
+	@docker exec minio mc ls minio/lakehouse/iceberg/gold/ 2>/dev/null || echo "No gold tables found"
+
+gold-clean:
+	@echo "Cleaning gold layer checkpoints and data..."
+	@docker exec spark-master rm -rf /tmp/checkpoint/gold/* 2>/dev/null || true
+	@docker exec minio mc rm -r minio/lakehouse/iceberg/gold/ 2>/dev/null || true
+	@echo "Gold layer cleaned"
 
 # -------- DuckDB Query Engine --------
 .PHONY: query-duckdb install-duckdb
