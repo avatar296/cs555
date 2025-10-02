@@ -1,5 +1,7 @@
 package csx55.pastry.node;
 
+import csx55.pastry.routing.LeafSet;
+import csx55.pastry.routing.RoutingTable;
 import csx55.pastry.transport.Message;
 import csx55.pastry.transport.MessageFactory;
 import csx55.pastry.transport.MessageType;
@@ -21,7 +23,7 @@ public class Peer {
 
   private final String discoverHost;
   private final int discoverPort;
-  private final String id; // 16-bit hex ID (4 hex digits)
+  private final String id;
 
   private ServerSocket serverSocket;
   private int peerPort;
@@ -29,6 +31,9 @@ public class Peer {
   private NodeInfo selfInfo;
   private File storageDir;
   private volatile boolean running;
+
+  private LeafSet leafSet;
+  private RoutingTable routingTable;
 
   public Peer(String discoverHost, int discoverPort, String id) {
     this.discoverHost = discoverHost;
@@ -47,6 +52,10 @@ public class Peer {
     logger.info("Discovery Node: " + discoverHost + ":" + discoverPort);
 
     try {
+      // Initialize routing structures
+      leafSet = new LeafSet(id);
+      routingTable = new RoutingTable(id);
+
       // Start TCP server on random port
       startPeerServer();
 
@@ -183,12 +192,10 @@ public class Peer {
             System.out.println(id);
             break;
           case "leaf-set":
-            // TODO: Print leaf set
-            System.out.println("Leaf set not yet implemented");
+            printLeafSet();
             break;
           case "routing-table":
-            // TODO: Print routing table
-            System.out.println("Routing table not yet implemented");
+            printRoutingTable();
             break;
           case "list-files":
             listFiles();
@@ -204,6 +211,19 @@ public class Peer {
     } catch (Exception e) {
       logger.severe("Error in command loop: " + e.getMessage());
     }
+  }
+
+  private void printLeafSet() {
+    String output = leafSet.toOutputFormat();
+    if (output.isEmpty()) {
+      System.out.println("Leaf set is empty");
+    } else {
+      System.out.println(output);
+    }
+  }
+
+  private void printRoutingTable() {
+    System.out.println(routingTable.toOutputFormat());
   }
 
   private void listFiles() {
