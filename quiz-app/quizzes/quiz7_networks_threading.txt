@@ -1,0 +1,125 @@
+1
+1 / 1 point
+A regular graph is one in which the n nodes are organized in a ring, with each node directly connected to its nearest k neighbors. In random graphs on the other hand, the vertices are connected to each other at random. Pathlength refers to the average number of hops needed to reach any node from any other node in the graph. The clustering coefficient is the measure of the level of clustering between the neighboring nodes for any vertex-node in the system.
+
+Indicate [High/Low] for the questions below.
+Random graph: Average pathlength
+
+
+High
+
+, Not Selected
+Correct answer:
+
+Low
+
+Results for question 2.
+2
+1 / 1 point
+A regular graph is one in which the n nodes are organized in a ring, with each node directly connected to its nearest k neighbors. In random graphs on the other hand, the vertices are connected to each other at random. Pathlength refers to the average number of hops needed to reach any node from any other node in the graph. The clustering coefficient is the measure of the level of clustering between the neighboring nodes for any vertex-node in the system.
+
+Indicate [High/Low] for the questions below.
+Random graph: Clustering Coefficients
+
+
+High
+
+, Not Selected
+Correct answer:
+
+Low
+
+Results for question 3.
+3
+1 / 1 point
+A regular graph is one in which the n nodes are organized in a ring, with each node directly connected to its nearest k neighbors. In random graphs on the other hand, the vertices are connected to each other at random. Pathlength refers to the average number of hops needed to reach any node from any other node in the graph. The clustering coefficient is the measure of the level of clustering between the neighboring nodes for any vertex-node in the system.
+
+Indicate [High/Low] for the question below.
+
+Regular graph: Average pathlength
+
+Correct answer:
+
+High
+
+
+Low
+
+, Not Selected
+Results for question 4.
+4
+1 / 1 point
+A regular graph is one in which the n nodes are organized in a ring, with each node directly connected to its nearest k neighbors. In random graphs on the other hand, the vertices are connected to each other at random. Pathlength refers to the average number of hops needed to reach any node from any other node in the graph. The clustering coefficient is the measure of the level of clustering between the neighboring nodes for any vertex-node in the system.
+
+Indicate [High/Low] for the question below.
+Regular graph: Clustering Coefficients
+
+
+Correct answer:
+
+High
+
+
+Low
+
+, Not Selected
+Results for question 5.
+5
+1 / 1 point
+A simple rule to create power-law networks is to ensure that new nodes attach preferentially to nodes with a high degree of connections to other nodes in the system.
+
+Correct answer:
+
+True
+
+False
+Results for question 6.
+6
+1 / 1 point
+Hubs can emerge in small-world networks.
+
+
+True
+Correct answer:
+
+False
+Results for question 7.
+7
+1 / 1 point
+An advantage of using a thread per connection is that the server benefits from lower thread management overheads compared to thread-per-request.
+
+Correct answer:
+
+True
+
+False
+Results for question 8.
+8
+1 / 1 point
+An advantage of using thread per request is that throughput is potentially maximized.
+
+Correct answer:
+
+True
+
+False
+Results for question 9.
+9
+1 / 1 point
+One advantage of a worker pool is that the number of worker threads is fixed, so, the number of threads may be too few to adequately cope with the rate of requests. Additionally, one disadvantage of a worker pool is that you need to account for coordinated accesses to the shared queue.
+
+
+True
+Correct answer:
+
+False
+Results for question 10.
+10
+1 / 1 point
+An advantage of a worker pool is that thread context switching is minimized.
+
+Correct answer:
+
+True
+
+False

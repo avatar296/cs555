@@ -1,0 +1,212 @@
+1
+2.5 / 2.5 points
+The following code correctly marshalls and unmarshalls the TrafficRecord class
+
+public TrafficRecord(byte[] marshalledBytes) throws IOException {
+    ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
+    DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
+
+    int MACAddressLength = din.readInt();
+    byte[] MACAddressBytes = new byte[MACAddressLength];
+    din.readFully(MACAddressBytes);
+    MACAddress = new String(MACAddressBytes);
+
+    timestamp = din.readLong();
+
+    int packetCount = din.readInt();
+    packetSizes = new int[packetCount];
+    for (int i = 0; i < packetCount; i++) {
+        packetSizes[i] = din.readInt();
+    }
+
+    baInputStream.close();
+    din.close();
+}
+
+public byte[] getBytes() throws IOException {
+    ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
+    DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
+
+    byte[] MACAddressBytes = MACAddress.getBytes();
+    int MACAddressLength = MACAddressBytes.length;
+    dout.writeInt(MACAddressLength);
+    dout.write(MACAddressBytes);
+
+    dout.writeInt(packetSizes.length);
+    for (int size : packetSizes) {
+        dout.writeInt(size);
+    }
+
+    dout.flush();
+    byte[] marshalledBytes = baOutputStream.toByteArray();
+    baOutputStream.close();
+    dout.close();
+    return marshalledBytes;
+}
+
+
+True
+Correct answer:
+
+False
+Results for question 2.
+2
+2.5 / 2.5 points
+The following code correctly marshalls and unmarshalls the TrafficRecord class
+
+public TrafficRecord(byte[] marshalledBytes) throws IOException {
+    ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
+    DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
+
+    int MACAddressLength = din.readInt();
+    byte[] MACAddressBytes = new byte[MACAddressLength];
+    din.readFully(MACAddressBytes);
+    MACAddress = new String(MACAddressBytes);
+
+    timestamp = din.readLong();
+
+    int packetCount = din.readInt();
+    packetSizes = new int[packetCount];
+    for (int i = 0; i < packetSizes.length - 1; i++) {
+        packetSizes[i] = din.readInt();
+    }
+
+    baInputStream.close();
+    din.close();
+}
+
+public byte[] getBytes() throws IOException {
+    ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
+    DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
+
+    byte[] MACAddressBytes = MACAddress.getBytes();
+    int MACAddressLength = MACAddressBytes.length;
+    dout.writeInt(MACAddressLength);
+    dout.write(MACAddressBytes);
+
+    dout.writeLong(timestamp);
+
+    dout.writeInt(packetSizes.length);
+    for (int size : packetSizes) {
+        dout.writeInt(size);
+    }
+
+    dout.flush();
+    byte[] marshalledBytes = baOutputStream.toByteArray();
+    baOutputStream.close();
+    dout.close();
+    return marshalledBytes;
+}
+
+
+True
+Correct answer:
+
+False
+Results for question 3.
+3
+0 / 2.5 points
+The following code correctly marshalls and unmarshalls the TrafficRecord class
+
+public TrafficRecord(byte[] marshalledBytes) throws IOException {
+    ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
+    DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
+
+    int MACAddressLength = din.readInt();
+    byte[] MACAddressBytes = new byte[MACAddressLength];
+    din.readFully(MACAddressBytes);
+    MACAddress = new String(MACAddressBytes);
+
+    timestamp = din.readLong();
+
+    int packetCount = din.readInt();
+    packetSizes = new int[packetCount];
+    for (int i = 0; i < packetCount; i++) {
+        packetSizes[i] = din.readInt();
+    }
+
+    baInputStream.close();
+    din.close();
+}
+
+public byte[] getBytes() throws IOException {
+    ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
+    DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
+
+    byte[] MACAddressBytes = MACAddress.getBytes();
+    int MACAddressLength = MACAddressBytes.length;
+    dout.writeInt(MACAddressLength);
+    dout.write(MACAddressBytes);
+
+    dout.writeLong(timestamp);
+
+    dout.writeInt(packetSizes.length);
+    for (int size : packetSizes) {
+        dout.writeInt(size);
+    }
+
+    dout.flush();
+    byte[] marshalledBytes = baOutputStream.toByteArray();
+    baOutputStream.close();
+    dout.close();
+    return marshalledBytes;
+}
+
+Correct answer:
+
+True
+
+False
+Results for question 4.
+4
+2.5 / 2.5 points
+The following code correctly marshalls and unmarshalls the TrafficRecord class
+
+public TrafficRecord(byte[] marshalledBytes) throws IOException {
+    ByteArrayInputStream baInputStream = new ByteArrayInputStream(marshalledBytes);
+    DataInputStream din = new DataInputStream(new BufferedInputStream(baInputStream));
+
+    int MACAddressLength = din.readInt();
+    byte[] MACAddressBytes = new byte[MACAddressLength];
+    din.readFully(MACAddressBytes);
+    MACAddress = new String(MACAddressBytes);
+
+    timestamp = din.readLong();
+
+    int packetCount = din.readInt();
+    packetSizes = new int[packetCount];
+    for (int i = 0; i < packetCount; i++) {
+        packetSizes[i] = din.readInt();
+    }
+
+    baInputStream.close();
+    din.close();
+}
+
+public byte[] getBytes() throws IOException {
+    ByteArrayOutputStream baOutputStream = new ByteArrayOutputStream();
+    DataOutputStream dout = new DataOutputStream(new BufferedOutputStream(baOutputStream));
+
+    byte[] MACAddressBytes = MACAddress.getBytes();
+    int MACAddressLength = MACAddressBytes.length;
+    dout.write(MACAddressBytes);
+
+    dout.writeLong(timestamp);
+
+    dout.writeInt(packetSizes.length);
+    for (int size : packetSizes) {
+        dout.writeInt(size);
+    }
+
+    dout.flush();
+    byte[] marshalledBytes = baOutputStream.toByteArray();
+    baOutputStream.close();
+    dout.close();
+    return marshalledBytes;
+}
+
+
+True
+Correct answer:
+
+False

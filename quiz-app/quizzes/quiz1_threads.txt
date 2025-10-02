@@ -1,0 +1,97 @@
+1
+1 / 1 point
+Threads within a process share the same program counter.
+
+
+True
+Correct answer:
+
+False
+Results for question 2.
+2
+1 / 1 point
+Context-switching between threads is more time-consuming than context-switching between processes.
+
+
+True
+Correct answer:
+
+False
+Results for question 3.
+3
+1 / 1 point
+Regardless of the recursion depth of an executing thread, there can only be 1 frame on that thread's stack.
+
+
+True
+Correct answer:
+
+False
+Results for question 4.
+4
+1 / 1 point
+All frames on an executing thread's stack must be of the same size.
+
+
+True
+Correct answer:
+
+False
+Results for question 5.
+5
+1 / 1 point
+A process with 4 threads has 5 program counters; one for each thread, and one for the process.
+
+
+True
+Correct answer:
+
+False
+Results for question 6.
+6
+1 / 1 point
+Though threads simplify sharing within a process, context-switching between threads within a process is just as expensive as context-switching between processes.
+
+
+True
+Correct answer:
+
+False
+Results for question 7.
+7
+1 / 1 point
+Consider a Thread T1 that invoked method x, which resulted in the invocation of method y, which resulted in the invocation of method z.
+How many frames exist on the thread T1's stack?
+
+Correct answer:
+3
+Results for question 8.
+8
+1 / 1 point
+Temporary variables of a function/method are allocated on the stack.
+
+Correct answer:
+
+True
+
+False
+Results for question 9.
+9
+1 / 1 point
+A single threaded process can only execute on one core, regardless of how many cores are available.
+
+Correct answer:
+
+True
+
+False
+Results for question 10.
+10
+1 / 1 point
+When a process crashes, some threads within that process can continue to operate.
+
+
+True
+Correct answer:
+
+False

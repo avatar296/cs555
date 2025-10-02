@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Results</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <h1 class="text-2xl font-bold text-gray-800">Quiz Results</h1>
+                <a href="/" class="text-blue-500 hover:text-blue-600 font-medium">
+                    &larr; Back to Home
+                </a>
+            </div>
+        </div>
+
+        <!-- Score Card -->
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg p-8 mb-6 text-white">
+            <h2 class="text-xl font-semibold mb-2">{{ results.quiz_name }}</h2>
+
+            <div class="flex items-center justify-center my-8">
+                <div class="text-center">
+                    <div class="text-6xl font-bold mb-2">{{ "%.1f"|format(results.score) }}%</div>
+                    <div class="text-blue-100 text-lg">
+                        {{ results.correct_answers }} out of {{ results.total_questions }} correct
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-center space-x-4">
+                <a
+                    href="/quiz/{{ results.quiz_id }}"
+                    class="bg-white text-blue-600 font-semibold py-2 px-6 rounded hover:bg-blue-50 transition-colors"
+                >
+                    Retake Quiz
+                </a>
+                <a
+                    href="/"
+                    class="bg-blue-700 text-white font-semibold py-2 px-6 rounded hover:bg-blue-800 transition-colors"
+                >
+                    More Quizzes
+                </a>
+            </div>
+        </div>
+
+        <!-- Performance Indicator -->
+        {% set pass_threshold = 70 %}
+        {% if results.score >= 90 %}
+        <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
+            <p class="text-green-800 font-medium">Excellent work! You've mastered this material.</p>
+        </div>
+        {% elif results.score >= pass_threshold %}
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+            <p class="text-blue-800 font-medium">Good job! Keep practicing to improve your score.</p>
+        </div>
+        {% else %}
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <p class="text-yellow-800 font-medium">Keep studying! Review the questions below and try again.</p>
+        </div>
+        {% endif %}
+
+        <!-- Detailed Results -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Question Review</h2>
+
+            <div class="space-y-4">
+                {% for answer in results.answers %}
+                <div class="border rounded-lg p-4 {% if answer.is_correct %}border-green-300 bg-green-50{% else %}border-red-300 bg-red-50{% endif %}">
+                    <div class="flex items-start justify-between mb-3">
+                        <h3 class="font-semibold text-gray-800 flex-1">
+                            Question {{ loop.index }}
+                        </h3>
+                        {% if answer.is_correct %}
+                        <span class="inline-block bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                            Correct
+                        </span>
+                        {% else %}
+                        <span class="inline-block bg-red-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                            Incorrect
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <p class="text-gray-700 mb-3">{{ answer.question }}</p>
+
+                    <div class="grid grid-cols-2 gap-4 text-sm mb-3">
+                        <div>
+                            <span class="font-semibold text-gray-600">Your answer:</span>
+                            <span class="{% if answer.is_correct %}text-green-700{% else %}text-red-700{% endif %}">
+                                {{ answer.user_answer }}
+                            </span>
+                        </div>
+                        {% if not answer.is_correct %}
+                        <div>
+                            <span class="font-semibold text-gray-600">Correct answer:</span>
+                            <span class="text-green-700">{{ answer.correct_answer }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if answer.explanation %}
+                    <div class="mt-3 pt-3 border-t {% if answer.is_correct %}border-green-200{% else %}border-red-200{% endif %}">
+                        <div class="flex items-start">
+                            <span class="text-lg mr-2">💡</span>
+                            <div class="flex-1">
+                                <p class="font-semibold text-sm {% if answer.is_correct %}text-green-800{% else %}text-red-800{% endif %} mb-1">
+                                    {% if answer.is_correct %}Explanation:{% else %}Why?{% endif %}
+                                </p>
+                                <p class="text-sm {% if answer.is_correct %}text-green-700{% else %}text-red-700{% endif %}">
+                                    {{ answer.explanation }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Study Tips -->
+        {% if results.score < 70 %}
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-3">Study Tips</h2>
+            <ul class="list-disc list-inside space-y-2 text-gray-700">
+                <li>Review the questions you got wrong</li>
+                <li>Take notes on key concepts</li>
+                <li>Try the quiz again after studying</li>
+                <li>Focus on understanding the "why" behind each answer</li>
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

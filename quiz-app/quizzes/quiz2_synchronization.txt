@@ -1,0 +1,109 @@
+1
+1 / 1 point
+Consider a class A that has two synchronized methods s1() and s2();   this class also has two unsynchronized methods u1() and u2().  Class A was used to create two object instances, a1 and a2, in a particular process P.  Within the process P, there are N threads that are represented as T1, T2, …, TN.   Please indicate if the following statement is True/False.
+
+Thread T1 can be active in a1.s1() and Thread T2 can be active in a2.s2() at the same time.
+
+Correct answer:
+
+True
+
+False
+Results for question 2.
+2
+1 / 1 point
+Consider a class A that has two synchronized methods s1() and s2();   this class also has two unsynchronized methods u1() and u2().  Class A was used to create two object instances, a1 and a2, in a particular process P.  Within the process P, there are N threads that are represented as T1, T2, …, TN.   Please indicate if the following statement is True/False.
+
+Thread T1 can be active in a1.u1() and Thread T2 can be active in a1.u2() at the same time.
+
+Correct answer:
+
+True
+
+False
+Results for question 3.
+3
+1 / 1 point
+Consider a class A that has two synchronized methods s1() and s2();   this class also has two unsynchronized methods u1() and u2().  Class A was used to create two object instances, a1 and a2, in a particular process P.  Within the process P, there are N threads that are represented as T1, T2, …, TN.   Please indicate if the following statement is True/False.
+
+Thread T1 can be active in a1.s1() and Thread T2 can be active in a1.s2() at the same time.
+
+
+True
+Correct answer:
+
+False
+Results for question 4.
+4
+1 / 1 point
+Consider a class A that has two synchronized methods s1() and s2();   this class also has two unsynchronized methods u1() and u2().  Class A was used to create two object instances, a1 and a2, in a particular process P.  Within the process P, there are N threads that are represented as T1, T2, …, TN.   Please indicate if the following statement is True/False.
+
+Threads T1 and T2 can be active inside method a1.s1() at the same time.
+
+
+True
+Correct answer:
+
+False
+Results for question 5.
+5
+1 / 1 point
+Consider a class A that has two synchronized methods s1() and s2();   this class also has two unsynchronized methods u1() and u2().  Class A was used to create two object instances, a1 and a2, in a particular process P.  Within the process P, there are N threads that are represented as T1, T2, …, TN.   Please indicate if the following 5 statements are True/False.
+
+(T/F) Threads T1, T2, …, TN can all be active in instance a1 at the same time and have different program counters.
+
+Correct answer:
+
+True
+
+False
+Results for question 6.
+6
+1 / 1 point
+There is more than one lock per object.
+
+
+True
+Correct answer:
+
+False
+Results for question 7.
+7
+1 / 1 point
+A code with latent race conditions is likely to be reliant on lucky timing for correct operation.
+
+Correct answer:
+
+True
+
+False
+Results for question 8.
+8
+1 / 1 point
+The scope of a lock impacts the degree of concurrency for threads within a process.
+
+Correct answer:
+
+True
+
+False
+Results for question 9.
+9
+1 / 1 point
+A program that declares all its variables volatile will execute faster than the same program where these variables were not declared volatile.
+
+
+True
+Correct answer:
+
+False
+Results for question 10.
+10
+1 / 1 point
+The volatile keyword for a variable is used for performance reasons because it allows Threads to cache that variable in a register.
+
+
+True
+Correct answer:
+
+False

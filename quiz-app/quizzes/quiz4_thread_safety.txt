@@ -1,0 +1,99 @@
+1
+1 / 1 point
+Synchronizing all public methods of all classes within a program will guarantee thread-safety.
+
+
+True
+Correct answer:
+
+False
+Results for question 2.
+2
+1 / 1 point
+Consider an instance a1 of Class A.  Class A has two synchronized methods m1() and m2().   Method m1() includes an invocation to method m2().  Any thread that invokes a1.m1() will deadlock.
+
+
+True
+Correct answer:
+
+False
+Results for question 3.
+3
+1 / 1 point
+We only need to synchronize accesses to write operations on a variable.  The read operations need not be synchronized.
+
+
+True
+Correct answer:
+
+False
+Results for question 4.
+4
+1 / 1 point
+Consider a variable count of type long.   If the mutation operation on this variable is the increment operator (++)  there is no need to synchronize accesses to the mutation operation.
+
+
+True
+Correct answer:
+
+False
+Results for question 5.
+5
+0 / 1 point
+Stateless objects are always thread-safe.
+
+Correct answer:
+
+True
+
+False
+Results for question 6.
+6
+1 / 1 point
+The transient keyword plays a role in thread-synchronization by ensuring that all accesses to that variable will be redirected to main memory.
+
+
+True
+Correct answer:
+
+False
+Results for question 7.
+7
+1 / 1 point
+The key to thread-safe programming is not so much what the object does, but rather how it will be accessed.
+
+Correct answer:
+
+True
+
+False
+Results for question 8.
+8
+0 / 1 point
+The wait()/notify() mechanism in Java has an inherent race condition that cannot be solved without deep integration with the JVM.
+
+Correct answer:
+
+True
+
+False
+Results for question 9.
+9
+1 / 1 point
+Storing state variables of a particular class in public fields allows other classes within that program to reason about thread-safety.
+
+
+True
+Correct answer:
+
+False
+Results for question 10.
+10
+1 / 1 point
+A program that has concurrency bugs may continue to function correctly if the rate of invocations and the number of threads are below a certain threshold.
+
+Correct answer:
+
+True
+
+False

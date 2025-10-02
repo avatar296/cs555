@@ -1,0 +1,99 @@
+1
+1 / 1 point
+Consider a program that has a mix of serial and parallel components. If the serial component accounts for 25% of the execution time, the maximum speed up that we can ever hope to achieve is 4.
+
+Correct answer:
+
+True
+
+False
+Results for question 2.
+2
+1 / 1 point
+Latency and throughputs may at times be at odds with each other.
+
+Correct answer:
+
+True
+
+False
+Results for question 3.
+3
+1 / 1 point
+Synchronizers encapsulate state that determines whether threads arriving at the synchronizer should be allowed to pass or wait.  However, they do support manipulation of this state.
+
+
+True
+Correct answer:
+
+False
+Results for question 4.
+4
+1 / 1 point
+A weakly consistent iterator may throw the ConcurrentModificiationException.
+
+
+True
+Correct answer:
+
+False
+Results for question 5.
+5
+1 / 1 point
+Consider a data structure such as the ConcurrentHashMap that relies on lock striping. Acquisition of the implicit lock associated with the object representing the data structure, will not result in acquisition of all locks that are part of stripe set.
+
+Correct answer:
+
+True
+
+False
+Results for question 6.
+6
+1 / 1 point
+In synchronized collections, such as the Hashtable, multiple threads may concurrently be active within the data structure at the same time.
+
+
+True
+Correct answer:
+
+False
+Results for question 7.
+7
+1 / 1 point
+Latches wait for other threads, while barriers wait for events.
+
+
+True
+Correct answer:
+
+False
+Results for question 8.
+8
+1 / 1 point
+Consider the case where you are using the semaphore synchronizer to implement resource pools.  You can skip the acquisition phase, and access the resource directly without violating correctness requirements.
+
+
+True
+Correct answer:
+
+False
+Results for question 9.
+9
+1 / 1 point
+Consider the case where you are using the semaphore synchronizer to implement resource pools. If you perform an acquire as opposed to a release when you are done using the resource, eventually you will have liveness issues with resource pool becoming unavailable.
+
+Correct answer:
+
+True
+
+False
+Results for question 10.
+10
+1 / 1 point
+Consider the case where you are using the semaphore synchronizer to implement resource pools. The semaphore must be initialized to twice the number of available resources.
+
+
+True
+Correct answer:
+
+False

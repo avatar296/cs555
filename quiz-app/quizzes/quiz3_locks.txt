@@ -1,0 +1,110 @@
+1
+1 / 1 point
+When using the Lock interface, it is critical to use the try.. finally block with the unlock() operation occurring in the finally block. This ensures that even if unexpected exceptions (including a RuntimeException) occur, the lock will still be released.
+
+Correct answer:
+
+True
+
+False
+Results for question 2.
+2
+1 / 1 point
+ReentrantLocks are granted as close to arrival order as possible.
+
+Correct answer:
+
+True
+
+False
+Results for question 3.
+3
+1 / 1 point
+One disadvantage of explicit locking is that the lock scope cannot be controlled and must be restricted to the entire method.
+
+
+True
+Correct answer:
+
+False
+Results for question 4.
+4
+1 / 1 point
+When using the Lock interface, the lock in question is no longer attached to the object whose method is being called.
+
+Correct answer:
+
+True
+
+False
+Results for question 5.
+5
+1 / 1 point
+How many total locks have been acquired when a non-static synchronized method calls a static synchronized method?
+
+
+0
+
+, Not Selected
+
+1
+
+, Not Selected
+Correct answer:
+
+2
+
+
+3
+
+, Not Selected
+Results for question 6.
+6
+1 / 1 point
+The class lock can be grabbed and released independently of the object lock.
+
+Correct answer:
+
+True
+
+False
+Results for question 7.
+7
+1 / 1 point
+For any given object, any number of its synchronized methods can execute at the same time.
+
+
+True
+Correct answer:
+
+False
+Results for question 8.
+8
+1 / 1 point
+Consider an unsynchronized method that does not include invocations to other methods. Invocations of this method will entail lock acquisition of the encapsulating object.
+
+
+True
+Correct answer:
+
+False
+Results for question 9.
+9
+1 / 1 point
+Invocation of (non-static) synchronized methods on an object involves acquisition of the implicit lock associated with that object.
+
+Correct answer:
+
+True
+
+False
+Results for question 10.
+10
+1 / 1 point
+Two or more synchronized methods of the same object can never run in parallel in separate threads.
+
+Correct answer:
+
+True
+
+False

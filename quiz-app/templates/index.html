@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Study App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">CS555 Quiz Study Tool</h1>
+            <p class="text-gray-600">Practice for your midterm with interactive quizzes</p>
+        </div>
+
+        <!-- Load Quizzes Button -->
+        {% if not quizzes %}
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-yellow-800 font-medium">No quizzes loaded yet</p>
+                    <p class="text-yellow-700 text-sm mt-1">Click the button to load quiz files from the quizzes directory</p>
+                </div>
+                <button
+                    onclick="loadQuizzes()"
+                    class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded"
+                >
+                    Load Quizzes
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Quizzes Grid -->
+        <div class="grid md:grid-cols-2 gap-6">
+            {% for quiz in quizzes %}
+            <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4">
+                    <h2 class="text-xl font-bold text-white">{{ quiz.name }}</h2>
+                    {% if quiz.topic %}
+                    <p class="text-blue-100 text-sm mt-1">{{ quiz.topic }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="text-gray-600">
+                            <span class="font-semibold">{{ quiz.question_count }}</span> questions
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    {% if quiz.stats and quiz.stats.attempts > 0 %}
+                    <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Your Stats</h3>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <div>
+                                <div class="text-2xl font-bold text-blue-600">{{ quiz.stats.attempts }}</div>
+                                <div class="text-xs text-gray-600">Attempts</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-green-600">{{ quiz.stats.avg_score }}%</div>
+                                <div class="text-xs text-gray-600">Avg Score</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-purple-600">{{ quiz.stats.best_score }}%</div>
+                                <div class="text-xs text-gray-600">Best</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <a
+                        href="/quiz/{{ quiz.id }}"
+                        class="block w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded text-center transition-colors"
+                    >
+                        Start Quiz
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if not quizzes %}
+        <div class="text-center text-gray-500 mt-8">
+            <p>No quizzes available. Add quiz files to the quizzes/ directory and reload.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        async function loadQuizzes() {
+            try {
+                const response = await fetch('/load-quizzes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.total > 0) {
+                    alert(`Successfully loaded ${result.total} quiz(es)!`);
+                    window.location.reload();
+                } else {
+                    alert('No quiz files found in the quizzes/ directory. Please add quiz files and try again.');
+                }
+
+                if (result.errors.length > 0) {
+                    console.error('Errors:', result.errors);
+                }
+            } catch (error) {
+                alert('Error loading quizzes: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

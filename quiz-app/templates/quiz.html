@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ quiz.name }} - Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-3xl">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">{{ quiz.name }}</h1>
+                    <p class="text-gray-600 text-sm mt-1">{{ quiz.question_count }} questions</p>
+                </div>
+                <a href="/" class="text-blue-500 hover:text-blue-600 font-medium">
+                    &larr; Back to Home
+                </a>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6" id="progress-container" style="display: none;">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-700">Progress</span>
+                <span class="text-sm font-medium text-gray-700" id="progress-text">0 / 0</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div id="progress-bar" class="bg-blue-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="bg-white rounded-lg shadow-md p-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Ready to start?</h2>
+            <p class="text-gray-600 mb-6">
+                This quiz contains {{ quiz.question_count }} questions. Answer each question and get immediate feedback.
+                Your progress will be saved and you can review your results at the end.
+            </p>
+
+            <div class="mb-6">
+                <label class="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" id="randomize" checked class="w-5 h-5 text-blue-500 rounded">
+                    <span class="text-gray-700">Randomize question order</span>
+                </label>
+            </div>
+
+            <button
+                onclick="startQuiz()"
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded transition-colors"
+            >
+                Start Quiz
+            </button>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="bg-white rounded-lg shadow-md p-8" style="display: none;">
+            <div class="mb-6">
+                <span class="inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
+                    Question <span id="question-number">1</span>
+                </span>
+                <p class="text-lg text-gray-800 leading-relaxed" id="question-text"></p>
+            </div>
+
+            <!-- Answer Options -->
+            <div class="space-y-3 mb-6" id="answer-options">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Feedback -->
+            <div id="feedback" class="p-4 rounded-lg mb-6" style="display: none;">
+                <p class="font-semibold mb-2" id="feedback-title"></p>
+                <p class="text-sm" id="feedback-text"></p>
+            </div>
+
+            <!-- Next Button -->
+            <button
+                id="next-btn"
+                onclick="nextQuestion()"
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded transition-colors"
+                style="display: none;"
+            >
+                Next Question
+            </button>
+
+            <!-- View Results Button -->
+            <button
+                id="results-btn"
+                onclick="viewResults()"
+                class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded transition-colors"
+                style="display: none;"
+            >
+                View Results
+            </button>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script>
+        const QUIZ_ID = {{ quiz.id }};
+    </script>
+</body>
+</html>
