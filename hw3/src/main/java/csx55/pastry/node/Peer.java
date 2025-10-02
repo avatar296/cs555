@@ -26,6 +26,7 @@ public class Peer {
   private final String id;
 
   private ServerSocket serverSocket;
+  private Thread serverThread;
   private int peerPort;
   private String peerHost;
   private NodeInfo selfInfo;
@@ -34,6 +35,7 @@ public class Peer {
 
   private LeafSet leafSet;
   private RoutingTable routingTable;
+  private java.util.Set<NodeInfo> joinResponders;
 
   public Peer(String discoverHost, int discoverPort, String id) {
     this.discoverHost = discoverHost;
@@ -55,6 +57,7 @@ public class Peer {
       // Initialize routing structures
       leafSet = new LeafSet(id);
       routingTable = new RoutingTable(id);
+      joinResponders = new java.util.HashSet<>();
 
       // Start TCP server on random port
       startPeerServer();
@@ -65,11 +68,31 @@ public class Peer {
       // Register with Discovery Node
       registerWithDiscovery();
 
+      // Join the DHT network
+      joinNetwork();
+
+      // Wait a bit for any late-arriving updates
+      Thread.sleep(3000);
+
+      // Log final routing structures
+      logRoutingStructures();
+
       System.out.println("Peer " + id + " is running");
       System.out.println("Listening on: " + peerHost + ":" + peerPort);
       System.out.println("Storage directory: " + storageDir.getAbsolutePath());
 
-      runCommandLoop();
+      // Only run command loop if running interactively
+      if (System.console() != null) {
+        runCommandLoop();
+      } else {
+        // Running non-interactively (background mode), keep main thread alive
+        try {
+          serverThread.join();
+        } catch (InterruptedException e) {
+          logger.info("Main thread interrupted, shutting down");
+          shutdown();
+        }
+      }
 
     } catch (Exception e) {
       logger.severe("Failed to start peer: " + e.getMessage());
@@ -86,8 +109,8 @@ public class Peer {
     selfInfo = new NodeInfo(id, peerHost, peerPort, "");
 
     // Start server thread
-    Thread serverThread = new Thread(this::runPeerServer);
-    serverThread.setDaemon(true);
+    serverThread = new Thread(this::runPeerServer);
+    serverThread.setDaemon(false);
     serverThread.start();
 
     logger.info("Peer server started on " + peerHost + ":" + peerPort);
@@ -118,7 +141,22 @@ public class Peer {
       Message request = Message.read(dis);
       logger.info("Received peer message: " + request.getType());
 
-      // TODO: Handle peer-to-peer messages (JOIN, ROUTING_TABLE_UPDATE, etc.)
+      switch (request.getType()) {
+        case JOIN_REQUEST:
+          handleJoinRequest(request, dos);
+          break;
+        case JOIN_RESPONSE:
+          handleJoinResponse(request);
+          break;
+        case ROUTING_TABLE_UPDATE:
+          handleRoutingTableUpdate(request);
+          break;
+        case LEAF_SET_UPDATE:
+          handleLeafSetUpdate(request);
+          break;
+        default:
+          logger.warning("Unhandled message type: " + request.getType());
+      }
 
     } catch (IOException e) {
       logger.warning("Error handling peer connection: " + e.getMessage());
@@ -128,6 +166,207 @@ public class Peer {
       } catch (IOException e) {
         // ignore
       }
+    }
+  }
+
+  private void handleJoinRequest(Message request, DataOutputStream dos) throws IOException {
+    MessageFactory.JoinRequestData data = MessageFactory.extractJoinRequest(request);
+
+    // Increment hop count and add self to path
+    int newHopCount = data.hopCount + 1;
+    data.path.add(id);
+
+    logger.info(
+        "JOIN request for "
+            + data.destination
+            + " (hop "
+            + newHopCount
+            + ", from "
+            + data.requester.getId()
+            + ")");
+
+    // Check if we're the destination (closest node)
+    boolean isDestination = isClosestNode(data.destination);
+
+    if (isDestination) {
+      // We're the destination - send leaf set back to requester
+      logger.info("We are destination for " + data.destination);
+
+      NodeInfo left = leafSet.getLeft();
+      NodeInfo right = leafSet.getRight();
+
+      sendJoinResponse(data.requester, -1, new NodeInfo[0], left, right);
+
+      // Add requester to our leaf set
+      leafSet.addNode(data.requester);
+      logger.info("Added " + data.requester.getId() + " to our leaf set");
+
+      // Send update to requester so it knows about us
+      sendUpdateToNode(data.requester, MessageType.LEAF_SET_UPDATE);
+      logger.info("Sent LEAF_SET_UPDATE to " + data.requester.getId());
+
+    } else {
+      // We're intermediate - send our routing table row back to requester and forward
+      int prefixLen = getCommonPrefixLength(id, data.destination);
+      NodeInfo[] row = routingTable.getRow(prefixLen);
+
+      logger.info("Intermediate node - sending row " + prefixLen + " to requester");
+
+      sendJoinResponse(data.requester, prefixLen, row, null, null);
+
+      // Add requester to our routing table
+      routingTable.addNode(data.requester);
+      logger.info("Added " + data.requester.getId() + " to our routing table");
+
+      // Send update to requester so it knows about us
+      sendUpdateToNode(data.requester, MessageType.ROUTING_TABLE_UPDATE);
+      logger.info("Sent ROUTING_TABLE_UPDATE to " + data.requester.getId());
+
+      // Forward JOIN_REQUEST to next hop
+      NodeInfo nextHop = route(data.destination);
+
+      // Check if next hop is the requester itself (circular routing)
+      if (nextHop != null && nextHop.getId().equals(data.requester.getId())) {
+        // We're actually the closest node - treat as destination
+        logger.info("Next hop is requester - treating this as destination");
+        NodeInfo left = leafSet.getLeft();
+        NodeInfo right = leafSet.getRight();
+        sendJoinResponse(data.requester, -1, new NodeInfo[0], left, right);
+        leafSet.addNode(data.requester);
+        logger.info("Added " + data.requester.getId() + " to our leaf set");
+        sendUpdateToNode(data.requester, MessageType.LEAF_SET_UPDATE);
+        logger.info("Sent LEAF_SET_UPDATE to " + data.requester.getId());
+      } else if (nextHop != null) {
+        forwardJoinRequest(data.requester, data.destination, newHopCount, data.path, nextHop);
+      } else {
+        logger.warning("No next hop found for " + data.destination);
+      }
+    }
+  }
+
+  private void sendJoinResponse(
+      NodeInfo requester, int rowNum, NodeInfo[] row, NodeInfo left, NodeInfo right) {
+    try (Socket socket = new Socket(requester.getHost(), requester.getPort());
+        DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
+
+      Message response = MessageFactory.createJoinResponse(rowNum, row, left, right);
+      response.write(dos);
+
+      if (rowNum == -1) {
+        logger.info(
+            "Sent JOIN_RESPONSE to "
+                + requester.getId()
+                + " with leaf set (left: "
+                + (left != null ? left.getId() : "null")
+                + ", right: "
+                + (right != null ? right.getId() : "null")
+                + ")");
+      } else {
+        logger.info(
+            "Sent JOIN_RESPONSE to "
+                + requester.getId()
+                + " with routing table row "
+                + rowNum
+                + " (entries: "
+                + (row != null ? row.length : 0)
+                + ")");
+      }
+
+    } catch (IOException e) {
+      logger.warning(
+          "Failed to send JOIN_RESPONSE to " + requester.getId() + ": " + e.getMessage());
+    }
+  }
+
+  private boolean isClosestNode(String targetId) {
+    long selfDist = computeDistance(id, targetId);
+
+    // Check leaf set
+    for (NodeInfo node : leafSet.getAllNodes()) {
+      long dist = computeDistance(node.getId(), targetId);
+      if (dist < selfDist) {
+        return false;
+      }
+    }
+
+    // Check routing table
+    for (int row = 0; row < 4; row++) {
+      for (int col = 0; col < 16; col++) {
+        NodeInfo node = routingTable.getEntry(row, col);
+        if (node != null) {
+          long dist = computeDistance(node.getId(), targetId);
+          if (dist < selfDist) {
+            return false;
+          }
+        }
+      }
+    }
+
+    return true; // We're closest
+  }
+
+  private void forwardJoinRequest(
+      NodeInfo requester,
+      String destination,
+      int hopCount,
+      java.util.List<String> path,
+      NodeInfo nextHop) {
+    try (Socket socket = new Socket(nextHop.getHost(), nextHop.getPort());
+        DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
+
+      Message joinMsg = MessageFactory.createJoinRequest(requester, destination, hopCount, path);
+      joinMsg.write(dos);
+
+      logger.info("Forwarded JOIN to " + nextHop.getId());
+
+    } catch (IOException e) {
+      logger.warning("Failed to forward JOIN to " + nextHop.getId() + ": " + e.getMessage());
+    }
+  }
+
+  private void handleRoutingTableUpdate(Message request) throws IOException {
+    NodeInfo node = MessageFactory.extractNodeInfo(request);
+    logger.info("Received ROUTING_TABLE_UPDATE for node " + node.getId());
+    routingTable.addNode(node);
+    logger.info("Updated routing table with " + node.getId());
+  }
+
+  private void handleLeafSetUpdate(Message request) throws IOException {
+    NodeInfo node = MessageFactory.extractNodeInfo(request);
+    logger.info("Received LEAF_SET_UPDATE for node " + node.getId());
+    leafSet.addNode(node);
+    logger.info("Updated leaf set with " + node.getId());
+  }
+
+  private void handleJoinResponse(Message request) throws IOException {
+    MessageFactory.JoinResponseData data = MessageFactory.extractJoinResponse(request);
+
+    if (data.rowNum == -1) {
+      // Leaf set response
+      logger.info(
+          "Received JOIN_RESPONSE with leaf set (left: "
+              + (data.left != null ? data.left.getId() : "null")
+              + ", right: "
+              + (data.right != null ? data.right.getId() : "null")
+              + ")");
+      if (data.left != null) {
+        leafSet.addNode(data.left);
+        logger.info("Added to leaf set: " + data.left.getId());
+      }
+      if (data.right != null) {
+        leafSet.addNode(data.right);
+        logger.info("Added to leaf set: " + data.right.getId());
+      }
+    } else {
+      // Routing table row response
+      logger.info(
+          "Received JOIN_RESPONSE with routing table row "
+              + data.rowNum
+              + " (entries: "
+              + (data.routingRow != null ? data.routingRow.length : 0)
+              + ")");
+      routingTable.setRow(data.rowNum, data.routingRow);
+      logger.info("Set routing table row " + data.rowNum);
     }
   }
 
@@ -177,6 +416,224 @@ public class Peer {
     } catch (IOException e) {
       logger.warning("Failed to deregister: " + e.getMessage());
     }
+  }
+
+  private void joinNetwork() throws IOException {
+    // Get random entry point from Discovery
+    NodeInfo entryPoint = getRandomNodeFromDiscovery();
+
+    if (entryPoint == null) {
+      logger.info("We are the first peer in the network");
+      logger.info("Leaf set after JOIN: left=null, right=null");
+      logger.info("Routing table after JOIN: 0 entries");
+      return;
+    }
+
+    logger.info("Joining network via entry point: " + entryPoint.getId());
+
+    // Send JOIN_REQUEST to entry point
+    try (Socket socket = new Socket(entryPoint.getHost(), entryPoint.getPort());
+        DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
+
+      java.util.List<String> path = new java.util.ArrayList<>();
+      Message joinMsg = MessageFactory.createJoinRequest(selfInfo, id, 0, path);
+      joinMsg.write(dos);
+
+      logger.info("Sent JOIN_REQUEST to " + entryPoint.getId());
+    }
+
+    // Wait for JOIN_RESPONSE messages to arrive
+    // (they will be handled by handleJoinResponse asynchronously)
+    try {
+      Thread.sleep(2000); // Wait 2 seconds for responses
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+
+    // Send updates to all nodes in routing table and leaf set
+    sendUpdatesToNetwork();
+
+    logger.info("Join protocol complete");
+
+    // Log final routing structures for verification
+    NodeInfo left = leafSet.getLeft();
+    NodeInfo right = leafSet.getRight();
+    logger.info(
+        "Leaf set after JOIN: left="
+            + (left != null ? left.getId() : "null")
+            + ", right="
+            + (right != null ? right.getId() : "null"));
+
+    int rtEntries = 0;
+    for (int row = 0; row < 4; row++) {
+      for (int col = 0; col < 16; col++) {
+        if (routingTable.getEntry(row, col) != null) {
+          rtEntries++;
+        }
+      }
+    }
+    logger.info("Routing table after JOIN: " + rtEntries + " entries");
+  }
+
+  private NodeInfo getRandomNodeFromDiscovery() throws IOException {
+    try (Socket socket = new Socket(discoverHost, discoverPort);
+        DataInputStream dis = new DataInputStream(socket.getInputStream());
+        DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
+
+      Message request = MessageFactory.createGetRandomNodeRequest(id);
+      request.write(dos);
+
+      Message response = Message.read(dis);
+      return MessageFactory.extractRandomNode(response);
+    }
+  }
+
+  private void sendUpdatesToNetwork() {
+    // Send ROUTING_TABLE_UPDATE to all nodes in routing table
+    for (int row = 0; row < 4; row++) {
+      for (int col = 0; col < 16; col++) {
+        NodeInfo node = routingTable.getEntry(row, col);
+        if (node != null) {
+          sendUpdateToNode(node, MessageType.ROUTING_TABLE_UPDATE);
+        }
+      }
+    }
+
+    // Send LEAF_SET_UPDATE to all nodes in leaf set
+    for (NodeInfo node : leafSet.getAllNodes()) {
+      sendUpdateToNode(node, MessageType.LEAF_SET_UPDATE);
+    }
+  }
+
+  private void sendUpdateToNode(NodeInfo node, MessageType updateType) {
+    // Don't send updates to ourselves
+    if (node.getId().equals(id)) {
+      logger.fine("Skipping update to self");
+      return;
+    }
+
+    try (Socket socket = new Socket(node.getHost(), node.getPort());
+        DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
+
+      Message updateMsg =
+          updateType == MessageType.ROUTING_TABLE_UPDATE
+              ? MessageFactory.createRoutingTableUpdate(selfInfo)
+              : MessageFactory.createLeafSetUpdate(selfInfo);
+
+      updateMsg.write(dos);
+      logger.info("Sent " + updateType + " to " + node.getId());
+
+    } catch (IOException e) {
+      logger.warning("Failed to send update to " + node.getId() + ": " + e.getMessage());
+    }
+  }
+
+  // Core routing algorithm: finds next hop for a given key
+  private NodeInfo route(String key) {
+    // Step 1: Check if key is in leaf set range
+    if (leafSet.isInRange(key)) {
+      NodeInfo closest = leafSet.getClosestNode(key);
+      if (closest != null) {
+        return closest;
+      }
+    }
+
+    // Step 2: Use routing table
+    int prefixLength = getCommonPrefixLength(id, key);
+
+    // If key matches our ID completely, we're the destination
+    if (prefixLength >= 4) {
+      return null;
+    }
+
+    // Get next digit in key at position prefixLength
+    int nextDigit = Character.digit(key.charAt(prefixLength), 16);
+
+    // Look up in routing table
+    NodeInfo nextHop = routingTable.getEntry(prefixLength, nextDigit);
+    if (nextHop != null) {
+      return nextHop;
+    }
+
+    // Step 3: Fallback - find any node numerically closer
+    return findCloserNode(key);
+  }
+
+  // Helper: find any node closer to key than self
+  private NodeInfo findCloserNode(String key) {
+    long selfDist = computeDistance(id, key);
+    NodeInfo closest = null;
+    long minDist = selfDist;
+
+    // Check leaf set
+    for (NodeInfo node : leafSet.getAllNodes()) {
+      long dist = computeDistance(node.getId(), key);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = node;
+      }
+    }
+
+    // Check routing table
+    for (int row = 0; row < 4; row++) {
+      for (int col = 0; col < 16; col++) {
+        NodeInfo node = routingTable.getEntry(row, col);
+        if (node != null) {
+          long dist = computeDistance(node.getId(), key);
+          if (dist < minDist) {
+            minDist = dist;
+            closest = node;
+          }
+        }
+      }
+    }
+
+    return closest;
+  }
+
+  // Helper: compute length of common prefix between two IDs
+  private int getCommonPrefixLength(String id1, String id2) {
+    int matches = 0;
+    int minLen = Math.min(id1.length(), id2.length());
+
+    for (int i = 0; i < minLen; i++) {
+      if (id1.charAt(i) == id2.charAt(i)) {
+        matches++;
+      } else {
+        break;
+      }
+    }
+
+    return matches;
+  }
+
+  // Helper: compute circular distance between two IDs
+  private long computeDistance(String id1, String id2) {
+    long val1 = Long.parseLong(id1, 16);
+    long val2 = Long.parseLong(id2, 16);
+    long diff = Math.abs(val1 - val2);
+    long wrapDiff = 0x10000 - diff; // 2^16 - diff
+    return Math.min(diff, wrapDiff);
+  }
+
+  private void logRoutingStructures() {
+    NodeInfo left = leafSet.getLeft();
+    NodeInfo right = leafSet.getRight();
+    logger.info(
+        "FINAL Leaf set: left="
+            + (left != null ? left.getId() : "null")
+            + ", right="
+            + (right != null ? right.getId() : "null"));
+
+    int rtEntries = 0;
+    for (int row = 0; row < 4; row++) {
+      for (int col = 0; col < 16; col++) {
+        if (routingTable.getEntry(row, col) != null) {
+          rtEntries++;
+        }
+      }
+    }
+    logger.info("FINAL Routing table: " + rtEntries + " entries");
   }
 
   private void runCommandLoop() {

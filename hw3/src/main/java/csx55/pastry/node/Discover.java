@@ -38,13 +38,24 @@ public class Discover {
 
     // Start TCP server in background thread
     Thread serverThread = new Thread(this::runServer);
-    serverThread.setDaemon(true);
+    serverThread.setDaemon(false);
     serverThread.start();
 
     System.out.println("Discovery Node running on port " + port);
     System.out.println("Ready to accept peer registrations");
 
-    runCommandLoop();
+    // Only run command loop if running interactively
+    if (System.console() != null) {
+      runCommandLoop();
+    } else {
+      // Running non-interactively (background mode), keep main thread alive
+      try {
+        serverThread.join();
+      } catch (InterruptedException e) {
+        logger.info("Main thread interrupted, shutting down");
+        shutdown();
+      }
+    }
   }
 
   private void runServer() {
@@ -80,7 +91,7 @@ public class Discover {
           handleRegister(request, dos);
           break;
         case GET_RANDOM_NODE:
-          handleGetRandomNode(dos);
+          handleGetRandomNode(request, dos);
           break;
         case DEREGISTER:
           handleDeregister(request);
@@ -117,15 +128,16 @@ public class Discover {
     }
   }
 
-  private void handleGetRandomNode(DataOutputStream dos) throws IOException {
-    NodeInfo randomNode = getRandomNode();
+  private void handleGetRandomNode(Message request, DataOutputStream dos) throws IOException {
+    String excludeId = MessageFactory.extractExcludeId(request);
+    NodeInfo randomNode = getRandomNode(excludeId);
     Message response = MessageFactory.createRandomNodeResponse(randomNode);
     response.write(dos);
 
     if (randomNode != null) {
-      logger.info("Returned random node: " + randomNode.getId());
+      logger.info("Returned random node: " + randomNode.getId() + " (excluded: " + excludeId + ")");
     } else {
-      logger.info("No nodes available to return");
+      logger.info("No nodes available to return (excluded: " + excludeId + ")");
     }
   }
 
@@ -137,12 +149,22 @@ public class Discover {
     }
   }
 
-  private NodeInfo getRandomNode() {
+  private NodeInfo getRandomNode(String excludeId) {
     if (registeredNodes.isEmpty()) {
       return null;
     }
 
-    List<NodeInfo> nodes = new ArrayList<>(registeredNodes.values());
+    List<NodeInfo> nodes = new ArrayList<>();
+    for (NodeInfo node : registeredNodes.values()) {
+      if (excludeId == null || !node.getId().equals(excludeId)) {
+        nodes.add(node);
+      }
+    }
+
+    if (nodes.isEmpty()) {
+      return null;
+    }
+
     return nodes.get(random.nextInt(nodes.size()));
   }
 
