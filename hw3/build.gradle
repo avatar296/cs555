@@ -1,0 +1,84 @@
+plugins {
+    id 'application'
+    id 'java'
+    id 'com.diffplug.spotless' version '6.25.0'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // no external dependencies per assignment spec
+}
+
+test {
+    enabled = false
+}
+
+spotless {
+    java {
+        googleJavaFormat('1.19.2')
+        target 'src/**/*.java'
+        removeUnusedImports()
+        importOrder()
+    }
+}
+
+application {
+    // default main class
+    mainClass = 'csx55.pastry.node.Discover'
+}
+
+tasks.register('runDiscover', JavaExec) {
+    group = "Execution"
+    description = "Runs the Discovery Node"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.pastry.node.Discover'
+    if (project.hasProperty('args')) {
+        args project.property('args').split()
+    }
+}
+
+tasks.register('runPeer', JavaExec) {
+    group = "Execution"
+    description = "Runs a Peer Node"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.pastry.node.Peer'
+    if (project.hasProperty('args')) {
+        args project.property('args').split()
+    }
+}
+
+tasks.register('runData', JavaExec) {
+    group = "Execution"
+    description = "Runs the Data Storage program"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.pastry.node.Data'
+    if (project.hasProperty('args')) {
+        args project.property('args').split()
+    }
+}
+
+task createTar(type: Tar) {
+    archiveBaseName.set('Christopher_Cowart_HW3')
+    archiveExtension.set('tar')
+
+    from('.') {
+        include 'build.gradle'
+        include 'README.txt'
+        include 'src/main/java/**/*.java'
+
+        exclude '**/._*'
+        exclude '**/.DS_Store'
+        exclude 'src/test/**'
+        exclude '**/test/**'
+        exclude '**/*Test.java'
+        exclude '**/*Tests.java'
+    }
+}

@@ -1,0 +1,48 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+gradle-app.setting
+.gradletasknamecache
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+._*
+
+# Logs
+*.log
+
+# Package Files
+*.tar
+
+# Virtual Machine Crash Logs
+hs_err_pid*
+
+# HW3 Specific - temporary peer storage directories
+# /tmp/<peer-id>/ directories are created at runtime
+# but we don't want to track any test files here
+test_images/
+images/
+downloads/
