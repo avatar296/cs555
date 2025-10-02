@@ -2,13 +2,8 @@ package csx55.pastry.util;
 
 import java.util.Objects;
 
-/**
- * Represents information about a peer node in the Pastry DHT.
- *
- * <p>Contains the node's identifier, network location, and optional nickname.
- */
 public class NodeInfo {
-  private final String id; // 16-bit hex ID (4 characters)
+  private final String id;
   private final String host;
   private final int port;
   private final String nickname;
@@ -40,20 +35,12 @@ public class NodeInfo {
     return nickname;
   }
 
-  /**
-   * Gets the address in format "host:port"
-   *
-   * @return formatted address string
-   */
+  // Format: "host:port"
   public String getAddress() {
     return host + ":" + port;
   }
 
-  /**
-   * Formats node info as required by assignment: "ip:port, id"
-   *
-   * @return formatted string
-   */
+  // Format for assignment output: "ip:port, id"
   public String toOutputFormat() {
     return host + ":" + port + ", " + id;
   }

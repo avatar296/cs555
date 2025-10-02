@@ -16,13 +16,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.logging.Logger;
 
-/**
- * Peer Node in Pastry DHT
- *
- * <p>Responsibilities: - Maintain Leaf Set (l=1: 2 neighbors) - Maintain Routing Table (4x16) -
- * Route messages using combined Leaf Set + Routing Table - Store files in /tmp/<peer-id>/ - Handle
- * join protocol
- */
 public class Peer {
   private static final Logger logger = Logger.getLogger(Peer.class.getName());
 

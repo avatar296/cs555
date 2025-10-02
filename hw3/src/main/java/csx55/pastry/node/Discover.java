@@ -17,12 +17,6 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-/**
- * Discovery Node for Pastry DHT
- *
- * <p>Responsibilities: - Maintain registry of all peers in the system - Return ONE random node for
- * network entry - Detect ID collisions
- */
 public class Discover {
   private static final Logger logger = Logger.getLogger(Discover.class.getName());
 

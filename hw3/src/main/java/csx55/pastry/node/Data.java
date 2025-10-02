@@ -2,12 +2,6 @@ package csx55.pastry.node;
 
 import java.util.logging.Logger;
 
-/**
- * Data Storage/Retrieval Program for Pastry DHT
- *
- * <p>Responsibilities: - Contact Discovery Node to get random entry point - Compute 16-bit hash of
- * filename - Use DHT routing to find correct peer - Store or retrieve file
- */
 public class Data {
   private static final Logger logger = Logger.getLogger(Data.class.getName());
 
