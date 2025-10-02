@@ -281,4 +281,232 @@ public class MessageFactory {
     String excludeId = dis.readUTF();
     return excludeId.isEmpty() ? null : excludeId;
   }
+
+  // LOOKUP protocol
+  public static class LookupRequestData {
+    public String targetId;
+    public NodeInfo origin;
+    public java.util.List<String> path;
+  }
+
+  public static Message createLookupRequest(
+      String targetId, NodeInfo origin, java.util.List<String> path) throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    DataOutputStream dos = new DataOutputStream(baos);
+
+    dos.writeUTF(targetId);
+
+    // Write origin node info
+    dos.writeUTF(origin.getId());
+    dos.writeUTF(origin.getHost());
+    dos.writeInt(origin.getPort());
+    dos.writeUTF(origin.getNickname() != null ? origin.getNickname() : "");
+
+    // Write path
+    dos.writeInt(path.size());
+    for (String nodeId : path) {
+      dos.writeUTF(nodeId);
+    }
+
+    dos.flush();
+    return new Message(MessageType.LOOKUP, baos.toByteArray());
+  }
+
+  public static LookupRequestData extractLookupRequest(Message message) throws IOException {
+    ByteArrayInputStream bais = new ByteArrayInputStream(message.getPayload());
+    DataInputStream dis = new DataInputStream(bais);
+
+    LookupRequestData data = new LookupRequestData();
+
+    data.targetId = dis.readUTF();
+
+    // Read origin
+    String originId = dis.readUTF();
+    String originHost = dis.readUTF();
+    int originPort = dis.readInt();
+    String originNickname = dis.readUTF();
+    data.origin = new NodeInfo(originId, originHost, originPort, originNickname);
+
+    // Read path
+    int pathSize = dis.readInt();
+    data.path = new java.util.ArrayList<>();
+    for (int i = 0; i < pathSize; i++) {
+      data.path.add(dis.readUTF());
+    }
+
+    return data;
+  }
+
+  public static class LookupResponseData {
+    public String targetId;
+    public NodeInfo responsible;
+    public java.util.List<String> path;
+  }
+
+  public static Message createLookupResponse(
+      String targetId, NodeInfo responsible, java.util.List<String> path) throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    DataOutputStream dos = new DataOutputStream(baos);
+
+    dos.writeUTF(targetId);
+
+    // Write responsible node info
+    dos.writeUTF(responsible.getId());
+    dos.writeUTF(responsible.getHost());
+    dos.writeInt(responsible.getPort());
+    dos.writeUTF(responsible.getNickname() != null ? responsible.getNickname() : "");
+
+    // Write path
+    dos.writeInt(path.size());
+    for (String nodeId : path) {
+      dos.writeUTF(nodeId);
+    }
+
+    dos.flush();
+    return new Message(MessageType.LOOKUP_RESPONSE, baos.toByteArray());
+  }
+
+  public static LookupResponseData extractLookupResponse(Message message) throws IOException {
+    ByteArrayInputStream bais = new ByteArrayInputStream(message.getPayload());
+    DataInputStream dis = new DataInputStream(bais);
+
+    LookupResponseData data = new LookupResponseData();
+
+    data.targetId = dis.readUTF();
+
+    // Read responsible node
+    String nodeId = dis.readUTF();
+    String host = dis.readUTF();
+    int port = dis.readInt();
+    String nickname = dis.readUTF();
+    data.responsible = new NodeInfo(nodeId, host, port, nickname);
+
+    // Read path
+    int pathSize = dis.readInt();
+    data.path = new java.util.ArrayList<>();
+    for (int i = 0; i < pathSize; i++) {
+      data.path.add(dis.readUTF());
+    }
+
+    return data;
+  }
+
+  // STORE_FILE protocol
+  public static Message createStoreFileRequest(String filename, byte[] fileData)
+      throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    DataOutputStream dos = new DataOutputStream(baos);
+
+    dos.writeUTF(filename);
+    dos.writeInt(fileData.length);
+    dos.write(fileData);
+
+    dos.flush();
+    return new Message(MessageType.STORE_FILE, baos.toByteArray());
+  }
+
+  public static class StoreFileData {
+    public String filename;
+    public byte[] fileData;
+  }
+
+  public static StoreFileData extractStoreFileRequest(Message message) throws IOException {
+    ByteArrayInputStream bais = new ByteArrayInputStream(message.getPayload());
+    DataInputStream dis = new DataInputStream(bais);
+
+    StoreFileData data = new StoreFileData();
+    data.filename = dis.readUTF();
+    int length = dis.readInt();
+    data.fileData = new byte[length];
+    dis.readFully(data.fileData);
+
+    return data;
+  }
+
+  // RETRIEVE_FILE protocol
+  public static Message createRetrieveFileRequest(String filename) throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    DataOutputStream dos = new DataOutputStream(baos);
+
+    dos.writeUTF(filename);
+
+    dos.flush();
+    return new Message(MessageType.RETRIEVE_FILE, baos.toByteArray());
+  }
+
+  public static String extractRetrieveFileRequest(Message message) throws IOException {
+    ByteArrayInputStream bais = new ByteArrayInputStream(message.getPayload());
+    DataInputStream dis = new DataInputStream(bais);
+
+    return dis.readUTF();
+  }
+
+  // FILE_DATA (response for retrieve)
+  public static Message createFileDataResponse(String filename, byte[] fileData, boolean success)
+      throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    DataOutputStream dos = new DataOutputStream(baos);
+
+    dos.writeBoolean(success);
+    dos.writeUTF(filename);
+    if (success && fileData != null) {
+      dos.writeInt(fileData.length);
+      dos.write(fileData);
+    } else {
+      dos.writeInt(0);
+    }
+
+    dos.flush();
+    return new Message(MessageType.FILE_DATA, baos.toByteArray());
+  }
+
+  public static class FileDataResponse {
+    public boolean success;
+    public String filename;
+    public byte[] fileData;
+  }
+
+  public static FileDataResponse extractFileDataResponse(Message message) throws IOException {
+    ByteArrayInputStream bais = new ByteArrayInputStream(message.getPayload());
+    DataInputStream dis = new DataInputStream(bais);
+
+    FileDataResponse data = new FileDataResponse();
+    data.success = dis.readBoolean();
+    data.filename = dis.readUTF();
+    int length = dis.readInt();
+    if (length > 0) {
+      data.fileData = new byte[length];
+      dis.readFully(data.fileData);
+    }
+
+    return data;
+  }
+
+  // ACK for store
+  public static Message createAck(boolean success, String message) throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    DataOutputStream dos = new DataOutputStream(baos);
+
+    dos.writeBoolean(success);
+    dos.writeUTF(message != null ? message : "");
+
+    dos.flush();
+    return new Message(MessageType.ACK, baos.toByteArray());
+  }
+
+  public static class AckData {
+    public boolean success;
+    public String message;
+  }
+
+  public static AckData extractAck(Message message) throws IOException {
+    ByteArrayInputStream bais = new ByteArrayInputStream(message.getPayload());
+    DataInputStream dis = new DataInputStream(bais);
+
+    AckData data = new AckData();
+    data.success = dis.readBoolean();
+    data.message = dis.readUTF();
+
+    return data;
+  }
 }

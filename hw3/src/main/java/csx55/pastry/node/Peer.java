@@ -154,6 +154,15 @@ public class Peer {
         case LEAF_SET_UPDATE:
           handleLeafSetUpdate(request);
           break;
+        case LOOKUP:
+          handleLookup(request);
+          break;
+        case STORE_FILE:
+          handleStoreFile(request, dos);
+          break;
+        case RETRIEVE_FILE:
+          handleRetrieveFile(request, dos);
+          break;
         default:
           logger.warning("Unhandled message type: " + request.getType());
       }
@@ -367,6 +376,107 @@ public class Peer {
               + ")");
       routingTable.setRow(data.rowNum, data.routingRow);
       logger.info("Set routing table row " + data.rowNum);
+    }
+  }
+
+  private void handleLookup(Message request) throws IOException {
+    MessageFactory.LookupRequestData data = MessageFactory.extractLookupRequest(request);
+
+    // Add self to path
+    data.path.add(id);
+
+    logger.info("LOOKUP for " + data.targetId + " (hop " + data.path.size() + ")");
+
+    // Check if we're the destination (closest node)
+    boolean isDestination = isClosestNode(data.targetId);
+
+    if (isDestination) {
+      // We're responsible - send LOOKUP_RESPONSE back to origin
+      logger.info("We are responsible for " + data.targetId);
+
+      try (Socket socket = new Socket(data.origin.getHost(), data.origin.getPort());
+          DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
+
+        Message response = MessageFactory.createLookupResponse(data.targetId, selfInfo, data.path);
+        response.write(dos);
+
+        logger.info("Sent LOOKUP_RESPONSE to " + data.origin.getId());
+      }
+    } else {
+      // Forward to next hop
+      NodeInfo nextHop = route(data.targetId);
+
+      if (nextHop != null) {
+        try (Socket socket = new Socket(nextHop.getHost(), nextHop.getPort());
+            DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
+
+          Message forwardMsg =
+              MessageFactory.createLookupRequest(data.targetId, data.origin, data.path);
+          forwardMsg.write(dos);
+
+          logger.info("Forwarded LOOKUP to " + nextHop.getId());
+        }
+      } else {
+        logger.warning("No next hop found for LOOKUP " + data.targetId);
+      }
+    }
+  }
+
+  private void handleStoreFile(Message request, DataOutputStream dos) throws IOException {
+    MessageFactory.StoreFileData data = MessageFactory.extractStoreFileRequest(request);
+
+    logger.info("Storing file: " + data.filename + " (" + data.fileData.length + " bytes)");
+
+    try {
+      // Write file to storage directory
+      File file = new File(storageDir, data.filename);
+      java.nio.file.Files.write(file.toPath(), data.fileData);
+
+      logger.info("Successfully stored file: " + data.filename);
+
+      // Send ACK
+      Message ack = MessageFactory.createAck(true, "File stored successfully");
+      ack.write(dos);
+
+    } catch (IOException e) {
+      logger.warning("Failed to store file " + data.filename + ": " + e.getMessage());
+
+      // Send error ACK
+      Message ack = MessageFactory.createAck(false, "Failed to store file: " + e.getMessage());
+      ack.write(dos);
+    }
+  }
+
+  private void handleRetrieveFile(Message request, DataOutputStream dos) throws IOException {
+    String filename = MessageFactory.extractRetrieveFileRequest(request);
+
+    logger.info("Retrieving file: " + filename);
+
+    try {
+      // Read file from storage directory
+      File file = new File(storageDir, filename);
+
+      if (!file.exists()) {
+        logger.warning("File not found: " + filename);
+        Message response = MessageFactory.createFileDataResponse(filename, null, false);
+        response.write(dos);
+        return;
+      }
+
+      byte[] fileData = java.nio.file.Files.readAllBytes(file.toPath());
+
+      logger.info("Successfully retrieved file: " + filename + " (" + fileData.length + " bytes)");
+
+      // Send file data
+      Message response = MessageFactory.createFileDataResponse(filename, fileData, true);
+      response.write(dos);
+
+    } catch (IOException e) {
+      logger.warning("Failed to retrieve file " + filename + ": " + e.getMessage());
+
+      // Send error response
+      Message response = MessageFactory.createFileDataResponse(filename, null, false);
+      response.write(dos);
     }
   }
 
@@ -694,8 +804,7 @@ public class Peer {
     for (File file : files) {
       if (file.isFile()) {
         String filename = file.getName();
-        // TODO: compute actual hash of filename
-        String hash = "0000"; // placeholder
+        String hash = csx55.pastry.util.HashUtil.hashFilename(filename);
         System.out.println(filename + ", " + hash);
       }
     }
