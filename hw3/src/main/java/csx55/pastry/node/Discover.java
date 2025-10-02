@@ -1,7 +1,20 @@
 package csx55.pastry.node;
 
+import csx55.pastry.transport.Message;
+import csx55.pastry.transport.MessageFactory;
+import csx55.pastry.util.NodeInfo;
 import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
@@ -14,22 +27,129 @@ public class Discover {
   private static final Logger logger = Logger.getLogger(Discover.class.getName());
 
   private final int port;
+  private final Map<String, NodeInfo> registeredNodes;
+  private final Random random;
+  private ServerSocket serverSocket;
+  private volatile boolean running;
 
   public Discover(int port) {
     this.port = port;
+    this.registeredNodes = new ConcurrentHashMap<>();
+    this.random = new Random();
+    this.running = true;
   }
 
   public void start() {
     logger.info("Discovery Node starting on port " + port);
 
-    // TODO: Start TCP server
-    // TODO: Listen for peer registrations
-    // TODO: Maintain list of registered peers
+    // Start TCP server in background thread
+    Thread serverThread = new Thread(this::runServer);
+    serverThread.setDaemon(true);
+    serverThread.start();
 
     System.out.println("Discovery Node running on port " + port);
     System.out.println("Ready to accept peer registrations");
 
     runCommandLoop();
+  }
+
+  private void runServer() {
+    try {
+      serverSocket = new ServerSocket(port);
+      logger.info("TCP server listening on port " + port);
+
+      while (running) {
+        try {
+          Socket clientSocket = serverSocket.accept();
+          Thread handler = new Thread(() -> handleClient(clientSocket));
+          handler.start();
+        } catch (IOException e) {
+          if (running) {
+            logger.warning("Error accepting connection: " + e.getMessage());
+          }
+        }
+      }
+    } catch (IOException e) {
+      logger.severe("Failed to start server: " + e.getMessage());
+    }
+  }
+
+  private void handleClient(Socket socket) {
+    try (DataInputStream dis = new DataInputStream(socket.getInputStream());
+        DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
+
+      Message request = Message.read(dis);
+      logger.info("Received request: " + request.getType());
+
+      switch (request.getType()) {
+        case REGISTER:
+          handleRegister(request, dos);
+          break;
+        case GET_RANDOM_NODE:
+          handleGetRandomNode(dos);
+          break;
+        case DEREGISTER:
+          handleDeregister(request);
+          break;
+        default:
+          logger.warning("Unknown message type: " + request.getType());
+      }
+
+    } catch (IOException e) {
+      logger.warning("Error handling client: " + e.getMessage());
+    } finally {
+      try {
+        socket.close();
+      } catch (IOException e) {
+        // ignore
+      }
+    }
+  }
+
+  private void handleRegister(Message request, DataOutputStream dos) throws IOException {
+    NodeInfo nodeInfo = MessageFactory.extractNodeInfo(request);
+    String nodeId = nodeInfo.getId();
+
+    // Check for collision
+    if (registeredNodes.containsKey(nodeId)) {
+      logger.warning("ID collision detected for: " + nodeId);
+      Message response = MessageFactory.createRegisterResponse(false, "ID collision");
+      response.write(dos);
+    } else {
+      registeredNodes.put(nodeId, nodeInfo);
+      logger.info("Registered node: " + nodeInfo);
+      Message response = MessageFactory.createRegisterResponse(true, "Success");
+      response.write(dos);
+    }
+  }
+
+  private void handleGetRandomNode(DataOutputStream dos) throws IOException {
+    NodeInfo randomNode = getRandomNode();
+    Message response = MessageFactory.createRandomNodeResponse(randomNode);
+    response.write(dos);
+
+    if (randomNode != null) {
+      logger.info("Returned random node: " + randomNode.getId());
+    } else {
+      logger.info("No nodes available to return");
+    }
+  }
+
+  private void handleDeregister(Message request) throws IOException {
+    String nodeId = MessageFactory.extractNodeId(request);
+    NodeInfo removed = registeredNodes.remove(nodeId);
+    if (removed != null) {
+      logger.info("Deregistered node: " + nodeId);
+    }
+  }
+
+  private NodeInfo getRandomNode() {
+    if (registeredNodes.isEmpty()) {
+      return null;
+    }
+
+    List<NodeInfo> nodes = new ArrayList<>(registeredNodes.values());
+    return nodes.get(random.nextInt(nodes.size()));
   }
 
   private void runCommandLoop() {
@@ -42,12 +162,10 @@ public class Discover {
 
         switch (line) {
           case "list-nodes":
-            // TODO: Implement list-nodes command
-            System.out.println("No nodes registered yet");
+            listNodes();
             break;
           case "exit":
-            System.out.println("Shutting down Discovery Node");
-            System.exit(0);
+            shutdown();
             break;
           default:
             System.out.println("Unknown command: " + line);
@@ -57,6 +175,31 @@ public class Discover {
     } catch (Exception e) {
       logger.severe("Error in command loop: " + e.getMessage());
     }
+  }
+
+  private void listNodes() {
+    if (registeredNodes.isEmpty()) {
+      System.out.println("No nodes registered");
+      return;
+    }
+
+    // Print in format: ip:port, id
+    registeredNodes.values().stream()
+        .sorted((a, b) -> a.getId().compareTo(b.getId()))
+        .forEach(node -> System.out.println(node.toOutputFormat()));
+  }
+
+  private void shutdown() {
+    System.out.println("Shutting down Discovery Node");
+    running = false;
+    try {
+      if (serverSocket != null) {
+        serverSocket.close();
+      }
+    } catch (IOException e) {
+      logger.warning("Error closing server socket: " + e.getMessage());
+    }
+    System.exit(0);
   }
 
   public static void main(String[] args) {
