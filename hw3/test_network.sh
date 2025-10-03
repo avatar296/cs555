@@ -14,6 +14,7 @@ DISCOVER_PORT=5555
 DISCOVER_PID=""
 PEER_PIDS=()
 PEER_IDS=()
+PEER_PIPES=()
 NUM_PEERS=${1:-3}  # Default to 3 peers if not specified
 
 # Cleanup on exit
@@ -33,19 +34,27 @@ cleanup() {
         kill "$DISCOVER_PID" 2>/dev/null || true
     fi
 
+    # Remove named pipes
+    for pipe in "${PEER_PIPES[@]}"; do
+        rm -f "$pipe" 2>/dev/null || true
+    done
+
     sleep 1
     echo -e "${GREEN}Test network stopped${NC}"
 }
 
 trap cleanup EXIT INT TERM
 
-# Send command to peer via socket
-send_command() {
-    local host=$1
-    local port=$2
-    local command=$3
+# Send command to peer via named pipe
+send_peer_command() {
+    local pipe=$1
+    local command=$2
 
-    echo "$command" | nc "$host" "$port" 2>/dev/null || echo -e "${RED}Error: Failed to connect to $host:$port${NC}"
+    if [ -p "$pipe" ]; then
+        echo "$command" > "$pipe"
+    else
+        echo -e "${RED}Error: Pipe $pipe not available${NC}"
+    fi
 }
 
 # Start Discovery node
@@ -97,14 +106,24 @@ start_peers() {
         PEER_IDS+=("$peer_id")
 
         local log_file="peer_${peer_id}_test.log"
+        local pipe_file="/tmp/peer_${peer_id}_pipe"
 
         # Create /tmp/<peer-id> directory
         mkdir -p "/tmp/${peer_id}"
 
-        # Start peer in background
-        java -cp build/classes/java/main csx55.pastry.node.Peer localhost $DISCOVER_PORT "$peer_id" &> "$log_file" &
+        # Create named pipe for sending commands
+        mkfifo "$pipe_file" 2>/dev/null || true
+        PEER_PIPES+=("$pipe_file")
+
+        # Keep pipe open in background to prevent EOF
+        tail -f /dev/null > "$pipe_file" &
+        local pipe_keeper_pid=$!
+
+        # Start peer in background with pipe as stdin
+        java -cp build/classes/java/main csx55.pastry.node.Peer localhost $DISCOVER_PORT "$peer_id" < "$pipe_file" &> "$log_file" &
         local pid=$!
         PEER_PIDS+=("$pid")
+        PEER_PIDS+=("$pipe_keeper_pid")
 
         sleep 1
 
@@ -210,21 +229,53 @@ interactive_mode() {
             if [ "$choice" -ge 1 ] && [ "$choice" -le "$total_peers" ]; then
                 local idx=$((choice - 1))
                 local peer_id="${PEER_IDS[$idx]}"
+                local pipe="${PEER_PIPES[$idx]}"
                 local log_file="peer_${peer_id}_test.log"
 
                 echo -e "${BLUE}Checking leaf-set for peer $peer_id...${NC}"
-                echo -e "${YELLOW}Log file: $log_file${NC}"
-                tail -20 "$log_file" | grep -A 10 "leaf" || echo "No leaf-set data found"
+
+                # Get current line count
+                local before_lines=$(wc -l < "$log_file")
+
+                # Send command
+                echo "leaf-set" > "$pipe"
+                sleep 0.5
+
+                # Get output from log (peer prints to stdout which goes to log)
+                local after_lines=$(wc -l < "$log_file")
+                local new_lines=$((after_lines - before_lines))
+
+                if [ "$new_lines" -gt 0 ]; then
+                    tail -n "$new_lines" "$log_file"
+                else
+                    echo -e "${YELLOW}No output (leaf set may be empty)${NC}"
+                fi
 
             # Check if it's a routing-table option (NUM_PEERS+1 to 2*NUM_PEERS)
             elif [ "$choice" -ge $((total_peers + 1)) ] && [ "$choice" -le $((total_peers * 2)) ]; then
                 local idx=$((choice - total_peers - 1))
                 local peer_id="${PEER_IDS[$idx]}"
+                local pipe="${PEER_PIPES[$idx]}"
                 local log_file="peer_${peer_id}_test.log"
 
                 echo -e "${BLUE}Checking routing-table for peer $peer_id...${NC}"
-                echo -e "${YELLOW}Log file: $log_file${NC}"
-                tail -30 "$log_file" | grep -A 20 "Routing" || echo "No routing-table data found"
+
+                # Get current line count
+                local before_lines=$(wc -l < "$log_file")
+
+                # Send command
+                echo "routing-table" > "$pipe"
+                sleep 0.5
+
+                # Get output from log
+                local after_lines=$(wc -l < "$log_file")
+                local new_lines=$((after_lines - before_lines))
+
+                if [ "$new_lines" -gt 0 ]; then
+                    tail -n "$new_lines" "$log_file"
+                else
+                    echo -e "${YELLOW}No output${NC}"
+                fi
             else
                 echo -e "${RED}Invalid option: $choice${NC}"
             fi

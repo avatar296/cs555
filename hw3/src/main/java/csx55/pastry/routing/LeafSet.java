@@ -24,11 +24,13 @@ public class LeafSet {
 
     if (comparison < 0) {
       // Node is to the left (smaller ID)
+      // Keep the one closest to us (largest among those smaller)
       if (left == null || compareIds(node.getId(), left.getId()) > 0) {
         left = node;
       }
     } else if (comparison > 0) {
       // Node is to the right (larger ID)
+      // Keep the one closest to us (smallest among those larger)
       if (right == null || compareIds(node.getId(), right.getId()) < 0) {
         right = node;
       }

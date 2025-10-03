@@ -81,18 +81,8 @@ public class Peer {
       System.out.println("Listening on: " + peerHost + ":" + peerPort);
       System.out.println("Storage directory: " + storageDir.getAbsolutePath());
 
-      // Only run command loop if running interactively
-      if (System.console() != null) {
-        runCommandLoop();
-      } else {
-        // Running non-interactively (background mode), keep main thread alive
-        try {
-          serverThread.join();
-        } catch (InterruptedException e) {
-          logger.info("Main thread interrupted, shutting down");
-          shutdown();
-        }
-      }
+      // Run command loop (works with both console and piped input)
+      runCommandLoop();
 
     } catch (Exception e) {
       logger.severe("Failed to start peer: " + e.getMessage());
