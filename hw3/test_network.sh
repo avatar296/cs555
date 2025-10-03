@@ -13,8 +13,8 @@ NC='\033[0m'
 DISCOVER_PORT=5555
 DISCOVER_PID=""
 PEER_PIDS=()
-PEER_IDS=(1000 5000 9000)
-PEER_PORTS=(6001 6002 6003)
+PEER_IDS=()
+NUM_PEERS=${1:-3}  # Default to 3 peers if not specified
 
 # Cleanup on exit
 cleanup() {
@@ -89,11 +89,13 @@ start_discovery() {
 # Start peer nodes
 start_peers() {
     echo ""
-    echo -e "${BLUE}Starting Peer Nodes...${NC}"
+    echo -e "${BLUE}Starting $NUM_PEERS Peer Nodes...${NC}"
 
-    for i in "${!PEER_IDS[@]}"; do
-        local peer_id="${PEER_IDS[$i]}"
-        local peer_port="${PEER_PORTS[$i]}"
+    for i in $(seq 1 "$NUM_PEERS"); do
+        # Generate random 16-bit hex ID (4 hex digits)
+        local peer_id=$(openssl rand -hex 2)
+        PEER_IDS+=("$peer_id")
+
         local log_file="peer_${peer_id}_test.log"
 
         # Create /tmp/<peer-id> directory
@@ -118,7 +120,7 @@ start_peers() {
     done
 
     echo ""
-    echo -e "${GREEN}All peers started successfully!${NC}"
+    echo -e "${GREEN}All $NUM_PEERS peers started successfully!${NC}"
 }
 
 # Show peer status
@@ -128,14 +130,13 @@ show_status() {
     echo ""
     echo -e "${BLUE}Discovery Node:${NC} localhost:$DISCOVER_PORT (PID $DISCOVER_PID)"
     echo ""
-    echo -e "${BLUE}Peer Nodes:${NC}"
+    echo -e "${BLUE}Peer Nodes ($NUM_PEERS):${NC}"
     for i in "${!PEER_IDS[@]}"; do
         local peer_id="${PEER_IDS[$i]}"
-        local peer_port="${PEER_PORTS[$i]}"
         local pid="${PEER_PIDS[$i]}"
 
         if kill -0 "$pid" 2>/dev/null; then
-            echo -e "  ${GREEN}✓${NC} Peer $peer_id - localhost:$peer_port (PID $pid)"
+            echo -e "  ${GREEN}✓${NC} Peer $peer_id (PID $pid)"
         else
             echo -e "  ${RED}✗${NC} Peer $peer_id - STOPPED"
         fi
@@ -148,38 +149,41 @@ show_menu() {
     echo -e "${CYAN}=== Test Menu ===${NC}"
     echo ""
     echo -e "${YELLOW}Peer Commands:${NC}"
-    echo "  1) Check leaf-set for peer 1000"
-    echo "  2) Check leaf-set for peer 5000"
-    echo "  3) Check leaf-set for peer 9000"
-    echo "  4) Check routing-table for peer 1000"
-    echo "  5) Check routing-table for peer 5000"
-    echo "  6) Check routing-table for peer 9000"
+    local option_num=1
+
+    # Leaf-set options
+    for peer_id in "${PEER_IDS[@]}"; do
+        echo "  $option_num) Check leaf-set for peer $peer_id"
+        ((option_num++))
+    done
+
+    echo ""
+
+    # Routing-table options
+    for peer_id in "${PEER_IDS[@]}"; do
+        echo "  $option_num) Check routing-table for peer $peer_id"
+        ((option_num++))
+    done
+
     echo ""
     echo -e "${YELLOW}Discovery Commands:${NC}"
-    echo "  7) List all registered nodes"
+    echo "  d) List all registered nodes"
     echo ""
     echo -e "${YELLOW}Logs:${NC}"
-    echo "  8) Tail Discovery log"
-    echo "  9) Tail Peer 1000 log"
-    echo "  10) Tail Peer 5000 log"
-    echo "  11) Tail Peer 9000 log"
+    echo "  ld) Tail Discovery log"
+
+    # Log options for each peer
+    for i in "${!PEER_IDS[@]}"; do
+        local peer_id="${PEER_IDS[$i]}"
+        echo "  l$i) Tail Peer $peer_id log"
+    done
+
     echo ""
     echo -e "${YELLOW}Other:${NC}"
     echo "  s) Show network status"
     echo "  r) Restart network"
     echo "  q) Quit"
     echo ""
-}
-
-# Get peer port by ID
-get_peer_port() {
-    local peer_id=$1
-    for i in "${!PEER_IDS[@]}"; do
-        if [ "${PEER_IDS[$i]}" = "$peer_id" ]; then
-            echo "${PEER_PORTS[$i]}"
-            return
-        fi
-    done
 }
 
 # Tail log file
@@ -198,73 +202,72 @@ interactive_mode() {
         read -p "Select option: " choice
         echo ""
 
-        case "$choice" in
-            1)
-                echo -e "${BLUE}Checking leaf-set for peer 1000...${NC}"
-                # For now, we need to manually check logs since peers don't accept socket commands
-                echo -e "${YELLOW}Check peer_1000_test.log for leaf-set output${NC}"
-                tail -20 peer_1000_test.log | grep -A 10 "leaf" || echo "No leaf-set data found"
-                ;;
-            2)
-                echo -e "${BLUE}Checking leaf-set for peer 5000...${NC}"
-                echo -e "${YELLOW}Check peer_5000_test.log for leaf-set output${NC}"
-                tail -20 peer_5000_test.log | grep -A 10 "leaf" || echo "No leaf-set data found"
-                ;;
-            3)
-                echo -e "${BLUE}Checking leaf-set for peer 9000...${NC}"
-                echo -e "${YELLOW}Check peer_9000_test.log for leaf-set output${NC}"
-                tail -20 peer_9000_test.log | grep -A 10 "leaf" || echo "No leaf-set data found"
-                ;;
-            4)
-                echo -e "${BLUE}Checking routing-table for peer 1000...${NC}"
-                echo -e "${YELLOW}Check peer_1000_test.log for routing-table output${NC}"
-                tail -30 peer_1000_test.log | grep -A 20 "Routing" || echo "No routing-table data found"
-                ;;
-            5)
-                echo -e "${BLUE}Checking routing-table for peer 5000...${NC}"
-                echo -e "${YELLOW}Check peer_5000_test.log for routing-table output${NC}"
-                tail -30 peer_5000_test.log | grep -A 20 "Routing" || echo "No routing-table data found"
-                ;;
-            6)
-                echo -e "${BLUE}Checking routing-table for peer 9000...${NC}"
-                echo -e "${YELLOW}Check peer_9009_test.log for routing-table output${NC}"
-                tail -30 peer_9000_test.log | grep -A 20 "Routing" || echo "No routing-table data found"
-                ;;
-            7)
-                echo -e "${BLUE}Registered nodes in Discovery:${NC}"
-                tail -50 discover_test.log | grep "Registered node\|registered nodes" || echo "No registration data found"
-                ;;
-            8)
-                tail_log "discover_test.log"
-                ;;
-            9)
-                tail_log "peer_1000_test.log"
-                ;;
-            10)
-                tail_log "peer_5000_test.log"
-                ;;
-            11)
-                tail_log "peer_9000_test.log"
-                ;;
-            s|S)
-                show_status
-                ;;
-            r|R)
-                echo -e "${YELLOW}Restarting network...${NC}"
-                cleanup
-                sleep 2
-                start_discovery
-                start_peers
-                show_status
-                ;;
-            q|Q)
-                echo -e "${YELLOW}Exiting...${NC}"
-                exit 0
-                ;;
-            *)
+        # Handle numeric options
+        if [[ "$choice" =~ ^[0-9]+$ ]]; then
+            local total_peers=${#PEER_IDS[@]}
+
+            # Check if it's a leaf-set option (1 to NUM_PEERS)
+            if [ "$choice" -ge 1 ] && [ "$choice" -le "$total_peers" ]; then
+                local idx=$((choice - 1))
+                local peer_id="${PEER_IDS[$idx]}"
+                local log_file="peer_${peer_id}_test.log"
+
+                echo -e "${BLUE}Checking leaf-set for peer $peer_id...${NC}"
+                echo -e "${YELLOW}Log file: $log_file${NC}"
+                tail -20 "$log_file" | grep -A 10 "leaf" || echo "No leaf-set data found"
+
+            # Check if it's a routing-table option (NUM_PEERS+1 to 2*NUM_PEERS)
+            elif [ "$choice" -ge $((total_peers + 1)) ] && [ "$choice" -le $((total_peers * 2)) ]; then
+                local idx=$((choice - total_peers - 1))
+                local peer_id="${PEER_IDS[$idx]}"
+                local log_file="peer_${peer_id}_test.log"
+
+                echo -e "${BLUE}Checking routing-table for peer $peer_id...${NC}"
+                echo -e "${YELLOW}Log file: $log_file${NC}"
+                tail -30 "$log_file" | grep -A 20 "Routing" || echo "No routing-table data found"
+            else
                 echo -e "${RED}Invalid option: $choice${NC}"
-                ;;
-        esac
+            fi
+        else
+            # Handle letter options
+            case "$choice" in
+                d|D)
+                    echo -e "${BLUE}Registered nodes in Discovery:${NC}"
+                    tail -50 discover_test.log | grep "Registered node\|registered nodes" || echo "No registration data found"
+                    ;;
+                ld|LD)
+                    tail_log "discover_test.log"
+                    ;;
+                l[0-9]*)
+                    # Extract peer index from log option (e.g., l0, l1, l2)
+                    local peer_idx="${choice#l}"
+                    if [ "$peer_idx" -lt "${#PEER_IDS[@]}" ]; then
+                        local peer_id="${PEER_IDS[$peer_idx]}"
+                        tail_log "peer_${peer_id}_test.log"
+                    else
+                        echo -e "${RED}Invalid peer index: $peer_idx${NC}"
+                    fi
+                    ;;
+                s|S)
+                    show_status
+                    ;;
+                r|R)
+                    echo -e "${YELLOW}Restarting network...${NC}"
+                    cleanup
+                    sleep 2
+                    start_discovery
+                    start_peers
+                    show_status
+                    ;;
+                q|Q)
+                    echo -e "${YELLOW}Exiting...${NC}"
+                    exit 0
+                    ;;
+                *)
+                    echo -e "${RED}Invalid option: $choice${NC}"
+                    ;;
+            esac
+        fi
 
         echo ""
         read -p "Press Enter to continue..."
@@ -277,6 +280,13 @@ clear
 echo -e "${CYAN}=====================================${NC}"
 echo -e "${CYAN}  CS555 HW3 - Pastry Network Tester  ${NC}"
 echo -e "${CYAN}=====================================${NC}"
+echo ""
+echo -e "${BLUE}Configuration:${NC}"
+echo "  Number of peers: $NUM_PEERS"
+echo "  Discovery port: $DISCOVER_PORT"
+echo ""
+echo -e "${YELLOW}Usage: $0 [NUM_PEERS]${NC}"
+echo "  Default: 3 peers"
 echo ""
 
 start_discovery
