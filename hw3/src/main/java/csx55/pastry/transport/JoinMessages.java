@@ -7,7 +7,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/** Factory methods for join protocol messages. */
 public class JoinMessages {
 
   public static class JoinRequestData {

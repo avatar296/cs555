@@ -43,16 +43,7 @@ public class Discover {
     System.out.println("Discovery Node running on port " + port);
     System.out.println("Ready to accept peer registrations");
 
-    if (System.console() != null) {
-      runCommandLoop();
-    } else {
-      try {
-        serverThread.join();
-      } catch (InterruptedException e) {
-        logger.info("Main thread interrupted, shutting down");
-        shutdown();
-      }
-    }
+    runCommandLoop();
   }
 
   private void runServer() {
