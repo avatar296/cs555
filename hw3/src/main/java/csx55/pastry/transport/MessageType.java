@@ -15,6 +15,5 @@ public enum MessageType {
   STORE_FILE,
   RETRIEVE_FILE,
   FILE_DATA,
-  HEARTBEAT,
   ACK
 }

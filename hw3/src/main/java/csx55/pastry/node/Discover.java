@@ -36,7 +36,6 @@ public class Discover {
   public void start() {
     logger.info("Discovery Node starting on port " + port);
 
-    // Start TCP server in background thread
     Thread serverThread = new Thread(this::runServer);
     serverThread.setDaemon(false);
     serverThread.start();
@@ -44,11 +43,9 @@ public class Discover {
     System.out.println("Discovery Node running on port " + port);
     System.out.println("Ready to accept peer registrations");
 
-    // Only run command loop if running interactively
     if (System.console() != null) {
       runCommandLoop();
     } else {
-      // Running non-interactively (background mode), keep main thread alive
       try {
         serverThread.join();
       } catch (InterruptedException e) {
@@ -84,7 +81,6 @@ public class Discover {
         DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
 
       Message request = Message.read(dis);
-      logger.info("Received request: " + request.getType());
 
       switch (request.getType()) {
         case REGISTER:
@@ -115,7 +111,7 @@ public class Discover {
     NodeInfo nodeInfo = MessageFactory.extractNodeInfo(request);
     String nodeId = nodeInfo.getId();
 
-    // Check for collision
+    // collision check
     if (registeredNodes.containsKey(nodeId)) {
       logger.warning("ID collision detected for: " + nodeId);
       Message response = MessageFactory.createRegisterResponse(false, "ID collision");
@@ -133,20 +129,11 @@ public class Discover {
     NodeInfo randomNode = getRandomNode(excludeId);
     Message response = MessageFactory.createRandomNodeResponse(randomNode);
     response.write(dos);
-
-    if (randomNode != null) {
-      logger.info("Returned random node: " + randomNode.getId() + " (excluded: " + excludeId + ")");
-    } else {
-      logger.info("No nodes available to return (excluded: " + excludeId + ")");
-    }
   }
 
   private void handleDeregister(Message request) throws IOException {
     String nodeId = MessageFactory.extractNodeId(request);
-    NodeInfo removed = registeredNodes.remove(nodeId);
-    if (removed != null) {
-      logger.info("Deregistered node: " + nodeId);
-    }
+    registeredNodes.remove(nodeId);
   }
 
   private NodeInfo getRandomNode(String excludeId) {

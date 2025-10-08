@@ -23,26 +23,13 @@ public class LeafSet {
     int comparison = compareIds(node.getId(), localId);
 
     if (comparison < 0) {
-      // Node is to the left (smaller ID)
-      // Keep the one closest to us (largest among those smaller)
       if (left == null || compareIds(node.getId(), left.getId()) > 0) {
         left = node;
       }
     } else if (comparison > 0) {
-      // Node is to the right (larger ID)
-      // Keep the one closest to us (smallest among those larger)
       if (right == null || compareIds(node.getId(), right.getId()) < 0) {
         right = node;
       }
-    }
-  }
-
-  public synchronized void removeNode(String nodeId) {
-    if (left != null && left.getId().equals(nodeId)) {
-      left = null;
-    }
-    if (right != null && right.getId().equals(nodeId)) {
-      right = null;
     }
   }
 
@@ -65,16 +52,6 @@ public class LeafSet {
     return nodes;
   }
 
-  public synchronized boolean contains(String nodeId) {
-    if (left != null && left.getId().equals(nodeId)) {
-      return true;
-    }
-    if (right != null && right.getId().equals(nodeId)) {
-      return true;
-    }
-    return false;
-  }
-
   public synchronized boolean isInRange(String key) {
     if (left == null && right == null) {
       return true;
@@ -88,7 +65,6 @@ public class LeafSet {
       return compareIds(key, localId) >= 0 && compareIds(key, left.getId()) > 0;
     }
 
-    // Check if key is between left and right (inclusive of local)
     String minId = left.getId();
     String maxId = right.getId();
 
@@ -109,7 +85,7 @@ public class LeafSet {
     long minDistance = Long.MAX_VALUE;
 
     for (NodeInfo node : candidates) {
-      long distance = computeDistance(key, node.getId());
+      long distance = csx55.pastry.node.peer.RoutingEngine.computeDistance(key, node.getId());
       if (distance < minDistance) {
         minDistance = distance;
         closest = node;
@@ -125,7 +101,6 @@ public class LeafSet {
       return "";
     }
 
-    // Sort by ID
     nodes.sort((a, b) -> compareIds(a.getId(), b.getId()));
 
     StringBuilder sb = new StringBuilder();
@@ -135,28 +110,9 @@ public class LeafSet {
     return sb.toString().trim();
   }
 
-  // Compare two hex IDs numerically
   private int compareIds(String id1, String id2) {
     int val1 = Integer.parseInt(id1, 16);
     int val2 = Integer.parseInt(id2, 16);
     return Integer.compare(val1, val2);
-  }
-
-  // Compute circular distance between two IDs
-  private long computeDistance(String id1, String id2) {
-    long val1 = Integer.parseInt(id1, 16);
-    long val2 = Integer.parseInt(id2, 16);
-    long diff = Math.abs(val1 - val2);
-    long wrapDiff = 0x10000 - diff; // 2^16 - diff
-    return Math.min(diff, wrapDiff);
-  }
-
-  @Override
-  public synchronized String toString() {
-    return "LeafSet{left="
-        + (left != null ? left.getId() : "null")
-        + ", right="
-        + (right != null ? right.getId() : "null")
-        + "}";
   }
 }

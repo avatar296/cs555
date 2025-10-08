@@ -1,28 +1,29 @@
 package csx55.pastry.util;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-
 public class HashUtil {
   /**
-   * Computes a 16-bit hash of a filename for Pastry DHT routing.
+   * Computes a 16-bit hash of a filename for Pastry DHT routing. Per PDF Appendix A specification.
+   *
+   * @param fileName The filename to hash
+   * @return 2-byte array containing the 16-bit hash
+   */
+  public static byte[] hash16(String fileName) {
+    int h = fileName.hashCode() & 0xFFFF;
+    byte[] result = new byte[2];
+    result[0] = (byte) ((h >>> 8) & 0xFF);
+    result[1] = (byte) (h & 0xFF);
+    return result;
+  }
+
+  /**
+   * Computes a 16-bit hash of a filename for Pastry DHT routing. Legacy method - returns hex
+   * string.
    *
    * @param filename The filename to hash
    * @return A 4-character hex string (16 bits)
    */
   public static String hashFilename(String filename) {
-    try {
-      MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      byte[] hashBytes = digest.digest(filename.getBytes(StandardCharsets.UTF_8));
-
-      // Take first 2 bytes (16 bits) and convert to hex
-      int hash16bit = ((hashBytes[0] & 0xFF) << 8) | (hashBytes[1] & 0xFF);
-      String hexHash = String.format("%04x", hash16bit);
-
-      return hexHash;
-    } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException("SHA-256 algorithm not available", e);
-    }
+    byte[] hashBytes = hash16(filename);
+    return HexUtil.convertBytesToHex(hashBytes);
   }
 }

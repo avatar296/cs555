@@ -1,7 +1,5 @@
 package csx55.pastry.util;
 
-import java.util.Objects;
-
 public class NodeInfo {
   private final String id;
   private final String host;
@@ -35,27 +33,12 @@ public class NodeInfo {
     return nickname;
   }
 
-  // Format: "host:port"
   public String getAddress() {
     return host + ":" + port;
   }
 
-  // Format for assignment output: "ip:port, id"
   public String toOutputFormat() {
     return host + ":" + port + ", " + id;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
-    NodeInfo nodeInfo = (NodeInfo) o;
-    return Objects.equals(id, nodeInfo.id);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(id);
   }
 
   @Override

@@ -19,7 +19,6 @@ public class RoutingTable {
       return;
     }
 
-    // Don't add entries that match local ID
     if (node != null && node.getId().equals(localId)) {
       return;
     }
@@ -53,43 +52,18 @@ public class RoutingTable {
     }
   }
 
-  public synchronized NodeInfo route(String key) {
-    // Find longest common prefix with key
-    int matchingDigits = getMatchingPrefixLength(localId, key);
-
-    if (matchingDigits >= ROWS) {
-      return null; // Key matches local ID completely
-    }
-
-    // Get the next digit in key
-    int nextDigit = Character.digit(key.charAt(matchingDigits), 16);
-
-    // Look up in routing table
-    NodeInfo nextHop = getEntry(matchingDigits, nextDigit);
-    return nextHop;
-  }
-
   public synchronized void addNode(NodeInfo node) {
     if (node == null || node.getId().equals(localId)) {
       return;
     }
 
     String nodeId = node.getId();
-    int matchingDigits = getMatchingPrefixLength(localId, nodeId);
+    int matchingDigits =
+        csx55.pastry.node.peer.RoutingEngine.getCommonPrefixLength(localId, nodeId);
 
     if (matchingDigits < ROWS) {
       int nextDigit = Character.digit(nodeId.charAt(matchingDigits), 16);
       setEntry(matchingDigits, nextDigit, node);
-    }
-  }
-
-  public synchronized void removeNode(String nodeId) {
-    for (int row = 0; row < ROWS; row++) {
-      for (int col = 0; col < COLS; col++) {
-        if (table[row][col] != null && table[row][col].getId().equals(nodeId)) {
-          table[row][col] = null;
-        }
-      }
     }
   }
 
@@ -114,33 +88,5 @@ public class RoutingTable {
     }
 
     return sb.toString();
-  }
-
-  private int getMatchingPrefixLength(String id1, String id2) {
-    int matches = 0;
-    int minLen = Math.min(id1.length(), id2.length());
-
-    for (int i = 0; i < minLen; i++) {
-      if (id1.charAt(i) == id2.charAt(i)) {
-        matches++;
-      } else {
-        break;
-      }
-    }
-
-    return matches;
-  }
-
-  @Override
-  public synchronized String toString() {
-    int nonEmpty = 0;
-    for (int row = 0; row < ROWS; row++) {
-      for (int col = 0; col < COLS; col++) {
-        if (table[row][col] != null) {
-          nonEmpty++;
-        }
-      }
-    }
-    return "RoutingTable{entries=" + nonEmpty + "}";
   }
 }

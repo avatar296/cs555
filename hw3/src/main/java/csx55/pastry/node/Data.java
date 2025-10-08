@@ -1,5 +1,7 @@
 package csx55.pastry.node;
 
+import csx55.pastry.transport.FileMessages;
+import csx55.pastry.transport.LookupMessages;
 import java.util.logging.Logger;
 
 public class Data {
@@ -7,7 +9,7 @@ public class Data {
 
   private final String discoverHost;
   private final int discoverPort;
-  private final String mode; // "store" or "retrieve"
+  private final String mode; // "store" || "retrieve"
   private final String filePath;
 
   public Data(String discoverHost, int discoverPort, String mode, String filePath) {
@@ -21,14 +23,11 @@ public class Data {
     logger.info("Data operation: " + mode + " " + filePath);
 
     try {
-      // Extract filename from path
       String filename = extractFilename(filePath);
 
-      // Compute 16-bit hash of filename
       String targetId = csx55.pastry.util.HashUtil.hashFilename(filename);
       System.out.println("Target ID for '" + filename + "': " + targetId);
 
-      // Get random entry point from Discovery
       csx55.pastry.util.NodeInfo entryPoint = getRandomEntryPoint();
       if (entryPoint == null) {
         System.err.println("Error: No peers available in the network");
@@ -37,14 +36,12 @@ public class Data {
 
       System.out.println("Entry point: " + entryPoint.getId());
 
-      // Perform LOOKUP to find responsible peer
       LookupResult lookupResult = performLookup(targetId, entryPoint);
       if (lookupResult == null) {
         System.err.println("Error: LOOKUP failed");
         return;
       }
 
-      // Print routing path
       System.out.print("Routing path: ");
       for (int i = 0; i < lookupResult.path.size(); i++) {
         System.out.print(lookupResult.path.get(i));
@@ -56,7 +53,6 @@ public class Data {
 
       System.out.println("Responsible peer: " + lookupResult.responsible.getId());
 
-      // Perform store or retrieve operation
       if ("store".equals(mode)) {
         performStore(filename, lookupResult.responsible);
       } else if ("retrieve".equals(mode)) {
@@ -97,27 +93,23 @@ public class Data {
         java.io.DataInputStream dis = new java.io.DataInputStream(socket.getInputStream());
         java.io.DataOutputStream dos = new java.io.DataOutputStream(socket.getOutputStream())) {
 
-      // Create a temporary NodeInfo for this Data process (for receiving response)
-      // Use a random high port for the response
       java.net.ServerSocket tempServer = new java.net.ServerSocket(0);
       int tempPort = tempServer.getLocalPort();
       String tempHost = java.net.InetAddress.getLocalHost().getHostAddress();
       csx55.pastry.util.NodeInfo origin =
           new csx55.pastry.util.NodeInfo("data", tempHost, tempPort, "");
 
-      // Send LOOKUP request
       java.util.List<String> path = new java.util.ArrayList<>();
       csx55.pastry.transport.Message lookupMsg =
           csx55.pastry.transport.MessageFactory.createLookupRequest(targetId, origin, path);
       lookupMsg.write(dos);
 
-      // Wait for LOOKUP_RESPONSE on temp server
       java.net.Socket responseSocket = tempServer.accept();
       java.io.DataInputStream responseDis =
           new java.io.DataInputStream(responseSocket.getInputStream());
 
       csx55.pastry.transport.Message response = csx55.pastry.transport.Message.read(responseDis);
-      csx55.pastry.transport.MessageFactory.LookupResponseData data =
+      LookupMessages.LookupResponseData data =
           csx55.pastry.transport.MessageFactory.extractLookupResponse(response);
 
       responseSocket.close();
@@ -138,7 +130,6 @@ public class Data {
 
   private void performStore(String filename, csx55.pastry.util.NodeInfo responsiblePeer) {
     try {
-      // Read file from disk
       java.io.File file = new java.io.File(filePath);
       if (!file.exists()) {
         System.err.println("Error: File not found: " + filePath);
@@ -148,7 +139,6 @@ public class Data {
       byte[] fileData = java.nio.file.Files.readAllBytes(file.toPath());
       System.out.println("Read file: " + filename + " (" + fileData.length + " bytes)");
 
-      // Send STORE_FILE request
       try (java.net.Socket socket =
               new java.net.Socket(responsiblePeer.getHost(), responsiblePeer.getPort());
           java.io.DataInputStream dis = new java.io.DataInputStream(socket.getInputStream());
@@ -160,8 +150,7 @@ public class Data {
 
         // Wait for ACK
         csx55.pastry.transport.Message response = csx55.pastry.transport.Message.read(dis);
-        csx55.pastry.transport.MessageFactory.AckData ack =
-            csx55.pastry.transport.MessageFactory.extractAck(response);
+        FileMessages.AckData ack = csx55.pastry.transport.MessageFactory.extractAck(response);
 
         if (ack.success) {
           System.out.println("File stored successfully at peer " + responsiblePeer.getId());
@@ -178,7 +167,6 @@ public class Data {
 
   private void performRetrieve(String filename, csx55.pastry.util.NodeInfo responsiblePeer) {
     try {
-      // Send RETRIEVE_FILE request
       try (java.net.Socket socket =
               new java.net.Socket(responsiblePeer.getHost(), responsiblePeer.getPort());
           java.io.DataInputStream dis = new java.io.DataInputStream(socket.getInputStream());
@@ -188,13 +176,11 @@ public class Data {
             csx55.pastry.transport.MessageFactory.createRetrieveFileRequest(filename);
         retrieveMsg.write(dos);
 
-        // Wait for FILE_DATA response
         csx55.pastry.transport.Message response = csx55.pastry.transport.Message.read(dis);
-        csx55.pastry.transport.MessageFactory.FileDataResponse fileData =
+        FileMessages.FileDataResponse fileData =
             csx55.pastry.transport.MessageFactory.extractFileDataResponse(response);
 
         if (fileData.success && fileData.fileData != null) {
-          // Write file to disk
           java.io.File outputFile = new java.io.File(filePath);
           java.nio.file.Files.write(outputFile.toPath(), fileData.fileData);
 
