@@ -8,12 +8,55 @@ from database import QuizDatabase
 from quiz_parser import parse_quiz_file
 from pathlib import Path
 import json
+import re
+from markupsafe import Markup, escape
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
 
 # Store active sessions in memory (could be moved to DB for persistence)
 active_sessions = {}
+
+
+def format_question_text(text):
+    """Format question text with code block detection and HTML formatting."""
+    if not text:
+        return ""
+
+    lines = text.split('\n')
+    # Detect if text contains code (multiple lines with indentation or code-like syntax)
+    has_code = any(re.match(r'^\s{4,}', line) or re.match(r'^(public|private|protected|class|interface|void|int|String|byte\[\])', line) for line in lines)
+
+    if has_code and len(lines) > 3:
+        # Split into description and code sections
+        description_lines = []
+        code_lines = []
+        in_code = False
+
+        for line in lines:
+            # Detect start of code block
+            if not in_code and (re.match(r'^\s{4,}', line) or re.match(r'^(public|private|protected|class|interface|void|int|String|byte\[\])', line)):
+                in_code = True
+
+            if in_code:
+                code_lines.append(line)
+            else:
+                description_lines.append(line)
+
+        # Format with description followed by code block
+        html = ''
+        if description_lines:
+            html += '<p class="mb-4">' + escape(' '.join(description_lines).strip()) + '</p>'
+        if code_lines:
+            html += '<pre class="code-block"><code>' + escape('\n'.join(code_lines)) + '</code></pre>'
+        return Markup(html)
+    else:
+        # Regular text, just escape and preserve line breaks
+        return Markup(escape(text).replace('\n', '<br>'))
+
+
+# Register template filter
+app.jinja_env.filters['format_question'] = format_question_text
 
 
 def get_db():

@@ -36,7 +36,9 @@ class QuizParser:
 
     def _parse_question_block(self, block: str) -> Optional[Dict]:
         """Parse a single question block."""
-        lines = [line.strip() for line in block.strip().split('\n') if line.strip()]
+        # Preserve original lines with their indentation for code blocks
+        raw_lines = block.strip().split('\n')
+        lines = [line.strip() for line in raw_lines if line.strip()]
 
         if not lines:
             return None
@@ -44,23 +46,35 @@ class QuizParser:
         # Remove question number and point info (e.g., "1\n1 / 1 point")
         # But keep answer options and question text
         filtered_lines = []
+        filtered_raw_lines = []
         skip_next = False
+        raw_idx = 0
+
         for i, line in enumerate(lines):
             # Skip standalone numbers ONLY if they're followed by point info
             if re.match(r'^\d+$', line) and i + 1 < len(lines) and re.match(r'^\d+\s*/\s*\d+\s*point', lines[i+1]):
                 skip_next = True
+                raw_idx += 1
                 continue
             if skip_next and re.match(r'^\d+\s*/\s*\d+\s*point', line):
                 skip_next = False
+                raw_idx += 1
                 continue
             skip_next = False
             filtered_lines.append(line)
+            # Find corresponding raw line
+            while raw_idx < len(raw_lines) and raw_lines[raw_idx].strip() != line:
+                raw_idx += 1
+            if raw_idx < len(raw_lines):
+                filtered_raw_lines.append(raw_lines[raw_idx])
+                raw_idx += 1
 
         if not filtered_lines:
             return None
 
         # Extract question text (everything before "True" or "Correct answer:")
         question_text = []
+        question_raw_lines = []
         answer_section_idx = None
 
         for i, line in enumerate(filtered_lines):
@@ -68,11 +82,14 @@ class QuizParser:
                 answer_section_idx = i
                 break
             question_text.append(line)
+            if i < len(filtered_raw_lines):
+                question_raw_lines.append(filtered_raw_lines[i])
 
         if not question_text:
             return None
 
-        question = ' '.join(question_text).strip()
+        # Use newlines to preserve formatting (especially for code blocks)
+        question = '\n'.join(question_raw_lines).strip()
 
         # Extract correct answer
         correct_answer = None

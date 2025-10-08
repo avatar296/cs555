@@ -39,6 +39,51 @@ async function startQuiz() {
     }
 }
 
+function formatQuestionText(text) {
+    // Detect if the text contains code (multiple lines with indentation or code-like syntax)
+    const lines = text.split('\n');
+    const hasCode = lines.some(line => line.match(/^\s{4,}/) || line.match(/^(public|private|protected|class|interface|void|int|String|byte\[\])/));
+
+    if (hasCode && lines.length > 3) {
+        // Split into description and code sections
+        let descriptionLines = [];
+        let codeLines = [];
+        let inCode = false;
+
+        for (let line of lines) {
+            // Detect start of code block (indented or starts with code keyword)
+            if (!inCode && (line.match(/^\s{4,}/) || line.match(/^(public|private|protected|class|interface|void|int|String|byte\[\])/))) {
+                inCode = true;
+            }
+
+            if (inCode) {
+                codeLines.push(line);
+            } else {
+                descriptionLines.push(line);
+            }
+        }
+
+        // Format with description followed by code block
+        let html = '';
+        if (descriptionLines.length > 0) {
+            html += '<p class="mb-4">' + escapeHtml(descriptionLines.join(' ').trim()) + '</p>';
+        }
+        if (codeLines.length > 0) {
+            html += '<pre class="code-block"><code>' + escapeHtml(codeLines.join('\n')) + '</code></pre>';
+        }
+        return html;
+    } else {
+        // Regular text, just escape and preserve line breaks
+        return escapeHtml(text).replace(/\n/g, '<br>');
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function displayQuestion(question) {
     currentQuestion = question;
 
@@ -47,7 +92,7 @@ function displayQuestion(question) {
 
     // Update question text
     document.getElementById('question-number').textContent = currentQuestionNum;
-    document.getElementById('question-text').textContent = question.question;
+    document.getElementById('question-text').innerHTML = formatQuestionText(question.question);
 
     // Clear previous feedback
     document.getElementById('feedback').style.display = 'none';
@@ -61,6 +106,15 @@ function displayQuestion(question) {
     if (question.type === 'boolean') {
         // True/False buttons
         ['True', 'False'].forEach(answer => {
+            const button = document.createElement('button');
+            button.className = 'w-full text-left p-4 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors';
+            button.textContent = answer;
+            button.onclick = () => submitAnswer(answer);
+            optionsContainer.appendChild(button);
+        });
+    } else if (question.type === 'choice') {
+        // High/Low choice buttons
+        ['High', 'Low'].forEach(answer => {
             const button = document.createElement('button');
             button.className = 'w-full text-left p-4 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors';
             button.textContent = answer;
