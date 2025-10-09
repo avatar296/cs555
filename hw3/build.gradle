@@ -76,9 +76,6 @@ task createTar(type: Tar) {
         include 'build.gradle'
         include 'README.txt'
         include 'src/main/java/**/*.java'
-        include 'gradlew'
-        include 'gradlew.bat'
-        include 'gradle/**'
 
         exclude '**/._*'
         exclude '**/.DS_Store'
