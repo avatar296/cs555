@@ -1,0 +1,111 @@
+1
+1 / 1 point
+The combiner has data locality.
+
+Correct answer:
+
+True
+
+False
+Results for question 2.
+2
+1 / 1 point
+In cases where speculative backup tasks are launched to circumvent stragglers, results from the original task are discarded regardless of whether it arrives before the corresponding speculative task
+
+
+True
+Correct answer:
+
+False
+Results for question 3.
+3
+1 / 1 point
+Straggler circumventions in a MapReduce job only targets mappers and not the reducers.
+
+
+True
+Correct answer:
+
+False
+Results for question 4.
+4
+0 / 1 point
+A given reducer can start processing only after all mappers have finished their processing.
+
+
+True
+Incorrect answer:
+
+False
+Correct Answer:
+True
+Results for question 5.
+5
+1 / 1 point
+Reducers do not have data locality.
+
+Correct answer:
+
+True
+
+False
+Results for question 6.
+6
+1 / 1 point
+In some instances, the MapReduce framework allows mappers to communicate with each other.
+
+
+True
+Correct answer:
+
+False
+Results for question 7.
+7
+1 / 1 point
+Consider a particular reducer RX that has received 1000 intermediate outputs from mappers; these intermediate outputs correspond to 100 unique keys. The question below pertains to execution of the reduce function in the reducer RX.
+
+If the reducer RX fails, all mappers must be re-executed to retrieve their intermediate outputs for the newly launched replacement for reducer RX.
+
+
+True
+Correct answer:
+
+False
+Results for question 8.
+8
+1 / 1 point
+Consider a particular reducer RX that has received 1000 intermediate outputs from mappers; these intermediate outputs correspond to 100 unique keys. The question below pertains to execution of the reduce function in the reducer RX
+
+The reduce function of RX is invoked exactly 100 times.
+
+Correct answer:
+
+True
+
+False
+Results for question 9.
+9
+1 / 1 point
+Consider a particular reducer RX that has received 1000 intermediate outputs from mappers; these intermediate outputs correspond to 100 unique keys. The question below pertains to execution of the reduce function in the reducer RX.
+
+It is possible that one of the mappers may not have generated intermediate outputs (<key, value> pairs) that need to be routed to RX.
+
+Correct answer:
+
+True
+
+False
+Results for question 10.
+10
+0 / 1 point
+Consider a particular reducer RX that has received 1000 intermediate outputs from mappers; these intermediate outputs correspond to 100 unique keys. The question below pertains to execution of the reduce function in the reducer RX.
+
+The intermediate keys are sorted but not grouped (by key) before invoking the reduce function.
+
+Incorrect answer:
+
+True
+Correct Answer:
+False
+
+False

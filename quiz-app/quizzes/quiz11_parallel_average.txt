@@ -1,0 +1,288 @@
+1
+2.5 / 2.5 points
+You will see multiple versions of the ParallelAverage class. You have to determine whether the computePartialSum() method works as intended or not. computePartialSum() should have each thread in the thread pool sum an even portion of the array, except for maybe the last thread. You cannot go back to a question after submitting your answer.
+
+Does computePartialSum() work as intended?
+
+public class ParallelAverage {
+
+    private final CyclicBarrier barrier;
+    private final Thread[] threads;
+    private int[] array;
+    private long[] partialSums;
+
+    public ParallelAverage(int nThreads) {
+        barrier = new CyclicBarrier(nThreads + 1);
+        threads = new Thread[nThreads];
+        for (int i = 0; i < nThreads; i++) {
+            threads[i] = new Thread(this::computePartialSum, String.valueOf(i));
+            threads[i].setDaemon(true);
+            threads[i].start();
+        }
+    }
+
+    private void computePartialSum() {
+        int id = Integer.valueOf(Thread.currentThread().getName());
+        try {
+            while (true) {
+                int chunkSize = (int) Math.ceil((double) array.length / threads.length);
+                int start = id * chunkSize;
+                int end = Math.min(start + chunkSize, array.length);
+                for (int i = start; i < end; i++)
+                    partialSums[id] += array[i];
+            }
+        } catch (Exception e) {
+        }
+    }
+
+    public synchronized double computeAvg(int[] array) {
+        try {
+            partialSums = new long[threads.length];
+            this.array = array;
+            barrier.await();
+            barrier.await();
+            long tot = 0L;
+            for (long v : partialSums)
+                tot += v;
+            return tot / (double) array.length;
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    public static void main(String[] args) {
+        ParallelAverage pa = new ParallelAverage(8);
+        int[] array = { 1, 2, 3, 4 };
+        double avg = pa.computeAvg(array);
+        System.out.println(avg);
+        array = new int[10000];
+        for (int i = 0; i < 10000; i++)
+            array[i] = i;
+        avg = pa.computeAvg(array);
+        System.out.println(avg);
+    }
+}
+
+
+True
+Correct answer:
+
+False
+Results for question 2.
+2
+2.5 / 2.5 points
+You will see multiple versions of the ParallelAverage class. You have to determine whether the computePartialSum() method works as intended or not. computePartialSum() should have each thread in the thread pool sum an even portion of the array, except for maybe the last thread. You cannot go back to a question after submitting your answer.
+
+Does computePartialSum() work as intended?
+
+public class ParallelAverage {
+
+    private final CyclicBarrier barrier;
+    private final Thread[] threads;
+    private int[] array;
+    private long[] partialSums;
+
+    public ParallelAverage(int nThreads) {
+        barrier = new CyclicBarrier(nThreads + 1);
+        threads = new Thread[nThreads];
+        for (int i = 0; i < nThreads; i++) {
+            threads[i] = new Thread(this::computePartialSum, String.valueOf(i));
+            threads[i].setDaemon(true);
+            threads[i].start();
+        }
+    }
+
+    private void computePartialSum() {
+        int id = Integer.valueOf(Thread.currentThread().getName());
+        try {
+            while (true) {
+                barrier.await();
+                int chunkSize = (int) Math.ceil((double) array.length / threads.length);
+                int start = id * chunkSize;
+                int end = start + chunkSize;
+                for (int i = start; i < end; i++)
+                    partialSums[id] += array[i];
+                barrier.await();
+            }
+        } catch (Exception e) {
+        }
+    }
+
+    public synchronized double computeAvg(int[] array) {
+        try {
+            partialSums = new long[threads.length];
+            this.array = array;
+            barrier.await();
+            barrier.await();
+            long tot = 0L;
+            for (long v : partialSums)
+                tot += v;
+            return tot / (double) array.length;
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    public static void main(String[] args) {
+        ParallelAverage pa = new ParallelAverage(8);
+        int[] array = { 1, 2, 3, 4 };
+        double avg = pa.computeAvg(array);
+        System.out.println(avg);
+        array = new int[10000];
+        for (int i = 0; i < 10000; i++)
+            array[i] = i;
+        avg = pa.computeAvg(array);
+        System.out.println(avg);
+    }
+}
+
+
+True
+Correct answer:
+
+False
+Results for question 3.
+3
+2.5 / 2.5 points
+You will see multiple versions of the ParallelAverage class. You have to determine whether the computePartialSum() method works as intended or not. computePartialSum() should have each thread in the thread pool sum an even portion of the array, except for maybe the last thread. You cannot go back to a question after submitting your answer.
+
+Does computePartialSum() work as intended?
+
+public class ParallelAverage {
+
+    private final CyclicBarrier barrier;
+    private final Thread[] threads;
+    private int[] array;
+    private long[] partialSums;
+
+    public ParallelAverage(int nThreads) {
+        barrier = new CyclicBarrier(nThreads + 1);
+        threads = new Thread[nThreads];
+        for (int i = 0; i < nThreads; i++) {
+            threads[i] = new Thread(this::computePartialSum, String.valueOf(i));
+            threads[i].setDaemon(true);
+            threads[i].start();
+        }
+    }
+
+    private void computePartialSum() {
+        int id = Integer.valueOf(Thread.currentThread().getName());
+        try {
+            while (true) {
+                barrier.await();
+                int chunkSize = (int) Math.ceil((double) array.length / threads.length);
+                int start = id * chunkSize;
+                int end = Math.min(start + chunkSize, array.length);
+                for (int i = start; i < end; i++)
+                    partialSums[id] += array[i];
+                barrier.await();
+            }
+        } catch (Exception e) {
+        }
+    }
+
+    public synchronized double computeAvg(int[] array) {
+        try {
+            partialSums = new long[threads.length];
+            this.array = array;
+            barrier.await();
+            barrier.await();
+            long tot = 0L;
+            for (long v : partialSums)
+                tot += v;
+            return tot / (double) array.length;
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    public static void main(String[] args) {
+        ParallelAverage pa = new ParallelAverage(8);
+        int[] array = { 1, 2, 3, 4 };
+        double avg = pa.computeAvg(array);
+        System.out.println(avg);
+        array = new int[10000];
+        for (int i = 0; i < 10000; i++)
+            array[i] = i;
+        avg = pa.computeAvg(array);
+        System.out.println(avg);
+    }
+}
+
+Correct answer:
+
+True
+
+False
+Results for question 4.
+4
+2.5 / 2.5 points
+You will see multiple versions of the ParallelAverage class. You have to determine whether the computePartialSum() method works as intended or not. computePartialSum() should have each thread in the thread pool sum an even portion of the array, except for maybe the last thread. You cannot go back to a question after submitting your answer.
+
+Does computePartialSum() work as intended?
+
+public class ParallelAverage {
+
+    private final CyclicBarrier barrier;
+    private final Thread[] threads;
+    private int[] array;
+    private long[] partialSums;
+
+    public ParallelAverage(int nThreads) {
+        barrier = new CyclicBarrier(nThreads + 1);
+        threads = new Thread[nThreads];
+        for (int i = 0; i < nThreads; i++) {
+            threads[i] = new Thread(this::computePartialSum, String.valueOf(i));
+            threads[i].setDaemon(true);
+            threads[i].start();
+        }
+    }
+
+    private void computePartialSum() {
+        int id = Integer.valueOf(Thread.currentThread().getName()) + 1;
+        try {
+            while (true) {
+                int chunkSize = (int) Math.ceil((double) array.length / threads.length);
+                int start = id * chunkSize;
+                int end = Math.min(start + chunkSize, array.length);
+                for (int i = start; i < end; i++)
+                    partialSums[id] += array[i];
+                barrier.await();
+            }
+        } catch (Exception e) {
+        }
+    }
+
+    public synchronized double computeAvg(int[] array) {
+        try {
+            partialSums = new long[threads.length];
+            this.array = array;
+            barrier.await();
+            barrier.await();
+            long tot = 0L;
+            for (long v : partialSums)
+                tot += v;
+            return tot / (double) array.length;
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    public static void main(String[] args) {
+        ParallelAverage pa = new ParallelAverage(8);
+        int[] array = { 1, 2, 3, 4 };
+        double avg = pa.computeAvg(array);
+        System.out.println(avg);
+        array = new int[10000];
+        for (int i = 0; i < 10000; i++)
+            array[i] = i;
+        avg = pa.computeAvg(array);
+        System.out.println(avg);
+    }
+}
+
+
+True
+Correct answer:
+
+False
