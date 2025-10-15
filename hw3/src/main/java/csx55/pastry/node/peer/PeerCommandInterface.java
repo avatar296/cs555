@@ -74,9 +74,8 @@ public class PeerCommandInterface {
 
   private void printLeafSet() {
     String output = leafSet.toOutputFormat();
-    if (output.isEmpty()) {
-      System.out.println("Leaf set is empty");
-    } else {
+    // Print nothing if empty, otherwise print the output
+    if (!output.isEmpty()) {
       System.out.println(output);
     }
   }

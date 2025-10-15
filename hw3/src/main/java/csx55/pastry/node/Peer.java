@@ -78,9 +78,9 @@ public class Peer {
 
       Thread.sleep(3000);
 
-      System.out.println("Peer " + id + " is running");
-      System.out.println("Listening on: " + peerServer.getHost() + ":" + peerServer.getPort());
-      System.out.println("Storage directory: " + fileStorage.getStorageDir().getAbsolutePath());
+      logger.info("Peer " + id + " is running");
+      logger.info("Listening on: " + peerServer.getHost() + ":" + peerServer.getPort());
+      logger.info("Storage directory: " + fileStorage.getStorageDir().getAbsolutePath());
 
       commandInterface.runCommandLoop();
 

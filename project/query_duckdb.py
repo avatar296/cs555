@@ -12,15 +12,13 @@ from datetime import datetime
 import sys
 
 def setup_duckdb_iceberg():
-    """Initialize DuckDB with Iceberg and S3 support"""
+    """Initialize DuckDB with S3 support for reading Parquet files"""
 
     # Create connection
     con = duckdb.connect()
 
-    # Install and load required extensions
-    con.execute("INSTALL iceberg;")
-    con.execute("INSTALL httpfs;")  # For S3 support
-    con.execute("LOAD iceberg;")
+    # Install and load httpfs extension for S3 support
+    con.execute("INSTALL httpfs;")
     con.execute("LOAD httpfs;")
 
     # Configure S3/MinIO credentials
@@ -36,13 +34,13 @@ def setup_duckdb_iceberg():
     return con
 
 def check_table_exists(con, table_path):
-    """Check if an Iceberg table exists"""
+    """Check if parquet files exist for a table"""
     try:
-        con.execute(f"""
-            SELECT COUNT(*) FROM iceberg_scan('{table_path}', allow_moved_paths=true)
-            LIMIT 1
+        # Try to find any parquet files for this table
+        result = con.execute(f"""
+            SELECT COUNT(*) FROM glob('{table_path}/data/**/*.parquet')
         """).fetchone()
-        return True
+        return result[0] > 0
     except Exception:
         return False
 
@@ -60,10 +58,13 @@ def query_bronze_trips(con):
         return
 
     try:
+        # Read all parquet files for this table
+        parquet_path = f"{table_path}/data/**/*.parquet"
+
         # Get total row count
         count = con.execute(f"""
             SELECT COUNT(*) as total_rows
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
+            FROM read_parquet('{parquet_path}')
         """).fetchone()[0]
 
         print(f"✅ Total records: {count:,}")
@@ -78,15 +79,15 @@ def query_bronze_trips(con):
             SELECT
                 ts,
                 pu as pickup_zone,
-                do as dropoff_zone,
+                "do" as dropoff_zone,
                 dist as distance,
                 lateness_ms,
                 consumer_id,
-                bronze_ingestion_time,
+                bronze_processing_time,
                 ingestion_date,
                 ingestion_hour
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
-            ORDER BY bronze_ingestion_time DESC
+            FROM read_parquet('{parquet_path}')
+            ORDER BY bronze_processing_time DESC
             LIMIT 10
         """).fetchdf()
 
@@ -102,7 +103,7 @@ def query_bronze_trips(con):
                 ROUND(AVG(dist), 2) as avg_distance,
                 MIN(ts) as earliest_event,
                 MAX(ts) as latest_event
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
+            FROM read_parquet('{parquet_path}')
         """).fetchdf()
 
         print(quality.to_string(index=False))
@@ -116,7 +117,7 @@ def query_bronze_trips(con):
                 COUNT(*) as record_count,
                 COUNT(DISTINCT pu) as unique_pickup_zones,
                 ROUND(AVG(dist), 2) as avg_distance
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
+            FROM read_parquet('{parquet_path}')
             GROUP BY ingestion_date, ingestion_hour
             ORDER BY ingestion_date DESC, ingestion_hour DESC
             LIMIT 5
@@ -141,10 +142,13 @@ def query_bronze_weather(con):
         return
 
     try:
+        # Read all parquet files for this table
+        parquet_path = f"{table_path}/data/**/*.parquet"
+
         # Get total row count
         count = con.execute(f"""
             SELECT COUNT(*) as total_rows
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
+            FROM read_parquet('{parquet_path}')
         """).fetchone()[0]
 
         print(f"✅ Total records: {count:,}")
@@ -165,9 +169,9 @@ def query_bronze_weather(con):
                 conditions,
                 station_id,
                 observation_time,
-                bronze_ingestion_time
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
-            ORDER BY bronze_ingestion_time DESC
+                bronze_processing_time
+            FROM read_parquet('{parquet_path}')
+            ORDER BY bronze_processing_time DESC
             LIMIT 10
         """).fetchdf()
 
@@ -183,7 +187,7 @@ def query_bronze_weather(con):
                 ROUND(MIN(temperature), 1) as min_temp,
                 ROUND(MAX(temperature), 1) as max_temp,
                 ROUND(AVG(wind_speed), 1) as avg_wind
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
+            FROM read_parquet('{parquet_path}')
             WHERE zone_id <= 10
             GROUP BY zone_id
             ORDER BY zone_id
@@ -200,7 +204,7 @@ def query_bronze_weather(con):
                 COUNT(*) as count,
                 ROUND(AVG(temperature), 1) as avg_temp,
                 ROUND(AVG(precipitation), 2) as avg_precip
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
+            FROM read_parquet('{parquet_path}')
             GROUP BY conditions
             ORDER BY count DESC
             LIMIT 5
@@ -225,10 +229,13 @@ def query_bronze_events(con):
         return
 
     try:
+        # Read all parquet files for this table
+        parquet_path = f"{table_path}/data/**/*.parquet"
+
         # Get total row count
         count = con.execute(f"""
             SELECT COUNT(*) as total_rows
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
+            FROM read_parquet('{parquet_path}')
         """).fetchone()[0]
 
         print(f"✅ Total records: {count:,}")
@@ -247,9 +254,9 @@ def query_bronze_events(con):
                 expected_attendance,
                 start_time,
                 end_time,
-                bronze_ingestion_time
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
-            ORDER BY bronze_ingestion_time DESC
+                bronze_processing_time
+            FROM read_parquet('{parquet_path}')
+            ORDER BY bronze_processing_time DESC
             LIMIT 10
         """).fetchdf()
 
@@ -263,7 +270,7 @@ def query_bronze_events(con):
                 COUNT(*) as event_count,
                 SUM(expected_attendance) as total_expected_attendance,
                 ROUND(AVG(expected_attendance), 0) as avg_attendance
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
+            FROM read_parquet('{parquet_path}')
             GROUP BY event_type
             ORDER BY event_count DESC
         """).fetchdf()
@@ -278,7 +285,7 @@ def query_bronze_events(con):
                 COUNT(*) as event_count,
                 COUNT(DISTINCT event_type) as event_types,
                 SUM(expected_attendance) as total_expected_attendance
-            FROM iceberg_scan('{table_path}', allow_moved_paths=true)
+            FROM read_parquet('{parquet_path}')
             GROUP BY venue_name
             ORDER BY event_count DESC
             LIMIT 5
@@ -313,42 +320,6 @@ def explore_bronze_tables(con):
     except Exception as e:
         print(f"❌ Could not explore bronze layer: {e}")
 
-def show_pipeline_status():
-    """Show the current pipeline status and instructions"""
-    print("\n" + "="*60)
-    print("🚀 BRONZE LAYER PIPELINE STATUS")
-    print("="*60)
-
-    print("""
-To test the complete pipeline:
-
-1️⃣  Start Infrastructure:
-    make up
-
-2️⃣  Run Producers (separate terminals):
-    make produce-trips SYNTHETIC_MODE=synthetic RATE=100
-    make produce-weather SYNTHETIC_MODE=synthetic RATE=50
-    make produce-events SYNTHETIC_MODE=synthetic RATE=10
-
-3️⃣  Run Bronze Consumers (separate terminals):
-    make bronze-trips
-    make bronze-weather
-    make bronze-events
-
-    OR run all at once:
-    make bronze-all
-
-4️⃣  Check Status:
-    make bronze-status
-    make kafka-topics
-
-5️⃣  Query Bronze Tables:
-    make query-duckdb
-
-6️⃣  Clean Up:
-    make stop-producers
-    make down
-    """)
 
 def main():
     """Main function to query Bronze Layer Iceberg tables"""
@@ -358,11 +329,8 @@ def main():
     print("🦆" * 30)
     print(f"\n⏰ Timestamp: {datetime.now()}")
 
-    # Show pipeline status first
-    show_pipeline_status()
-
     # Initialize DuckDB
-    print("\n🔧 Initializing DuckDB with Iceberg support...")
+    print("\n🔧 Initializing DuckDB with S3 support...")
     con = setup_duckdb_iceberg()
     print("✅ DuckDB ready")
 
@@ -378,11 +346,6 @@ def main():
     print("\n" + "="*60)
     print("✨ BRONZE LAYER QUERY COMPLETE")
     print("="*60)
-    print("""
-Note: Bronze layer preserves raw data with no transformations.
-      Data includes ingestion metadata for lineage tracking.
-      Use silver layer for cleaned/validated data (not yet implemented).
-    """)
 
     # Close connection
     con.close()

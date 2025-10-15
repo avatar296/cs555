@@ -72,14 +72,18 @@ public class RoutingTable {
 
     for (int row = 0; row < ROWS; row++) {
       for (int col = 0; col < COLS; col++) {
+        String prefix = localId.substring(0, row) + Integer.toHexString(col);
+
         NodeInfo node = table[row][col];
 
         if (node != null) {
-          sb.append(node.getId()).append("-").append(node.getAddress());
+          sb.append(prefix).append("-").append(node.getAddress());
+        } else {
+          sb.append(prefix).append("-:");
         }
 
         if (col < COLS - 1) {
-          sb.append(", ");
+          sb.append(",");
         }
       }
       if (row < ROWS - 1) {

@@ -26,7 +26,7 @@ public class Data {
       String filename = extractFilename(filePath);
 
       String targetId = csx55.pastry.util.HashUtil.hashFilename(filename);
-      System.out.println("Target ID for '" + filename + "': " + targetId);
+      logger.info("Target ID for '" + filename + "': " + targetId);
 
       csx55.pastry.util.NodeInfo entryPoint = getRandomEntryPoint();
       if (entryPoint == null) {
@@ -34,7 +34,7 @@ public class Data {
         return;
       }
 
-      System.out.println("Entry point: " + entryPoint.getId());
+      logger.info("Entry point: " + entryPoint.getId());
 
       LookupResult lookupResult = performLookup(targetId, entryPoint);
       if (lookupResult == null) {
@@ -42,16 +42,12 @@ public class Data {
         return;
       }
 
-      System.out.print("Routing path: ");
-      for (int i = 0; i < lookupResult.path.size(); i++) {
-        System.out.print(lookupResult.path.get(i));
-        if (i < lookupResult.path.size() - 1) {
-          System.out.print(" -> ");
-        }
+      for (String nodeId : lookupResult.path) {
+        System.out.println(nodeId);
       }
-      System.out.println(" -> " + targetId);
+      System.out.println(targetId);
 
-      System.out.println("Responsible peer: " + lookupResult.responsible.getId());
+      logger.info("Responsible peer: " + lookupResult.responsible.getId());
 
       if ("store".equals(mode)) {
         performStore(filename, lookupResult.responsible);
@@ -137,7 +133,7 @@ public class Data {
       }
 
       byte[] fileData = java.nio.file.Files.readAllBytes(file.toPath());
-      System.out.println("Read file: " + filename + " (" + fileData.length + " bytes)");
+      logger.info("Read file: " + filename + " (" + fileData.length + " bytes)");
 
       try (java.net.Socket socket =
               new java.net.Socket(responsiblePeer.getHost(), responsiblePeer.getPort());
@@ -153,7 +149,7 @@ public class Data {
         FileMessages.AckData ack = csx55.pastry.transport.MessageFactory.extractAck(response);
 
         if (ack.success) {
-          System.out.println("File stored successfully at peer " + responsiblePeer.getId());
+          logger.info("File stored successfully at peer " + responsiblePeer.getId());
         } else {
           System.err.println("Failed to store file: " + ack.message);
         }
@@ -184,8 +180,8 @@ public class Data {
           java.io.File outputFile = new java.io.File(filePath);
           java.nio.file.Files.write(outputFile.toPath(), fileData.fileData);
 
-          System.out.println("File retrieved successfully from peer " + responsiblePeer.getId());
-          System.out.println("Saved to: " + filePath + " (" + fileData.fileData.length + " bytes)");
+          logger.info("File retrieved successfully from peer " + responsiblePeer.getId());
+          logger.info("Saved to: " + filePath + " (" + fileData.fileData.length + " bytes)");
         } else {
           System.err.println(
               "Failed to retrieve file: File not found at peer " + responsiblePeer.getId());
