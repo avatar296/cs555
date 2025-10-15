@@ -45,18 +45,23 @@ public class PeerCommandInterface {
         switch (line) {
           case "id":
             System.out.println(id);
+            System.out.flush();
             break;
           case "leaf-set":
             printLeafSet();
+            System.out.flush();
             break;
           case "routing-table":
             printRoutingTable();
+            System.out.flush();
             break;
           case "list-files":
             listFiles();
+            System.out.flush();
             break;
           case "stats":
             printStats();
+            System.out.flush();
             break;
           case "exit":
             shutdown();
@@ -65,6 +70,7 @@ public class PeerCommandInterface {
             System.out.println("Unknown command: " + line);
             System.out.println(
                 "Available commands: id, leaf-set, routing-table, list-files, stats, exit");
+            System.out.flush();
         }
       }
     } catch (Exception e) {
@@ -74,7 +80,6 @@ public class PeerCommandInterface {
 
   private void printLeafSet() {
     String output = leafSet.toOutputFormat();
-    // Print nothing if empty, otherwise print the output
     if (!output.isEmpty()) {
       System.out.println(output);
     }

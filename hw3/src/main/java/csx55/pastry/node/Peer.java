@@ -12,10 +12,35 @@ import csx55.pastry.routing.LeafSet;
 import csx55.pastry.routing.RoutingTable;
 import csx55.pastry.util.HexUtil;
 import csx55.pastry.util.NodeInfo;
+import java.io.IOException;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.FileHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 public class Peer {
   private static final Logger logger = Logger.getLogger(Peer.class.getName());
+
+  private static void configureLogging(String peerId) {
+    try {
+      Logger rootLogger = Logger.getLogger("");
+      for (Handler handler : rootLogger.getHandlers()) {
+        if (handler instanceof ConsoleHandler) {
+          rootLogger.removeHandler(handler);
+        }
+      }
+
+      FileHandler fileHandler = new FileHandler("/tmp/peer-" + peerId + ".log", true);
+      fileHandler.setFormatter(new SimpleFormatter());
+      fileHandler.setLevel(Level.ALL);
+      rootLogger.addHandler(fileHandler);
+      rootLogger.setLevel(Level.INFO);
+    } catch (IOException e) {
+      System.err.println("Failed to configure logging: " + e.getMessage());
+    }
+  }
 
   private final String discoverHost;
   private final int discoverPort;
@@ -25,7 +50,6 @@ public class Peer {
   private LeafSet leafSet;
   private RoutingTable routingTable;
 
-  // Helper classes
   private DiscoveryClient discoveryClient;
   private FileStorageManager fileStorage;
   private RoutingEngine routingEngine;
@@ -73,10 +97,32 @@ public class Peer {
           new PeerCommandInterface(
               id, leafSet, routingTable, fileStorage, discoveryClient, peerServer, statistics);
 
-      discoveryClient.register(selfInfo);
-      joinProtocol.joinNetwork();
+      Runtime.getRuntime()
+          .addShutdownHook(
+              new Thread(
+                  () -> {
+                    try {
+                      System.out.flush();
+                    } catch (Throwable ignore) {
+                    }
+                  },
+                  "StdoutFlusher"));
 
-      Thread.sleep(3000);
+      // Join network in background thread so command loop can start immediately
+      Thread joinThread =
+          new Thread(
+              () -> {
+                try {
+                  discoveryClient.register(selfInfo);
+                  joinProtocol.joinNetwork();
+                  logger.info("Peer " + id + " joined network");
+                } catch (Exception e) {
+                  logger.warning("Failed to join network: " + e.getMessage());
+                }
+              },
+              "NetworkJoin");
+      joinThread.setDaemon(true);
+      joinThread.start();
 
       logger.info("Peer " + id + " is running");
       logger.info("Listening on: " + peerServer.getHost() + ":" + peerServer.getPort());
@@ -100,6 +146,8 @@ public class Peer {
     String discoverHost = args[0];
     int discoverPort = Integer.parseInt(args[1]);
     String id = args[2];
+
+    configureLogging(id);
 
     Peer peer = new Peer(discoverHost, discoverPort, id);
     peer.start();

@@ -15,10 +15,10 @@ public class FileStorageManager {
   public FileStorageManager(String peerId, PeerStatistics statistics) {
     this.storageDir = new File("/tmp/" + peerId);
     this.statistics = statistics;
-    createStorageDirectory();
+    // Defer directory creation until first use to speed up startup
   }
 
-  private void createStorageDirectory() {
+  private void ensureStorageDirectory() {
     if (!storageDir.exists()) {
       if (storageDir.mkdirs()) {
         logger.info("Created storage directory: " + storageDir.getAbsolutePath());
@@ -33,6 +33,7 @@ public class FileStorageManager {
   }
 
   public void storeFile(String filename, byte[] fileData) throws IOException {
+    ensureStorageDirectory();
     File file = new File(storageDir, filename);
     java.nio.file.Files.write(file.toPath(), fileData);
     statistics.incrementFilesStored();
@@ -53,6 +54,7 @@ public class FileStorageManager {
   }
 
   public String[] listFilesWithHashes() {
+    ensureStorageDirectory();
     File[] files = storageDir.listFiles();
     if (files == null || files.length == 0) {
       return new String[0];

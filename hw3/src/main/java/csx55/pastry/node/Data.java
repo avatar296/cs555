@@ -2,10 +2,37 @@ package csx55.pastry.node;
 
 import csx55.pastry.transport.FileMessages;
 import csx55.pastry.transport.LookupMessages;
+import java.io.IOException;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.FileHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 public class Data {
   private static final Logger logger = Logger.getLogger(Data.class.getName());
+
+  private static void configureLogging() {
+    try {
+      // Get root logger and remove all console handlers
+      Logger rootLogger = Logger.getLogger("");
+      for (Handler handler : rootLogger.getHandlers()) {
+        if (handler instanceof ConsoleHandler) {
+          rootLogger.removeHandler(handler);
+        }
+      }
+
+      // Add file handler to write logs to /tmp/data.log
+      FileHandler fileHandler = new FileHandler("/tmp/data.log", true);
+      fileHandler.setFormatter(new SimpleFormatter());
+      fileHandler.setLevel(Level.ALL);
+      rootLogger.addHandler(fileHandler);
+      rootLogger.setLevel(Level.INFO);
+    } catch (IOException e) {
+      System.err.println("Failed to configure logging: " + e.getMessage());
+    }
+  }
 
   private final String discoverHost;
   private final int discoverPort;
@@ -219,6 +246,9 @@ public class Data {
       System.err.println("Error: mode must be 'store' or 'retrieve'");
       System.exit(1);
     }
+
+    // Configure logging to file before any logging occurs
+    configureLogging();
 
     Data data = new Data(discoverHost, discoverPort, mode, path);
     data.execute();

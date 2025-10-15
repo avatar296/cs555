@@ -15,10 +15,36 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.FileHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 public class Discover {
   private static final Logger logger = Logger.getLogger(Discover.class.getName());
+
+  private static void configureLogging(int port) {
+    try {
+      // Get root logger and remove all console handlers
+      Logger rootLogger = Logger.getLogger("");
+      for (Handler handler : rootLogger.getHandlers()) {
+        if (handler instanceof ConsoleHandler) {
+          rootLogger.removeHandler(handler);
+        }
+      }
+
+      // Add file handler to write logs to /tmp/discover-<port>.log
+      FileHandler fileHandler = new FileHandler("/tmp/discover-" + port + ".log", true);
+      fileHandler.setFormatter(new SimpleFormatter());
+      fileHandler.setLevel(Level.ALL);
+      rootLogger.addHandler(fileHandler);
+      rootLogger.setLevel(Level.INFO);
+    } catch (IOException e) {
+      System.err.println("Failed to configure logging: " + e.getMessage());
+    }
+  }
 
   private final int port;
   private final Map<String, NodeInfo> registeredNodes;
@@ -203,6 +229,9 @@ public class Discover {
     }
 
     int port = Integer.parseInt(args[0]);
+
+    configureLogging(port);
+
     Discover discover = new Discover(port);
     discover.start();
   }
