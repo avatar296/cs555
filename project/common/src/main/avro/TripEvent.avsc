@@ -1,0 +1,40 @@
+{
+  "namespace": "csx55.sta.schema",
+  "type": "record",
+  "name": "TripEvent",
+  "doc": "NYC Taxi Trip Event",
+  "fields": [
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Event timestamp (epoch millis)"
+    },
+    {
+      "name": "pickupLocationId",
+      "type": "int",
+      "doc": "TLC Taxi Zone where the trip started"
+    },
+    {
+      "name": "dropoffLocationId",
+      "type": "int",
+      "doc": "TLC Taxi Zone where the trip ended"
+    },
+    {
+      "name": "tripDistance",
+      "type": "double",
+      "doc": "Trip distance in miles"
+    },
+    {
+      "name": "fareAmount",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Fare amount in USD"
+    },
+    {
+      "name": "passengerCount",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Number of passengers"
+    }
+  ]
+}

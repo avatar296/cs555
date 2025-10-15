@@ -1,0 +1,42 @@
+{
+  "namespace": "csx55.sta.schema",
+  "type": "record",
+  "name": "WeatherEvent",
+  "doc": "Weather conditions affecting a location",
+  "fields": [
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Event timestamp (epoch millis)"
+    },
+    {
+      "name": "locationId",
+      "type": "int",
+      "doc": "TLC Taxi Zone affected by weather"
+    },
+    {
+      "name": "temperature",
+      "type": "double",
+      "doc": "Temperature in Fahrenheit"
+    },
+    {
+      "name": "precipitation",
+      "type": "double",
+      "doc": "Precipitation level in inches per hour"
+    },
+    {
+      "name": "windSpeed",
+      "type": "double",
+      "doc": "Wind speed in mph"
+    },
+    {
+      "name": "condition",
+      "type": {
+        "type": "enum",
+        "name": "WeatherCondition",
+        "symbols": ["CLEAR", "CLOUDY", "RAIN", "SNOW", "FOG", "STORM"]
+      },
+      "doc": "Current weather condition"
+    }
+  ]
+}

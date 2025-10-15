@@ -48,3 +48,17 @@ data/zones/*.json
 tmp/
 temp/
 *.tmp
+# Gradle
+.gradle
+build
+bin/
+out/
+.gradle-wrapper-download/
+
+# Java
+*.class
+*.jar
+!gradle-wrapper.jar
+*.war
+*.ear
+hs_err_pid*

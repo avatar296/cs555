@@ -1,0 +1,48 @@
+{
+  "namespace": "csx55.sta.schema",
+  "type": "record",
+  "name": "SpecialEvent",
+  "doc": "Special events (concerts, sports, conferences) affecting demand",
+  "fields": [
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Event timestamp (epoch millis)"
+    },
+    {
+      "name": "locationId",
+      "type": "int",
+      "doc": "TLC Taxi Zone where event is located"
+    },
+    {
+      "name": "eventType",
+      "type": {
+        "type": "enum",
+        "name": "EventType",
+        "symbols": ["CONCERT", "SPORTS", "CONFERENCE", "FESTIVAL", "THEATER", "OTHER"]
+      },
+      "doc": "Type of special event"
+    },
+    {
+      "name": "attendanceEstimate",
+      "type": "int",
+      "doc": "Estimated number of attendees"
+    },
+    {
+      "name": "startTime",
+      "type": "long",
+      "doc": "Event start time (epoch millis)"
+    },
+    {
+      "name": "endTime",
+      "type": "long",
+      "doc": "Event end time (epoch millis)"
+    },
+    {
+      "name": "venueName",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Name of the venue"
+    }
+  ]
+}
