@@ -22,6 +22,7 @@ import java.util.logging.SimpleFormatter;
 
 public class Peer {
   private static final Logger logger = Logger.getLogger(Peer.class.getName());
+  private static volatile boolean gracefulShutdown = false;
 
   private static void configureLogging(String peerId) {
     try {
@@ -69,6 +70,10 @@ public class Peer {
     }
   }
 
+  public static void setGracefulShutdown() {
+    gracefulShutdown = true;
+  }
+
   public void start() {
     logger.info("Peer " + id + " starting...");
     logger.info("Discovery Node: " + discoverHost + ":" + discoverPort);
@@ -102,11 +107,18 @@ public class Peer {
               new Thread(
                   () -> {
                     try {
+                      // Only deregister if not already doing graceful shutdown via exit command
+                      if (!gracefulShutdown) {
+                        logger.info("Peer " + id + " shutting down (forced termination)...");
+                        discoveryClient.deregister(id);
+                        peerServer.stop();
+                      }
                       System.out.flush();
                     } catch (Throwable ignore) {
+                      // Ignore exceptions during shutdown
                     }
                   },
-                  "StdoutFlusher"));
+                  "PeerShutdown"));
 
       // Join network in background thread so command loop can start immediately
       Thread joinThread =

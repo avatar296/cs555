@@ -29,9 +29,9 @@ public class PeerServer {
   }
 
   public void start() throws IOException {
-    serverSocket = new ServerSocket(0); // random port
+    serverSocket = new ServerSocket(0);
     port = serverSocket.getLocalPort();
-    host = InetAddress.getLoopbackAddress().getHostAddress();
+    host = InetAddress.getLocalHost().getHostAddress();
 
     serverThread = new Thread(this::run);
     serverThread.setDaemon(false);

@@ -1,5 +1,6 @@
 package csx55.pastry.node.peer;
 
+import csx55.pastry.node.Peer;
 import csx55.pastry.routing.LeafSet;
 import csx55.pastry.routing.RoutingTable;
 import java.io.BufferedReader;
@@ -107,6 +108,9 @@ public class PeerCommandInterface {
 
   private void shutdown() {
     System.out.println("Peer " + id + " exiting...");
+
+    // Set flag so shutdown hook doesn't duplicate deregistration
+    Peer.setGracefulShutdown();
 
     discoveryClient.deregister(id);
     peerServer.stop();

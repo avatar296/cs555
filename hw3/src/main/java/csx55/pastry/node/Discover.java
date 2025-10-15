@@ -200,6 +200,7 @@ public class Discover {
   private void listNodes() {
     if (registeredNodes.isEmpty()) {
       System.out.println("No nodes registered");
+      System.out.flush();
       return;
     }
 
@@ -207,6 +208,7 @@ public class Discover {
     registeredNodes.values().stream()
         .sorted((a, b) -> a.getId().compareTo(b.getId()))
         .forEach(node -> System.out.println(node.toOutputFormat()));
+    System.out.flush();
   }
 
   private void shutdown() {
