@@ -46,6 +46,11 @@ public class RoutingEngine {
       long dist = computeDistance(node.getId(), targetId);
       if (dist < selfDist) {
         return false;
+      } else if (dist == selfDist) {
+        // Tie-breaking: prefer higher identifier
+        if (compareIds(node.getId(), selfId) > 0) {
+          return false;
+        }
       }
     }
 
@@ -56,12 +61,22 @@ public class RoutingEngine {
           long dist = computeDistance(node.getId(), targetId);
           if (dist < selfDist) {
             return false;
+          } else if (dist == selfDist) {
+            if (compareIds(node.getId(), selfId) > 0) {
+              return false;
+            }
           }
         }
       }
     }
 
     return true; // closest node
+  }
+
+  private int compareIds(String id1, String id2) {
+    int val1 = Integer.parseInt(id1, 16);
+    int val2 = Integer.parseInt(id2, 16);
+    return Integer.compare(val1, val2);
   }
 
   private NodeInfo findCloserNode(String key) {
@@ -74,6 +89,10 @@ public class RoutingEngine {
       if (dist < minDist) {
         minDist = dist;
         closest = node;
+      } else if (dist == minDist && closest != null) {
+        if (compareIds(node.getId(), closest.getId()) > 0) {
+          closest = node;
+        }
       }
     }
 
@@ -85,6 +104,10 @@ public class RoutingEngine {
           if (dist < minDist) {
             minDist = dist;
             closest = node;
+          } else if (dist == minDist && closest != null) {
+            if (compareIds(node.getId(), closest.getId()) > 0) {
+              closest = node;
+            }
           }
         }
       }

@@ -3,14 +3,20 @@ package csx55.pastry.node.peer;
 import csx55.pastry.node.Peer;
 import csx55.pastry.routing.LeafSet;
 import csx55.pastry.routing.RoutingTable;
+import csx55.pastry.transport.Message;
+import csx55.pastry.transport.MessageFactory;
+import csx55.pastry.util.NodeInfo;
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.InputStreamReader;
+import java.net.Socket;
 import java.util.logging.Logger;
 
 public class PeerCommandInterface {
   private static final Logger logger = Logger.getLogger(PeerCommandInterface.class.getName());
 
   private final String id;
+  private final NodeInfo selfInfo;
   private final LeafSet leafSet;
   private final RoutingTable routingTable;
   private final FileStorageManager fileStorage;
@@ -19,14 +25,15 @@ public class PeerCommandInterface {
   private final PeerStatistics statistics;
 
   public PeerCommandInterface(
-      String id,
+      NodeInfo selfInfo,
       LeafSet leafSet,
       RoutingTable routingTable,
       FileStorageManager fileStorage,
       DiscoveryClient discoveryClient,
       PeerServer peerServer,
       PeerStatistics statistics) {
-    this.id = id;
+    this.id = selfInfo.getId();
+    this.selfInfo = selfInfo;
     this.leafSet = leafSet;
     this.routingTable = routingTable;
     this.fileStorage = fileStorage;
@@ -111,9 +118,45 @@ public class PeerCommandInterface {
 
     Peer.setGracefulShutdown();
 
+    // Notify all leaf set neighbors
+    for (NodeInfo node : leafSet.getAllNodes()) {
+      sendLeaveNotification(node);
+    }
+
+    // Notify all routing table neighbors
+    for (int row = 0; row < 4; row++) {
+      for (int col = 0; col < 16; col++) {
+        NodeInfo node = routingTable.getEntry(row, col);
+        if (node != null) {
+          sendLeaveNotification(node);
+        }
+      }
+    }
+
+    // Brief delay to allow LEAVE messages to be sent
+    try {
+      Thread.sleep(100);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+
     discoveryClient.deregister(id);
     peerServer.stop();
 
     System.exit(0);
+  }
+
+  private void sendLeaveNotification(NodeInfo node) {
+    try (Socket socket = new Socket(node.getHost(), node.getPort());
+        DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
+
+      Message leaveMsg = MessageFactory.createLeaveNotification(selfInfo);
+      leaveMsg.write(dos);
+
+      logger.info("Sent LEAVE notification to " + node.getId());
+    } catch (Exception e) {
+      logger.warning(
+          "Failed to send LEAVE notification to " + node.getId() + ": " + e.getMessage());
+    }
   }
 }

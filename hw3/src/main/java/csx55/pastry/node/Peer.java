@@ -100,7 +100,13 @@ public class Peer {
       joinProtocol = new JoinProtocol(selfInfo, leafSet, routingTable, discoveryClient);
       commandInterface =
           new PeerCommandInterface(
-              id, leafSet, routingTable, fileStorage, discoveryClient, peerServer, statistics);
+              selfInfo,
+              leafSet,
+              routingTable,
+              fileStorage,
+              discoveryClient,
+              peerServer,
+              statistics);
 
       Runtime.getRuntime()
           .addShutdownHook(

@@ -15,6 +15,10 @@ public class UpdateMessages {
     return createNodeInfoMessage(MessageType.LEAF_SET_UPDATE, node);
   }
 
+  public static Message createLeaveNotification(NodeInfo node) throws IOException {
+    return createNodeInfoMessage(MessageType.LEAVE, node);
+  }
+
   private static Message createNodeInfoMessage(MessageType type, NodeInfo node) throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutputStream dos = new DataOutputStream(baos);

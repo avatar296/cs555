@@ -74,6 +74,10 @@ public class MessageFactory {
     return UpdateMessages.createLeafSetUpdate(node);
   }
 
+  public static Message createLeaveNotification(NodeInfo node) throws IOException {
+    return UpdateMessages.createLeaveNotification(node);
+  }
+
   public static Message createLookupRequest(
       String targetId, NodeInfo origin, java.util.List<String> path) throws IOException {
     return LookupMessages.createLookupRequest(targetId, origin, path);

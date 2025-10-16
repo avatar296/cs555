@@ -53,6 +53,9 @@ public class MessageHandler {
       case LEAF_SET_UPDATE:
         handleLeafSetUpdate(request);
         break;
+      case LEAVE:
+        handleLeave(request);
+        break;
       case LOOKUP:
         handleLookup(request);
         break;
@@ -200,6 +203,14 @@ public class MessageHandler {
     statistics.incrementLeafSetUpdates();
     NodeInfo node = MessageFactory.extractNodeInfo(request);
     leafSet.addNode(node);
+  }
+
+  private void handleLeave(Message request) throws IOException {
+    NodeInfo node = MessageFactory.extractNodeInfo(request);
+    logger.info("Node " + node.getId() + " is leaving the network");
+
+    leafSet.removeNode(node.getId());
+    routingTable.removeNode(node.getId());
   }
 
   private void handleLookup(Message request) throws IOException {

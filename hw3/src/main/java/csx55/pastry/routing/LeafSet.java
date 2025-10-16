@@ -3,8 +3,10 @@ package csx55.pastry.routing;
 import csx55.pastry.util.NodeInfo;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 public class LeafSet {
+  private static final Logger logger = Logger.getLogger(LeafSet.class.getName());
   private final String localId;
   private NodeInfo left;
   private NodeInfo right;
@@ -23,48 +25,103 @@ public class LeafSet {
     long localVal = Long.parseLong(localId, 16);
     long nodeVal = Long.parseLong(node.getId(), 16);
 
-    if (nodeVal > localVal) {
-      if (right == null) {
-        right = node;
-      } else {
-        long rightVal = Long.parseLong(right.getId(), 16);
-        if (rightVal < localVal) {
-          right = node;
-        } else if (nodeVal < rightVal) {
-          right = node;
-        }
-      }
+    // Calculate clockwise distance on circular ring
+    long clockwiseDistance;
+    if (nodeVal >= localVal) {
+      clockwiseDistance = nodeVal - localVal;
     } else {
-      if (right == null) {
-        right = node;
-      } else {
-        long rightVal = Long.parseLong(right.getId(), 16);
-        if (rightVal > localVal) {
-        } else if (nodeVal > rightVal) {
-          right = node;
-        }
-      }
+      clockwiseDistance = (0x10000 - localVal) + nodeVal;
     }
 
-    if (nodeVal < localVal) {
-      if (left == null) {
-        left = node;
+    long counterClockwiseDistance = 0x10000 - clockwiseDistance;
+
+    // Node is RIGHT if closer going clockwise, LEFT if closer going counter-clockwise
+    boolean isRightNeighbor = clockwiseDistance <= counterClockwiseDistance;
+
+    logger.info(
+        String.format(
+            "[%s] Adding node %s: CW=%d, CCW=%d, isRight=%b",
+            localId, node.getId(), clockwiseDistance, counterClockwiseDistance, isRightNeighbor));
+
+    if (isRightNeighbor) {
+      if (right == null) {
+        logger.info(String.format("[%s] Setting RIGHT to %s (was null)", localId, node.getId()));
+        right = node;
       } else {
-        long leftVal = Long.parseLong(left.getId(), 16);
-        if (leftVal > localVal) {
-          left = node;
-        } else if (nodeVal > leftVal) {
-          left = node;
+        // For right neighbors, compare clockwise distances
+        long rightVal = Long.parseLong(right.getId(), 16);
+        long currentClockwise;
+        if (rightVal >= localVal) {
+          currentClockwise = rightVal - localVal;
+        } else {
+          currentClockwise = (0x10000 - localVal) + rightVal;
+        }
+
+        logger.info(
+            String.format(
+                "[%s] Comparing RIGHT: current=%s (CW=%d) vs new=%s (CW=%d)",
+                localId, right.getId(), currentClockwise, node.getId(), clockwiseDistance));
+
+        if (clockwiseDistance < currentClockwise) {
+          logger.info(
+              String.format(
+                  "[%s] REPLACING RIGHT: %s -> %s", localId, right.getId(), node.getId()));
+          right = node;
+        } else if (clockwiseDistance == currentClockwise) {
+          // Tie-breaking: prefer higher identifier
+          if (compareIds(node.getId(), right.getId()) > 0) {
+            logger.info(
+                String.format(
+                    "[%s] TIE-BREAK RIGHT: %s -> %s (higher ID)",
+                    localId, right.getId(), node.getId()));
+            right = node;
+          } else {
+            logger.info(String.format("[%s] KEEPING RIGHT: %s", localId, right.getId()));
+          }
+        } else {
+          logger.info(String.format("[%s] KEEPING RIGHT: %s", localId, right.getId()));
         }
       }
     } else {
       if (left == null) {
+        logger.info(String.format("[%s] Setting LEFT to %s (was null)", localId, node.getId()));
         left = node;
       } else {
+        // For left neighbors, compare counter-clockwise distances
         long leftVal = Long.parseLong(left.getId(), 16);
-        if (leftVal < localVal) {
-        } else if (nodeVal > leftVal) {
+        long currentCounterClockwise;
+        if (leftVal <= localVal) {
+          currentCounterClockwise = localVal - leftVal;
+        } else {
+          currentCounterClockwise = localVal + (0x10000 - leftVal);
+        }
+
+        logger.info(
+            String.format(
+                "[%s] Comparing LEFT: current=%s (CCW=%d) vs new=%s (CCW=%d)",
+                localId,
+                left.getId(),
+                currentCounterClockwise,
+                node.getId(),
+                counterClockwiseDistance));
+
+        if (counterClockwiseDistance < currentCounterClockwise) {
+          logger.info(
+              String.format("[%s] REPLACING LEFT: %s -> %s", localId, left.getId(), node.getId()));
           left = node;
+        } else if (counterClockwiseDistance == currentCounterClockwise) {
+          // Tie-breaking: prefer higher identifier
+          if (compareIds(node.getId(), left.getId()) > 0) {
+            logger.info(
+                String.format(
+                    "[%s] TIE-BREAK LEFT: %s -> %s (higher ID)",
+                    localId, left.getId(), node.getId()));
+            left = node;
+          } else {
+            logger.info(String.format("[%s] KEEPING LEFT: %s", localId, left.getId()));
+          }
+        } else {
+          logger.info(String.format("[%s] KEEPING LEFT: %s", localId, left.getId()));
         }
       }
     }
@@ -76,6 +133,17 @@ public class LeafSet {
 
   public synchronized NodeInfo getRight() {
     return right;
+  }
+
+  public synchronized void removeNode(String nodeId) {
+    if (left != null && left.getId().equals(nodeId)) {
+      logger.info(String.format("[%s] Removing LEFT neighbor: %s", localId, nodeId));
+      left = null;
+    }
+    if (right != null && right.getId().equals(nodeId)) {
+      logger.info(String.format("[%s] Removing RIGHT neighbor: %s", localId, nodeId));
+      right = null;
+    }
   }
 
   public synchronized List<NodeInfo> getAllNodes() {
@@ -94,18 +162,43 @@ public class LeafSet {
       return true;
     }
 
+    long keyVal = Long.parseLong(key, 16);
+    long localVal = Long.parseLong(localId, 16);
+
+    // If we only have one neighbor, check if key is between local and that neighbor
     if (left == null) {
-      return compareIds(key, localId) <= 0 && compareIds(key, right.getId()) < 0;
+      long rightVal = Long.parseLong(right.getId(), 16);
+      long distKeyToLocal = computeCircularDistance(keyVal, localVal);
+      long distKeyToRight = computeCircularDistance(keyVal, rightVal);
+
+      // Key is in range if it's closer to local than to right
+      return distKeyToLocal < distKeyToRight;
     }
 
     if (right == null) {
-      return compareIds(key, localId) >= 0 && compareIds(key, left.getId()) > 0;
+      long leftVal = Long.parseLong(left.getId(), 16);
+      long distKeyToLocal = computeCircularDistance(keyVal, localVal);
+      long distKeyToLeft = computeCircularDistance(keyVal, leftVal);
+
+      // Key is in range if it's closer to local than to left
+      return distKeyToLocal < distKeyToLeft;
     }
 
-    String minId = left.getId();
-    String maxId = right.getId();
+    // With both neighbors, check if key is closer to local than to either neighbor
+    long leftVal = Long.parseLong(left.getId(), 16);
+    long rightVal = Long.parseLong(right.getId(), 16);
 
-    return compareIds(key, minId) > 0 && compareIds(key, maxId) < 0;
+    long distKeyToLocal = computeCircularDistance(keyVal, localVal);
+    long distKeyToLeft = computeCircularDistance(keyVal, leftVal);
+    long distKeyToRight = computeCircularDistance(keyVal, rightVal);
+
+    return distKeyToLocal < distKeyToLeft && distKeyToLocal < distKeyToRight;
+  }
+
+  private long computeCircularDistance(long val1, long val2) {
+    long diff = Math.abs(val1 - val2);
+    long wrapDiff = 0x10000 - diff;
+    return Math.min(diff, wrapDiff);
   }
 
   public synchronized NodeInfo getClosestNode(String key) {
@@ -126,6 +219,11 @@ public class LeafSet {
       if (distance < minDistance) {
         minDistance = distance;
         closest = node;
+      } else if (distance == minDistance && closest != null) {
+        // Tie-breaking: prefer higher identifier
+        if (compareIds(node.getId(), closest.getId()) > 0) {
+          closest = node;
+        }
       }
     }
 

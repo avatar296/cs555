@@ -67,6 +67,16 @@ public class RoutingTable {
     }
   }
 
+  public synchronized void removeNode(String nodeId) {
+    for (int row = 0; row < ROWS; row++) {
+      for (int col = 0; col < COLS; col++) {
+        if (table[row][col] != null && table[row][col].getId().equals(nodeId)) {
+          table[row][col] = null;
+        }
+      }
+    }
+  }
+
   public synchronized String toOutputFormat() {
     StringBuilder sb = new StringBuilder();
 
