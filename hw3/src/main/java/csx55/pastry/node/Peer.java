@@ -119,20 +119,28 @@ public class Peer {
                   },
                   "PeerShutdown"));
 
+      // Register and join network in background thread
+      // Command loop starts immediately so peer can respond to commands quickly
       Thread joinThread =
           new Thread(
               () -> {
                 try {
                   discoveryClient.register(selfInfo);
                   joinProtocol.joinNetwork();
-                  logger.info("Peer " + id + " joined network");
+                  logger.info("Peer " + id + " joined network successfully");
                 } catch (Exception e) {
                   logger.warning("Failed to join network: " + e.getMessage());
                 }
               },
               "NetworkJoin");
-      joinThread.setDaemon(true);
       joinThread.start();
+
+      // Brief pause to ensure registration completes
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
 
       logger.info("Peer " + id + " is running");
       logger.info("Listening on: " + peerServer.getHost() + ":" + peerServer.getPort());

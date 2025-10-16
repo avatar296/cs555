@@ -23,61 +23,47 @@ public class LeafSet {
     long localVal = Long.parseLong(localId, 16);
     long nodeVal = Long.parseLong(node.getId(), 16);
 
-    // Update right neighbor (next in increasing ID order, with wraparound)
     if (nodeVal > localVal) {
-      // Node is numerically greater - normal right neighbor candidate
       if (right == null) {
         right = node;
       } else {
         long rightVal = Long.parseLong(right.getId(), 16);
         if (rightVal < localVal) {
-          // Current right has wrapped around (< localVal), replace with non-wrapped
           right = node;
         } else if (nodeVal < rightVal) {
-          // Both non-wrapped, keep closer (smaller) one
           right = node;
         }
       }
     } else {
-      // nodeVal < localVal - wrapped right neighbor candidate
       if (right == null) {
         right = node;
       } else {
         long rightVal = Long.parseLong(right.getId(), 16);
         if (rightVal > localVal) {
-          // Current right is non-wrapped, don't replace with wrapped candidate
-        } else if (nodeVal < rightVal) {
-          // Both wrapped, keep smaller (closer when wrapping) one
+        } else if (nodeVal > rightVal) {
           right = node;
         }
       }
     }
 
-    // Update left neighbor (next in decreasing ID order, with wraparound)
     if (nodeVal < localVal) {
-      // Node is numerically smaller - normal left neighbor candidate
       if (left == null) {
         left = node;
       } else {
         long leftVal = Long.parseLong(left.getId(), 16);
         if (leftVal > localVal) {
-          // Current left has wrapped around (> localVal), replace with non-wrapped
           left = node;
         } else if (nodeVal > leftVal) {
-          // Both non-wrapped, keep closer (larger) one
           left = node;
         }
       }
     } else {
-      // nodeVal > localVal - wrapped left neighbor candidate
       if (left == null) {
         left = node;
       } else {
         long leftVal = Long.parseLong(left.getId(), 16);
         if (leftVal < localVal) {
-          // Current left is non-wrapped, don't replace with wrapped candidate
         } else if (nodeVal > leftVal) {
-          // Both wrapped, keep larger (closer when wrapping) one
           left = node;
         }
       }
