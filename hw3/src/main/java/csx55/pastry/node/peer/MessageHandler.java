@@ -176,6 +176,7 @@ public class MessageHandler {
     JoinMessages.JoinResponseData data = MessageFactory.extractJoinResponse(request);
 
     if (data.rowNum == -1) {
+      // This is a leaf set message from the destination node
       if (data.left != null) {
         leafSet.addNode(data.left);
       }
@@ -183,13 +184,9 @@ public class MessageHandler {
         leafSet.addNode(data.right);
       }
     } else {
+      // This is a routing table row from an intermediate node
+      // Add to routing table ONLY, not to leaf set
       routingTable.setRow(data.rowNum, data.routingRow);
-
-      for (NodeInfo node : data.routingRow) {
-        if (node != null) {
-          leafSet.addNode(node);
-        }
-      }
     }
   }
 
@@ -206,11 +203,28 @@ public class MessageHandler {
   }
 
   private void handleLeave(Message request) throws IOException {
-    NodeInfo node = MessageFactory.extractNodeInfo(request);
-    logger.info("Node " + node.getId() + " is leaving the network");
+    csx55.pastry.transport.UpdateMessages.LeaveNotificationData data =
+        MessageFactory.extractLeaveNotification(request);
 
-    leafSet.removeNode(node.getId());
-    routingTable.removeNode(node.getId());
+    NodeInfo departingNode = data.departingNode;
+    NodeInfo replacementNeighbor = data.replacementNeighbor;
+
+    logger.info("Node " + departingNode.getId() + " is leaving the network");
+
+    // Remove the departing node from leaf set and routing table
+    leafSet.removeNode(departingNode.getId(), routingTable);
+    routingTable.removeNode(departingNode.getId());
+
+    // If we received a replacement neighbor, add it to our leaf set
+    if (replacementNeighbor != null) {
+      logger.info(
+          "Replacement neighbor provided: "
+              + replacementNeighbor.getId()
+              + " (from departing node "
+              + departingNode.getId()
+              + ")");
+      leafSet.addNode(replacementNeighbor);
+    }
   }
 
   private void handleLookup(Message request) throws IOException {

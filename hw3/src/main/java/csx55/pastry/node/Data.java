@@ -22,7 +22,13 @@ public class Data {
         }
       }
 
-      FileHandler fileHandler = new FileHandler("/tmp/data.log", true);
+      // Create logs directory in current working directory
+      java.io.File logsDir = new java.io.File("logs");
+      if (!logsDir.exists()) {
+        logsDir.mkdirs();
+      }
+
+      FileHandler fileHandler = new FileHandler("logs/data.log", true);
       fileHandler.setFormatter(new SimpleFormatter());
       fileHandler.setLevel(Level.ALL);
       rootLogger.addHandler(fileHandler);

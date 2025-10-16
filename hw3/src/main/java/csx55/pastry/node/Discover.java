@@ -35,8 +35,14 @@ public class Discover {
         }
       }
 
-      // Add file handler to write logs to /tmp/discover-<port>.log
-      FileHandler fileHandler = new FileHandler("/tmp/discover-" + port + ".log", true);
+      // Create logs directory in current working directory
+      java.io.File logsDir = new java.io.File("logs");
+      if (!logsDir.exists()) {
+        logsDir.mkdirs();
+      }
+
+      // Add file handler to write logs to logs/discover-<port>.log
+      FileHandler fileHandler = new FileHandler("logs/discover-" + port + ".log", true);
       fileHandler.setFormatter(new SimpleFormatter());
       fileHandler.setLevel(Level.ALL);
       rootLogger.addHandler(fileHandler);

@@ -118,17 +118,28 @@ public class PeerCommandInterface {
 
     Peer.setGracefulShutdown();
 
-    // Notify all leaf set neighbors
-    for (NodeInfo node : leafSet.getAllNodes()) {
-      sendLeaveNotification(node);
+    // Implement leaf swapping: tell each leaf neighbor who their new neighbor should be
+    NodeInfo left = leafSet.getLeft();
+    NodeInfo right = leafSet.getRight();
+
+    // Tell left neighbor: your new right neighbor is my right
+    if (left != null) {
+      sendLeaveNotification(left, right);
     }
 
-    // Notify all routing table neighbors
+    // Tell right neighbor: your new left neighbor is my left
+    if (right != null) {
+      sendLeaveNotification(right, left);
+    }
+
+    // Notify all routing table neighbors (no replacement)
     for (int row = 0; row < 4; row++) {
       for (int col = 0; col < 16; col++) {
         NodeInfo node = routingTable.getEntry(row, col);
-        if (node != null) {
-          sendLeaveNotification(node);
+        if (node != null
+            && !node.getId().equals(left != null ? left.getId() : "")
+            && !node.getId().equals(right != null ? right.getId() : "")) {
+          sendLeaveNotification(node, null);
         }
       }
     }
@@ -146,14 +157,22 @@ public class PeerCommandInterface {
     System.exit(0);
   }
 
-  private void sendLeaveNotification(NodeInfo node) {
+  private void sendLeaveNotification(NodeInfo node, NodeInfo replacementNeighbor) {
     try (Socket socket = new Socket(node.getHost(), node.getPort());
         DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
 
-      Message leaveMsg = MessageFactory.createLeaveNotification(selfInfo);
+      Message leaveMsg = MessageFactory.createLeaveNotification(selfInfo, replacementNeighbor);
       leaveMsg.write(dos);
 
-      logger.info("Sent LEAVE notification to " + node.getId());
+      if (replacementNeighbor != null) {
+        logger.info(
+            "Sent LEAVE notification to "
+                + node.getId()
+                + " with replacement "
+                + replacementNeighbor.getId());
+      } else {
+        logger.info("Sent LEAVE notification to " + node.getId());
+      }
     } catch (Exception e) {
       logger.warning(
           "Failed to send LEAVE notification to " + node.getId() + ": " + e.getMessage());

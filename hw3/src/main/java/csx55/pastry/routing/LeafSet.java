@@ -125,6 +125,15 @@ public class LeafSet {
         }
       }
     }
+
+    // Log final state after adding node
+    logger.info(
+        String.format(
+            "[%s] FINAL STATE after adding %s: LEFT=%s, RIGHT=%s",
+            localId,
+            node.getId(),
+            left != null ? left.getId() : "null",
+            right != null ? right.getId() : "null"));
   }
 
   public synchronized NodeInfo getLeft() {
@@ -135,15 +144,67 @@ public class LeafSet {
     return right;
   }
 
-  public synchronized void removeNode(String nodeId) {
+  public synchronized void removeNode(String nodeId, RoutingTable routingTable) {
+    logger.info(
+        String.format(
+            "[%s] BEFORE removeNode(%s): LEFT=%s, RIGHT=%s",
+            localId,
+            nodeId,
+            left != null ? left.getId() : "null",
+            right != null ? right.getId() : "null"));
+
+    boolean leftRemoved = false;
+    boolean rightRemoved = false;
+
     if (left != null && left.getId().equals(nodeId)) {
       logger.info(String.format("[%s] Removing LEFT neighbor: %s", localId, nodeId));
       left = null;
+      leftRemoved = true;
     }
     if (right != null && right.getId().equals(nodeId)) {
       logger.info(String.format("[%s] Removing RIGHT neighbor: %s", localId, nodeId));
       right = null;
+      rightRemoved = true;
     }
+
+    // Try to find replacements from routing table
+    if (leftRemoved || rightRemoved) {
+      logger.info(
+          String.format("[%s] Calling findReplacements() after removing %s", localId, nodeId));
+      findReplacements(routingTable);
+    }
+
+    logger.info(
+        String.format(
+            "[%s] AFTER removeNode(%s): LEFT=%s, RIGHT=%s",
+            localId,
+            nodeId,
+            left != null ? left.getId() : "null",
+            right != null ? right.getId() : "null"));
+  }
+
+  private void findReplacements(RoutingTable routingTable) {
+    logger.info(String.format("[%s] findReplacements() scanning routing table...", localId));
+
+    int candidatesFound = 0;
+    // Scan routing table for potential replacements
+    for (int row = 0; row < 4; row++) {
+      for (int col = 0; col < 16; col++) {
+        NodeInfo node = routingTable.getEntry(row, col);
+        if (node != null) {
+          logger.info(
+              String.format(
+                  "[%s] findReplacements() found candidate: %s at [%d][%d]",
+                  localId, node.getId(), row, col));
+          candidatesFound++;
+          addNode(node);
+        }
+      }
+    }
+
+    logger.info(
+        String.format(
+            "[%s] findReplacements() complete: processed %d candidates", localId, candidatesFound));
   }
 
   public synchronized List<NodeInfo> getAllNodes() {

@@ -33,7 +33,13 @@ public class Peer {
         }
       }
 
-      FileHandler fileHandler = new FileHandler("/tmp/peer-" + peerId + ".log", true);
+      // Create logs directory in current working directory
+      java.io.File logsDir = new java.io.File("logs");
+      if (!logsDir.exists()) {
+        logsDir.mkdirs();
+      }
+
+      FileHandler fileHandler = new FileHandler("logs/peer-" + peerId + ".log", true);
       fileHandler.setFormatter(new SimpleFormatter());
       fileHandler.setLevel(Level.ALL);
       rootLogger.addHandler(fileHandler);

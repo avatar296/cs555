@@ -74,8 +74,14 @@ public class MessageFactory {
     return UpdateMessages.createLeafSetUpdate(node);
   }
 
-  public static Message createLeaveNotification(NodeInfo node) throws IOException {
-    return UpdateMessages.createLeaveNotification(node);
+  public static Message createLeaveNotification(
+      NodeInfo departingNode, NodeInfo replacementNeighbor) throws IOException {
+    return UpdateMessages.createLeaveNotification(departingNode, replacementNeighbor);
+  }
+
+  public static UpdateMessages.LeaveNotificationData extractLeaveNotification(Message message)
+      throws IOException {
+    return UpdateMessages.extractLeaveNotification(message);
   }
 
   public static Message createLookupRequest(
