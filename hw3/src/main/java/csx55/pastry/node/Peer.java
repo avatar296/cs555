@@ -107,7 +107,6 @@ public class Peer {
               new Thread(
                   () -> {
                     try {
-                      // Only deregister if not already doing graceful shutdown via exit command
                       if (!gracefulShutdown) {
                         logger.info("Peer " + id + " shutting down (forced termination)...");
                         discoveryClient.deregister(id);
@@ -120,7 +119,6 @@ public class Peer {
                   },
                   "PeerShutdown"));
 
-      // Join network in background thread so command loop can start immediately
       Thread joinThread =
           new Thread(
               () -> {

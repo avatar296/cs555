@@ -15,7 +15,6 @@ public class Data {
 
   private static void configureLogging() {
     try {
-      // Get root logger and remove all console handlers
       Logger rootLogger = Logger.getLogger("");
       for (Handler handler : rootLogger.getHandlers()) {
         if (handler instanceof ConsoleHandler) {
@@ -23,7 +22,6 @@ public class Data {
         }
       }
 
-      // Add file handler to write logs to /tmp/data.log
       FileHandler fileHandler = new FileHandler("/tmp/data.log", true);
       fileHandler.setFormatter(new SimpleFormatter());
       fileHandler.setLevel(Level.ALL);

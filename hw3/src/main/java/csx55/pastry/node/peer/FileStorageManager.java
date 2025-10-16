@@ -15,7 +15,6 @@ public class FileStorageManager {
   public FileStorageManager(String peerId, PeerStatistics statistics) {
     this.storageDir = new File("/tmp/" + peerId);
     this.statistics = statistics;
-    // Defer directory creation until first use to speed up startup
   }
 
   private void ensureStorageDirectory() {

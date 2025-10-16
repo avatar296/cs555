@@ -181,6 +181,12 @@ public class MessageHandler {
       }
     } else {
       routingTable.setRow(data.rowNum, data.routingRow);
+
+      for (NodeInfo node : data.routingRow) {
+        if (node != null) {
+          leafSet.addNode(node);
+        }
+      }
     }
   }
 

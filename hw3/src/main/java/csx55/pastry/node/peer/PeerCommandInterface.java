@@ -109,7 +109,6 @@ public class PeerCommandInterface {
   private void shutdown() {
     System.out.println("Peer " + id + " exiting...");
 
-    // Set flag so shutdown hook doesn't duplicate deregistration
     Peer.setGracefulShutdown();
 
     discoveryClient.deregister(id);
