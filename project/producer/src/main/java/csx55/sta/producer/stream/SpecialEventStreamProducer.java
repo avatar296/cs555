@@ -1,5 +1,8 @@
-package csx55.sta.producer;
+package csx55.sta.producer.stream;
 
+import csx55.sta.producer.config.SyntheticProducerConfig;
+import csx55.sta.producer.generator.SyntheticSpecialEventGenerator;
+import csx55.sta.producer.util.ErrorInjector;
 import csx55.sta.schema.SpecialEvent;
 
 public class SpecialEventStreamProducer extends EventStreamProducer<SpecialEvent> {

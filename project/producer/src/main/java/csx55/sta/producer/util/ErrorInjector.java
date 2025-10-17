@@ -1,5 +1,6 @@
-package csx55.sta.producer;
+package csx55.sta.producer.util;
 
+import csx55.sta.producer.config.NycConstants;
 import csx55.sta.schema.TripEvent;
 import csx55.sta.schema.WeatherEvent;
 import csx55.sta.schema.WeatherCondition;
@@ -138,8 +139,10 @@ public class ErrorInjector {
      */
     public static boolean isInvalidEvent(TripEvent event) {
         // Check for various invalid conditions
-        if (event.getPickupLocationId() < 1 || event.getPickupLocationId() > 263) return true;
-        if (event.getDropoffLocationId() < 1 || event.getDropoffLocationId() > 263) return true;
+        if (event.getPickupLocationId() < NycConstants.MIN_ZONE_ID ||
+            event.getPickupLocationId() > NycConstants.MAX_ZONE_ID) return true;
+        if (event.getDropoffLocationId() < NycConstants.MIN_ZONE_ID ||
+            event.getDropoffLocationId() > NycConstants.MAX_ZONE_ID) return true;
         if (event.getTripDistance() <= 0.0) return true;
         if (event.getTripDistance() > 100.0) return true;
         if (event.getFareAmount() != null && event.getFareAmount() < 0.0) return true;
@@ -188,7 +191,8 @@ public class ErrorInjector {
      * Check if a weather event is invalid
      */
     public static boolean isInvalidEvent(WeatherEvent event) {
-        if (event.getLocationId() < 1 || event.getLocationId() > 263) return true;
+        if (event.getLocationId() < NycConstants.MIN_ZONE_ID ||
+            event.getLocationId() > NycConstants.MAX_ZONE_ID) return true;
         if (event.getTemperature() < -50.0 || event.getTemperature() > 150.0) return true;
         if (event.getPrecipitation() < 0.0) return true;
         if (event.getWindSpeed() < 0.0) return true;
@@ -236,7 +240,8 @@ public class ErrorInjector {
      * Check if a special event is invalid
      */
     public static boolean isInvalidEvent(SpecialEvent event) {
-        if (event.getLocationId() < 1 || event.getLocationId() > 263) return true;
+        if (event.getLocationId() < NycConstants.MIN_ZONE_ID ||
+            event.getLocationId() > NycConstants.MAX_ZONE_ID) return true;
         if (event.getAttendanceEstimate() < 0) return true;
         if (event.getAttendanceEstimate() > 100000) return true; // Unrealistic
         if (event.getEndTime() <= event.getStartTime()) return true; // End before/at start

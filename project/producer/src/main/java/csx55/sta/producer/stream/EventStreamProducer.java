@@ -1,5 +1,7 @@
-package csx55.sta.producer;
+package csx55.sta.producer.stream;
 
+import csx55.sta.producer.config.SyntheticProducerConfig;
+import csx55.sta.producer.util.ErrorInjector;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -133,6 +135,16 @@ public abstract class EventStreamProducer<T> implements Runnable {
         props.put("compression.type", "snappy");
         props.put("linger.ms", "10");
         props.put("batch.size", "16384");
+
+        // Connection resilience and timeout configurations
+        props.put("metadata.max.age.ms", "30000");           // Refresh metadata every 30s
+        props.put("connections.max.idle.ms", "540000");      // Keep connections alive (9 min)
+        props.put("request.timeout.ms", "30000");            // Fail fast on requests (30s)
+        props.put("delivery.timeout.ms", "120000");          // Total time for delivery (2 min)
+
+        // Retry behavior for transient failures
+        props.put("retries", "5");                           // Retry failed sends up to 5 times
+        props.put("retry.backoff.ms", "1000");               // Wait 1s between retries
 
         this.producer = new KafkaProducer<>(props);
     }

@@ -1,0 +1,68 @@
+# Docker build context exclusions
+# Excludes files from being sent to Docker daemon during build
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Gradle build artifacts
+**/build/
+**/bin/
+**/out/
+.gradle/
+.gradle-wrapper-download/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+docs/
+CSx55-Fall25-TermProject.pdf
+
+# Docker files (don't need docker-compose in build context)
+docker-compose.yml
+spark/
+
+# Scripts (not needed in container)
+*.sh
+
+# Python artifacts (if any)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Data files
+data/
+*.csv
+*.parquet
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Claude AI
+.claude/

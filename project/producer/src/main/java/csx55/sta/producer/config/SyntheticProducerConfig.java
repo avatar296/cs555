@@ -1,4 +1,4 @@
-package csx55.sta.producer;
+package csx55.sta.producer.config;
 
 /**
  * Configuration for the Multi-Stream Synthetic Producer.

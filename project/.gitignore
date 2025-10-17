@@ -15,7 +15,6 @@ env/
 
 # Spark/Streaming
 streaming/checkpoint/
-*.log
 spark-warehouse/
 metastore_db/
 derby.log
@@ -24,13 +23,15 @@ derby.log
 iceberg-warehouse/
 .iceberg/
 
-# IDE
-.vscode/
-.idea/
+# OS-specific files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Vim
 *.swp
 *.swo
 *~
-.DS_Store
 
 # Jupyter
 .ipynb_checkpoints/
@@ -48,12 +49,14 @@ data/zones/*.json
 tmp/
 temp/
 *.tmp
+
 # Gradle
-.gradle
-build
-bin/
-out/
+.gradle/
+**/build/
+**/bin/
+**/out/
 .gradle-wrapper-download/
+gradle-app.setting
 
 # Java
 *.class
@@ -62,3 +65,43 @@ out/
 *.war
 *.ear
 hs_err_pid*
+replay_pid*
+
+# Avro generated sources (auto-generated from schemas)
+**/generated-main-avro-java/
+**/generated-test-avro-java/
+**/generated/
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+.idea_modules/
+
+# IDE - Eclipse
+.classpath
+.project
+.settings/
+*.launch
+
+# IDE - NetBeans
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# IDE - VS Code
+.vscode/
+*.code-workspace
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Kafka/Zookeeper local data (if running docker-compose with local volumes)
+kafka-data/
+zookeeper-data/
+schema-registry-data/

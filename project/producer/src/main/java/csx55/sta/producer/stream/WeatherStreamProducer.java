@@ -1,5 +1,8 @@
-package csx55.sta.producer;
+package csx55.sta.producer.stream;
 
+import csx55.sta.producer.config.SyntheticProducerConfig;
+import csx55.sta.producer.generator.SyntheticWeatherGenerator;
+import csx55.sta.producer.util.ErrorInjector;
 import csx55.sta.schema.WeatherEvent;
 
 public class WeatherStreamProducer extends EventStreamProducer<WeatherEvent> {

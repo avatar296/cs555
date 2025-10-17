@@ -22,12 +22,8 @@ subprojects {
     apply(plugin = "java")
 
     java {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    tasks.withType<Test> {
-        useJUnitPlatform()
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     tasks.withType<JavaCompile> {
@@ -37,21 +33,13 @@ subprojects {
 
 // Version catalog for dependency management
 val kafkaVersion = "3.7.0"
-val sparkVersion = "3.5.0"
-val deltaVersion = "3.2.0"
 val avroVersion = "1.11.3"
 val confluentVersion = "7.5.0"
-val duckdbVersion = "0.9.2"
 val slf4jVersion = "2.0.9"
 val logbackVersion = "1.4.14"
-val junitVersion = "5.10.1"
 
 extra["kafkaVersion"] = kafkaVersion
-extra["sparkVersion"] = sparkVersion
-extra["deltaVersion"] = deltaVersion
 extra["avroVersion"] = avroVersion
 extra["confluentVersion"] = confluentVersion
-extra["duckdbVersion"] = duckdbVersion
 extra["slf4jVersion"] = slf4jVersion
 extra["logbackVersion"] = logbackVersion
-extra["junitVersion"] = junitVersion

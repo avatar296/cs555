@@ -4,7 +4,6 @@ plugins {
 }
 
 val slf4jVersion: String by rootProject.extra
-val junitVersion: String by rootProject.extra
 
 dependencies {
     // Common module
@@ -12,9 +11,6 @@ dependencies {
 
     // Logging
     implementation("org.slf4j:slf4j-api:$slf4jVersion")
-
-    // Testing
-    testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
 }
 
 application {

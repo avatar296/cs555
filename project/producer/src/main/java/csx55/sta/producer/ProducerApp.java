@@ -1,5 +1,10 @@
 package csx55.sta.producer;
 
+import csx55.sta.producer.config.SyntheticProducerConfig;
+import csx55.sta.producer.stream.EventStreamProducer;
+import csx55.sta.producer.stream.SpecialEventStreamProducer;
+import csx55.sta.producer.stream.TripStreamProducer;
+import csx55.sta.producer.stream.WeatherStreamProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
