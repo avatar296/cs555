@@ -235,18 +235,21 @@ public class MessageHandler {
     NodeInfo currentLeft = leafSet.getLeft();
     NodeInfo currentRight = leafSet.getRight();
 
-    boolean leftChanged = (previousLeft == null && currentLeft != null)
-        || (previousLeft != null
-            && currentLeft != null
-            && !previousLeft.getId().equals(currentLeft.getId()));
-    boolean rightChanged = (previousRight == null && currentRight != null)
-        || (previousRight != null
-            && currentRight != null
-            && !previousRight.getId().equals(currentRight.getId()));
+    boolean leftChanged =
+        (previousLeft == null && currentLeft != null)
+            || (previousLeft != null
+                && currentLeft != null
+                && !previousLeft.getId().equals(currentLeft.getId()));
+    boolean rightChanged =
+        (previousRight == null && currentRight != null)
+            || (previousRight != null
+                && currentRight != null
+                && !previousRight.getId().equals(currentRight.getId()));
 
     if (leftChanged || rightChanged) {
       boolean isNewLeftNeighbor = currentLeft != null && currentLeft.getId().equals(node.getId());
-      boolean isNewRightNeighbor = currentRight != null && currentRight.getId().equals(node.getId());
+      boolean isNewRightNeighbor =
+          currentRight != null && currentRight.getId().equals(node.getId());
 
       if (isNewLeftNeighbor || isNewRightNeighbor) {
         logger.info(
@@ -267,7 +270,8 @@ public class MessageHandler {
   }
 
   private void handleLeave(Message request) throws IOException {
-    csx55.pastry.transport.UpdateMessages.LeaveNotificationData data = MessageFactory.extractLeaveNotification(request);
+    csx55.pastry.transport.UpdateMessages.LeaveNotificationData data =
+        MessageFactory.extractLeaveNotification(request);
 
     NodeInfo departingNode = data.departingNode;
     NodeInfo replacementNeighbor = data.replacementNeighbor;
@@ -316,7 +320,8 @@ public class MessageHandler {
         try (Socket socket = new Socket(nextHop.getHost(), nextHop.getPort());
             DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
 
-          Message forwardMsg = MessageFactory.createLookupRequest(data.targetId, data.origin, data.path);
+          Message forwardMsg =
+              MessageFactory.createLookupRequest(data.targetId, data.origin, data.path);
           forwardMsg.write(dos);
         }
       } else {
@@ -380,9 +385,10 @@ public class MessageHandler {
     try (Socket socket = new Socket(node.getHost(), node.getPort());
         DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
 
-      Message updateMsg = updateType == MessageType.ROUTING_TABLE_UPDATE
-          ? MessageFactory.createRoutingTableUpdate(selfInfo)
-          : MessageFactory.createLeafSetUpdate(selfInfo);
+      Message updateMsg =
+          updateType == MessageType.ROUTING_TABLE_UPDATE
+              ? MessageFactory.createRoutingTableUpdate(selfInfo)
+              : MessageFactory.createLeafSetUpdate(selfInfo);
 
       updateMsg.write(dos);
     } catch (IOException e) {

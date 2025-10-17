@@ -115,6 +115,9 @@ public class Discover {
         case DEREGISTER:
           handleDeregister(request);
           break;
+        case LIST_NODES:
+          handleListNodes(dos);
+          break;
         default:
           logger.warning("Unknown message type: " + request.getType());
       }
@@ -157,6 +160,12 @@ public class Discover {
   private void handleDeregister(Message request) throws IOException {
     String nodeId = MessageFactory.extractNodeId(request);
     registeredNodes.remove(nodeId);
+  }
+
+  private void handleListNodes(DataOutputStream dos) throws IOException {
+    List<NodeInfo> nodes = new ArrayList<>(registeredNodes.values());
+    Message response = MessageFactory.createListNodesResponse(nodes);
+    response.write(dos);
   }
 
   private NodeInfo getRandomNode(String excludeId) {

@@ -45,6 +45,18 @@ public class MessageFactory {
     return RegistrationMessages.extractExcludeId(message);
   }
 
+  public static Message createListNodesRequest() throws IOException {
+    return RegistrationMessages.createListNodesRequest();
+  }
+
+  public static Message createListNodesResponse(java.util.List<NodeInfo> nodes) throws IOException {
+    return RegistrationMessages.createListNodesResponse(nodes);
+  }
+
+  public static java.util.List<NodeInfo> extractNodeList(Message message) throws IOException {
+    return RegistrationMessages.extractNodeList(message);
+  }
+
   public static Message createJoinRequest(
       NodeInfo requester, String destination, int hopCount, java.util.List<String> path)
       throws IOException {

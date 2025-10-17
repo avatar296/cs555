@@ -69,4 +69,17 @@ public class DiscoveryClient {
       return MessageFactory.extractRandomNode(response);
     }
   }
+
+  public java.util.List<NodeInfo> getAllNodes() throws IOException {
+    try (Socket socket = new Socket(discoverHost, discoverPort);
+        DataInputStream dis = new DataInputStream(socket.getInputStream());
+        DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
+
+      Message request = MessageFactory.createListNodesRequest();
+      request.write(dos);
+
+      Message response = Message.read(dis);
+      return MessageFactory.extractNodeList(response);
+    }
+  }
 }

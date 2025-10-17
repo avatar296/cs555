@@ -108,4 +108,47 @@ public class RegistrationMessages {
     String excludeId = dis.readUTF();
     return excludeId.isEmpty() ? null : excludeId;
   }
+
+  public static Message createListNodesRequest() throws IOException {
+    return new Message(MessageType.LIST_NODES, new byte[0]);
+  }
+
+  public static Message createListNodesResponse(java.util.List<NodeInfo> nodes) throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    DataOutputStream dos = new DataOutputStream(baos);
+
+    // Write number of nodes
+    dos.writeInt(nodes != null ? nodes.size() : 0);
+
+    // Write each node
+    if (nodes != null) {
+      for (NodeInfo node : nodes) {
+        dos.writeUTF(node.getId());
+        dos.writeUTF(node.getHost());
+        dos.writeInt(node.getPort());
+        dos.writeUTF(node.getNickname());
+      }
+    }
+
+    dos.flush();
+    return new Message(MessageType.LIST_NODES_RESPONSE, baos.toByteArray());
+  }
+
+  public static java.util.List<NodeInfo> extractNodeList(Message message) throws IOException {
+    ByteArrayInputStream bais = new ByteArrayInputStream(message.getPayload());
+    DataInputStream dis = new DataInputStream(bais);
+
+    int count = dis.readInt();
+    java.util.List<NodeInfo> nodes = new java.util.ArrayList<>();
+
+    for (int i = 0; i < count; i++) {
+      String id = dis.readUTF();
+      String host = dis.readUTF();
+      int port = dis.readInt();
+      String nickname = dis.readUTF();
+      nodes.add(new NodeInfo(id, host, port, nickname));
+    }
+
+    return nodes;
+  }
 }

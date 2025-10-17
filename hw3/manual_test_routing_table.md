@@ -321,3 +321,297 @@ After verifying the routing table works locally:
 **What We Fixed:** Use `setEntry()` to accumulate entries from all JOIN_RESPONSE messages
 **Expected Outcome:** Node b589 has 8+ routing table entries (vs. 3 before fix)
 **Success Indicator:** `routing-table` command shows entries in columns 1,2,3,4,6,9,c,d for row 0
+
+---
+
+## Additional Test Scenarios
+
+Beyond the basic routing table population test, these advanced scenarios validate edge cases and spec compliance:
+
+### 1. Routing Table Updates After Node Joins
+
+**Purpose:** Verify existing nodes update their routing tables when new nodes join
+
+**Scenario:**
+```bash
+# Start initial network
+./test_routing_table.sh
+# Wait for startup, check node 5000's routing table (baseline)
+> n 5000
+
+# In separate terminal, add new node
+java -cp build/classes/java/main csx55.pastry.node.Peer localhost 5555 5500 &
+
+# Wait 5 seconds, check node 5000 again
+> n 5000
+```
+
+**Expected:**
+- Node 5000 should have node 5500 in row 1, column 5
+- Routing table row 1 count increases by 1
+- Verifies `handleRoutingTableUpdate()` works
+
+**Pass Criteria:** Node 5500 appears in 5000's routing table at [1][5]
+
+---
+
+### 2. Routing Table Removal on Node Departure
+
+**Purpose:** Verify routing table entries are cleaned when nodes exit gracefully
+
+**Scenario:**
+```bash
+# Start 8-node network
+# Check node 1000's routing table (should have multiple entries)
+> n 1000
+
+# Exit node 4000 (assuming it's in 1000's routing table)
+# Check node 1000's routing table again
+> n 1000
+```
+
+**Expected:**
+- Node 4000 should disappear from all routing tables
+- Verifies `removeNode()` is called during LEAVE handling
+- Other entries remain intact
+
+**Pass Criteria:** Node 4000 no longer appears in any routing table cell
+
+---
+
+### 3. Routing Table Density by Row
+
+**Purpose:** Verify row 0 has more entries than row 1, row 1 more than row 2, etc.
+
+**Scenario:**
+```bash
+# Start 13-node network with diverse IDs
+# Check node b589's routing table
+> v
+```
+
+**Expected Distribution:**
+- **Row 0:** 6-8 entries (most populated)
+- **Row 1:** 1-2 entries (less populated)
+- **Row 2:** 0-1 entries (sparse)
+- **Row 3:** 0 entries (usually empty with 13 nodes)
+
+**Reasoning:**
+- Row 0 matches on 0 prefix digits (broadest match)
+- Row 1 matches on 1 prefix digit (narrower)
+- Row 2 matches on 2 prefix digits (very narrow)
+- Row 3 matches on 3 prefix digits (extremely narrow)
+
+**Pass Criteria:** count(row 0) > count(row 1) >= count(row 2) >= count(row 3)
+
+---
+
+### 4. Empty Routing Table Cells
+
+**Purpose:** Verify routing works even with incomplete routing tables
+
+**Scenario:**
+```bash
+# Start minimal 4-node network: 1000, 5000, 9000, d000
+# Node 5000 will have many empty cells
+> n 5000
+
+# Verify routing still works despite gaps
+# Check logs for successful routing
+```
+
+**Expected:**
+- Routing table has gaps (many `:` entries)
+- Routing still succeeds by finding best available match
+- May take more hops but eventually routes correctly
+
+**Pass Criteria:** Routing succeeds despite sparse routing table
+
+---
+
+### 5. Self-ID Exclusion
+
+**Purpose:** Verify node never adds itself to its own routing table
+
+**Scenario:**
+```bash
+# Check any node's routing table
+> n b589
+
+# Look for b589 appearing anywhere in its own output
+# Should NOT find b589 in any cell
+```
+
+**Expected:**
+- No cell contains the node's own ID
+- `setEntry()` checks prevent self-addition (line 22-24 in RoutingTable.java)
+
+**Pass Criteria:** Node's own ID never appears in its routing table output
+
+---
+
+### 6. Leaf Set Nodes Also in Routing Table
+
+**Purpose:** Per MessageHandler.java:227, leaf set nodes are ALWAYS added to routing table
+
+**Scenario:**
+```bash
+# Start 5-node ring: 1000, 2000, 3000, 4000, 5000
+# Check node 3000's leaf set
+> (check leaf-set via peer command interface)
+
+# Check node 3000's routing table
+> n 3000
+```
+
+**Expected:**
+- Node 3000's leaf neighbors (2000 and 4000) also appear in routing table
+- Ensures dual storage for better connectivity
+- Verifies `routingTable.addNode(node)` in `handleLeafSetUpdate()`
+
+**Pass Criteria:** Both leaf neighbors appear in routing table
+
+---
+
+### 7. Routing Table Row Assignment
+
+**Purpose:** Verify correct row/column calculation based on common prefix length
+
+**Test Cases:**
+
+| Local Node | Added Node | Common Prefix | Expected Position | Reasoning |
+|------------|------------|---------------|-------------------|-----------|
+| b589       | b4f9       | "b" (1 digit) | [1][4]            | Next digit = '4' |
+| b589       | 1804       | "" (0 digits) | [0][1]            | Next digit = '1' |
+| 65a1       | 65b2       | "65" (2)      | [2][b]            | Next digit = 'b' |
+| 5000       | 5fff       | "5" (1)       | [1][f]            | Next digit = 'f' |
+
+**Verification:**
+- Use logs or debug output to verify cell assignment
+- Check routing table output to confirm placement
+
+**Pass Criteria:** All nodes appear in correct [row][col] positions
+
+---
+
+### 8. Entry Point Row 0 Initialization
+
+**Purpose:** Per spec page 4, new node gets row 0 from entry point
+
+**Scenario:**
+```bash
+# Node b589 joins via entry point 6050
+# Check b589's routing table row 0
+# Check 6050's routing table row 0
+# Compare them
+```
+
+**Expected:**
+- b589's row 0 should contain entries from 6050's row 0
+- Not necessarily identical (b589 may accumulate more)
+- But should have overlap from entry point
+
+**Pass Criteria:** At least 50% of b589's row 0 entries came from entry point
+
+---
+
+### 9. Intermediate Node Row Sharing
+
+**Purpose:** Per spec, intermediate nodes send row matching their prefix length
+
+**Scenario:**
+```bash
+# Node b589 joins, routed through intermediate node b4f9
+# Common prefix: "b" (1 digit)
+# b4f9 should send row 1, not row 0 or 2
+```
+
+**Verification:**
+- Check JOIN logs: `grep "Sent JOIN_RESPONSE.*row" logs/peer-b4f9.log`
+- Should see: "Sent JOIN_RESPONSE to b589 with routing table row 1"
+
+**Pass Criteria:** Intermediate nodes send row matching common prefix length
+
+---
+
+### 10. Multiple Nodes with Same Prefix
+
+**Purpose:** When multiple nodes share a prefix, only ONE should be in each routing table cell
+
+**Scenario:**
+```bash
+# Start nodes: b100, b120, b150 (all start with 'b1')
+# Check node 5000's routing table
+# Look at row 1, column 1 (b1-)
+```
+
+**Expected:**
+- Cell [1][1] contains exactly ONE of {b100, b120, b150}
+- Implementation uses `setEntry()` which overwrites
+- Last one wins, or based on arrival order
+
+**Pass Criteria:** Each cell has 0 or 1 entry, never multiple
+
+---
+
+### 11. Routing Table Accumulation During Sequential Joins
+
+**Purpose:** Verify routing tables grow correctly as network expands
+
+**Scenario:**
+```bash
+# Start with 3 nodes: 1000, 5000, 9000
+# Check 5000's routing table (baseline: ~2 entries)
+
+# Add node 2000 (wait 5 seconds)
+# Check 5000's routing table (should have +1 entry)
+
+# Add node 3000 (wait 5 seconds)
+# Check 5000's routing table (should have +1 more)
+
+# Continue adding up to 15 nodes
+# Track growth of 5000's routing table
+```
+
+**Expected Growth:**
+- Routing table size increases monotonically
+- Eventually plateaus as row 0 fills up
+- No entries lost during additions
+
+**Pass Criteria:** Routing table size never decreases, only increases or stays same
+
+---
+
+## Testing These Scenarios
+
+The `test_routing_table.sh` script includes an "Advanced Tests" menu option that automates many of these scenarios:
+
+```bash
+./test_routing_table.sh
+
+# In menu:
+> x  # Advanced tests menu
+
+# Options:
+1) Test routing updates
+2) Test self-ID exclusion
+3) Test row density
+4) Test leaf+routing dual storage
+5) Run all advanced tests
+```
+
+Each advanced test provides:
+- Clear pass/fail indication
+- Detailed diagnostics
+- Color-coded output
+- Comparison with expected behavior
+
+---
+
+## Why These Tests Matter
+
+1. **Spec Compliance:** Verify implementation matches Pastry protocol specification
+2. **Edge Cases:** Catch bugs that don't appear in basic 13-node scenario
+3. **Robustness:** Ensure routing works with sparse tables, node churn, timing issues
+4. **Correctness:** Validate row/column assignment, self-exclusion, update handling
+5. **Autograder Prep:** Additional confidence beyond the basic routing table test
