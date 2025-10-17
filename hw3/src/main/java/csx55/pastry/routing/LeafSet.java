@@ -25,7 +25,6 @@ public class LeafSet {
     long localVal = Long.parseLong(localId, 16);
     long nodeVal = Long.parseLong(node.getId(), 16);
 
-    // Calculate clockwise distance on circular ring
     long clockwiseDistance;
     if (nodeVal >= localVal) {
       clockwiseDistance = nodeVal - localVal;
@@ -35,7 +34,6 @@ public class LeafSet {
 
     long counterClockwiseDistance = 0x10000 - clockwiseDistance;
 
-    // Special case: if distances are equal (node is exactly opposite), fill whichever slot is empty
     boolean isRightNeighbor;
     if (clockwiseDistance == counterClockwiseDistance) {
       // Node is exactly opposite (0x8000 away)
@@ -44,11 +42,9 @@ public class LeafSet {
       } else if (right == null && left != null) {
         isRightNeighbor = true; // Fill empty RIGHT slot
       } else {
-        // Both empty or both full - default to RIGHT
         isRightNeighbor = true;
       }
     } else {
-      // Normal case: node is closer in one direction
       isRightNeighbor = clockwiseDistance < counterClockwiseDistance;
     }
 
@@ -62,7 +58,6 @@ public class LeafSet {
         logger.info(String.format("[%s] Setting RIGHT to %s (was null)", localId, node.getId()));
         right = node;
       } else {
-        // For right neighbors, compare clockwise distances
         long rightVal = Long.parseLong(right.getId(), 16);
         long currentClockwise;
         if (rightVal >= localVal) {
@@ -82,7 +77,6 @@ public class LeafSet {
                   "[%s] REPLACING RIGHT: %s -> %s", localId, right.getId(), node.getId()));
           right = node;
         } else if (clockwiseDistance == currentClockwise) {
-          // Tie-breaking: prefer higher identifier
           if (compareIds(node.getId(), right.getId()) > 0) {
             logger.info(
                 String.format(
@@ -101,7 +95,6 @@ public class LeafSet {
         logger.info(String.format("[%s] Setting LEFT to %s (was null)", localId, node.getId()));
         left = node;
       } else {
-        // For left neighbors, compare counter-clockwise distances
         long leftVal = Long.parseLong(left.getId(), 16);
         long currentCounterClockwise;
         if (leftVal <= localVal) {
@@ -140,7 +133,6 @@ public class LeafSet {
       }
     }
 
-    // Log final state after adding node
     logger.info(
         String.format(
             "[%s] FINAL STATE after adding %s: LEFT=%s, RIGHT=%s",
@@ -181,7 +173,6 @@ public class LeafSet {
       rightRemoved = true;
     }
 
-    // Try to find replacements from routing table
     if (leftRemoved || rightRemoved) {
       logger.info(
           String.format("[%s] Calling findReplacements() after removing %s", localId, nodeId));
@@ -237,7 +228,6 @@ public class LeafSet {
     logger.info(String.format("[%s] findReplacements() scanning routing table...", localId));
 
     int candidatesFound = 0;
-    // Scan routing table for potential replacements
     for (int row = 0; row < 4; row++) {
       for (int col = 0; col < 16; col++) {
         NodeInfo node = routingTable.getEntry(row, col);
@@ -276,13 +266,11 @@ public class LeafSet {
     long keyVal = Long.parseLong(key, 16);
     long localVal = Long.parseLong(localId, 16);
 
-    // If we only have one neighbor, check if key is between local and that neighbor
     if (left == null) {
       long rightVal = Long.parseLong(right.getId(), 16);
       long distKeyToLocal = computeCircularDistance(keyVal, localVal);
       long distKeyToRight = computeCircularDistance(keyVal, rightVal);
 
-      // Key is in range if it's closer to local than to right
       return distKeyToLocal < distKeyToRight;
     }
 
@@ -291,11 +279,9 @@ public class LeafSet {
       long distKeyToLocal = computeCircularDistance(keyVal, localVal);
       long distKeyToLeft = computeCircularDistance(keyVal, leftVal);
 
-      // Key is in range if it's closer to local than to left
       return distKeyToLocal < distKeyToLeft;
     }
 
-    // With both neighbors, check if key is closer to local than to either neighbor
     long leftVal = Long.parseLong(left.getId(), 16);
     long rightVal = Long.parseLong(right.getId(), 16);
 
@@ -331,7 +317,6 @@ public class LeafSet {
         minDistance = distance;
         closest = node;
       } else if (distance == minDistance && closest != null) {
-        // Tie-breaking: prefer higher identifier
         if (compareIds(node.getId(), closest.getId()) > 0) {
           closest = node;
         }
@@ -342,8 +327,6 @@ public class LeafSet {
   }
 
   public synchronized String toOutputFormat() {
-    // IMPORTANT: Output must be in LEFT, RIGHT order (not sorted)
-    // This matches the expected format for the leaf-set command
     StringBuilder sb = new StringBuilder();
 
     if (left != null) {

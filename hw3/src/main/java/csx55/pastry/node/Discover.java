@@ -27,7 +27,6 @@ public class Discover {
 
   private static void configureLogging(int port) {
     try {
-      // Get root logger and remove all console handlers
       Logger rootLogger = Logger.getLogger("");
       for (Handler handler : rootLogger.getHandlers()) {
         if (handler instanceof ConsoleHandler) {
@@ -35,13 +34,11 @@ public class Discover {
         }
       }
 
-      // Create logs directory in current working directory
       java.io.File logsDir = new java.io.File("logs");
       if (!logsDir.exists()) {
         logsDir.mkdirs();
       }
 
-      // Add file handler to write logs to logs/discover-<port>.log
       FileHandler fileHandler = new FileHandler("logs/discover-" + port + ".log", true);
       fileHandler.setFormatter(new SimpleFormatter());
       fileHandler.setLevel(Level.ALL);
@@ -137,7 +134,6 @@ public class Discover {
     NodeInfo nodeInfo = MessageFactory.extractNodeInfo(request);
     String nodeId = nodeInfo.getId();
 
-    // collision check
     if (registeredNodes.containsKey(nodeId)) {
       logger.warning("ID collision detected for: " + nodeId);
       Message response = MessageFactory.createRegisterResponse(false, "ID collision");

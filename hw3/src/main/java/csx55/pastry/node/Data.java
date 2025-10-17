@@ -22,7 +22,6 @@ public class Data {
         }
       }
 
-      // Create logs directory in current working directory
       java.io.File logsDir = new java.io.File("logs");
       if (!logsDir.exists()) {
         logsDir.mkdirs();
@@ -251,7 +250,6 @@ public class Data {
       System.exit(1);
     }
 
-    // Configure logging to file before any logging occurs
     configureLogging();
 
     Data data = new Data(discoverHost, discoverPort, mode, path);

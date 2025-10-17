@@ -50,15 +50,12 @@ public class JoinProtocol {
       joinMsg.write(dos);
     }
 
-    // Brief delay to allow JOIN responses to arrive
     try {
       Thread.sleep(500);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
 
-    // Broadcast to ALL nodes in the network (not just those in routing table)
-    // This ensures comprehensive routing table population in distributed environments
     try {
       List<NodeInfo> allNodes = discoveryClient.getAllNodes();
       logger.info(
@@ -70,11 +67,9 @@ public class JoinProtocol {
         }
       }
 
-      // Wait for reciprocal updates to arrive
       Thread.sleep(500);
     } catch (Exception e) {
       logger.warning("Failed to broadcast to all nodes: " + e.getMessage());
-      // Fall back to routing table-based updates
       sendUpdatesToNetwork();
     }
 
@@ -82,7 +77,6 @@ public class JoinProtocol {
   }
 
   public void sendUpdatesToNetwork() {
-    // Send ROUTING_TABLE_UPDATE to all routing table entries
     for (int row = 0; row < 4; row++) {
       for (int col = 0; col < 16; col++) {
         NodeInfo node = routingTable.getEntry(row, col);
@@ -92,13 +86,10 @@ public class JoinProtocol {
       }
     }
 
-    // Send LEAF_SET_UPDATE to leaf set neighbors
     for (NodeInfo node : leafSet.getAllNodes()) {
       sendUpdateToNode(node, MessageType.LEAF_SET_UPDATE);
     }
 
-    // ALSO send LEAF_SET_UPDATE to all routing table entries
-    // This ensures broader propagation and helps nodes discover closer neighbors
     for (int row = 0; row < 4; row++) {
       for (int col = 0; col < 16; col++) {
         NodeInfo node = routingTable.getEntry(row, col);

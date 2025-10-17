@@ -33,7 +33,6 @@ public class Peer {
         }
       }
 
-      // Create logs directory in current working directory
       java.io.File logsDir = new java.io.File("logs");
       if (!logsDir.exists()) {
         logsDir.mkdirs();
@@ -126,13 +125,11 @@ public class Peer {
                       }
                       System.out.flush();
                     } catch (Throwable ignore) {
-                      // Ignore exceptions during shutdown
+
                     }
                   },
                   "PeerShutdown"));
 
-      // Register and join network in background thread
-      // Command loop starts immediately so peer can respond to commands quickly
       Thread joinThread =
           new Thread(
               () -> {
@@ -147,7 +144,6 @@ public class Peer {
               "NetworkJoin");
       joinThread.start();
 
-      // Brief pause to ensure registration completes
       try {
         Thread.sleep(100);
       } catch (InterruptedException e) {

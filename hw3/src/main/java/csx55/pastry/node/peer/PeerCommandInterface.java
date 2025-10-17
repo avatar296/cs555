@@ -118,26 +118,20 @@ public class PeerCommandInterface {
 
     Peer.setGracefulShutdown();
 
-    // Implement leaf swapping: tell each leaf neighbor who their new neighbor should be
     NodeInfo left = leafSet.getLeft();
     NodeInfo right = leafSet.getRight();
 
-    // Tell left neighbor: your new right neighbor is my right
     if (left != null) {
       sendLeaveNotification(left, right);
     }
 
-    // Tell right neighbor: your new left neighbor is my left
     if (right != null) {
       sendLeaveNotification(right, left);
     }
 
-    // Notify ALL registered nodes to ensure complete routing table cleanup
-    // This fixes the autograder issue where nodes have stale routing table entries
     try {
       java.util.List<NodeInfo> allNodes = discoveryClient.getAllNodes();
       for (NodeInfo node : allNodes) {
-        // Skip self and leaf neighbors (already notified with replacement info)
         if (node.getId().equals(id)
             || (left != null && node.getId().equals(left.getId()))
             || (right != null && node.getId().equals(right.getId()))) {
@@ -147,7 +141,6 @@ public class PeerCommandInterface {
       }
     } catch (Exception e) {
       logger.warning("Failed to query all nodes from discovery service: " + e.getMessage());
-      // Fallback: notify routing table neighbors only
       for (int row = 0; row < 4; row++) {
         for (int col = 0; col < 16; col++) {
           NodeInfo node = routingTable.getEntry(row, col);
@@ -160,7 +153,6 @@ public class PeerCommandInterface {
       }
     }
 
-    // Brief delay to allow LEAVE messages to be sent
     try {
       Thread.sleep(100);
     } catch (InterruptedException e) {
