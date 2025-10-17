@@ -43,30 +43,54 @@ public class RoutingEngine {
   }
 
   public boolean isClosestNode(String targetId) {
+    int selfPrefixLength = getCommonPrefixLength(selfId, targetId);
     long selfDist = computeDistance(selfId, targetId);
 
+    // Check leaf set - prefix matching takes priority over distance
     for (NodeInfo node : leafSet.getAllNodes()) {
-      long dist = computeDistance(node.getId(), targetId);
-      if (dist < selfDist) {
+      int nodePrefixLength = getCommonPrefixLength(node.getId(), targetId);
+
+      // If node has longer prefix match, it's closer (Pastry DHT spec)
+      if (nodePrefixLength > selfPrefixLength) {
         return false;
-      } else if (dist == selfDist) {
-        // Tie-breaking: prefer higher identifier
-        if (compareIds(node.getId(), selfId) > 0) {
+      }
+
+      // Only compare distance if prefix lengths are equal
+      if (nodePrefixLength == selfPrefixLength) {
+        long dist = computeDistance(node.getId(), targetId);
+        if (dist < selfDist) {
           return false;
+        } else if (dist == selfDist) {
+          // Tie-breaking: prefer higher identifier
+          if (compareIds(node.getId(), selfId) > 0) {
+            return false;
+          }
         }
       }
+      // If nodePrefixLength < selfPrefixLength, self is better, continue
     }
 
+    // Check routing table - same prefix-first logic
     for (int row = 0; row < 4; row++) {
       for (int col = 0; col < 16; col++) {
         NodeInfo node = routingTable.getEntry(row, col);
         if (node != null) {
-          long dist = computeDistance(node.getId(), targetId);
-          if (dist < selfDist) {
+          int nodePrefixLength = getCommonPrefixLength(node.getId(), targetId);
+
+          // If node has longer prefix match, it's closer
+          if (nodePrefixLength > selfPrefixLength) {
             return false;
-          } else if (dist == selfDist) {
-            if (compareIds(node.getId(), selfId) > 0) {
+          }
+
+          // Only compare distance if prefix lengths are equal
+          if (nodePrefixLength == selfPrefixLength) {
+            long dist = computeDistance(node.getId(), targetId);
+            if (dist < selfDist) {
               return false;
+            } else if (dist == selfDist) {
+              if (compareIds(node.getId(), selfId) > 0) {
+                return false;
+              }
             }
           }
         }
@@ -83,26 +107,44 @@ public class RoutingEngine {
   }
 
   private NodeInfo findCloserNode(String key) {
+    int selfPrefixLength = getCommonPrefixLength(selfId, key);
     long selfDist = computeDistance(selfId, key);
+
     NodeInfo closest = null;
+    int bestPrefixLength = selfPrefixLength;
     long minDist = selfDist;
 
+    // Check leaf set - prefix matching takes priority
     for (NodeInfo node : leafSet.getAllNodes()) {
       // Skip if this node IS the key we're looking for
       if (node.getId().equals(key)) {
         continue;
       }
+
+      int nodePrefixLength = getCommonPrefixLength(node.getId(), key);
       long dist = computeDistance(node.getId(), key);
-      if (dist < minDist) {
+
+      // Prefer longer prefix match (Pastry DHT spec)
+      if (nodePrefixLength > bestPrefixLength) {
+        bestPrefixLength = nodePrefixLength;
         minDist = dist;
         closest = node;
-      } else if (dist == minDist && closest != null) {
-        if (compareIds(node.getId(), closest.getId()) > 0) {
+      }
+      // If prefix lengths equal, prefer shorter distance
+      else if (nodePrefixLength == bestPrefixLength) {
+        if (dist < minDist) {
+          minDist = dist;
           closest = node;
+        } else if (dist == minDist && closest != null) {
+          if (compareIds(node.getId(), closest.getId()) > 0) {
+            closest = node;
+          }
         }
       }
+      // If nodePrefixLength < bestPrefixLength, skip (current best is better)
     }
 
+    // Check routing table - same prefix-first logic
     for (int row = 0; row < 4; row++) {
       for (int col = 0; col < 16; col++) {
         NodeInfo node = routingTable.getEntry(row, col);
@@ -111,13 +153,25 @@ public class RoutingEngine {
           if (node.getId().equals(key)) {
             continue;
           }
+
+          int nodePrefixLength = getCommonPrefixLength(node.getId(), key);
           long dist = computeDistance(node.getId(), key);
-          if (dist < minDist) {
+
+          // Prefer longer prefix match
+          if (nodePrefixLength > bestPrefixLength) {
+            bestPrefixLength = nodePrefixLength;
             minDist = dist;
             closest = node;
-          } else if (dist == minDist && closest != null) {
-            if (compareIds(node.getId(), closest.getId()) > 0) {
+          }
+          // If prefix lengths equal, prefer shorter distance
+          else if (nodePrefixLength == bestPrefixLength) {
+            if (dist < minDist) {
+              minDist = dist;
               closest = node;
+            } else if (dist == minDist && closest != null) {
+              if (compareIds(node.getId(), closest.getId()) > 0) {
+                closest = node;
+              }
             }
           }
         }
