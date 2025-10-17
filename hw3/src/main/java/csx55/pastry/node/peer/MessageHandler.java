@@ -201,9 +201,13 @@ public class MessageHandler {
         leafSet.addNode(data.right);
       }
     } else {
-      // This is a routing table row from an intermediate node
-      // Add to routing table ONLY, not to leaf set
-      routingTable.setRow(data.rowNum, data.routingRow);
+      if (data.routingRow != null) {
+        for (int col = 0; col < data.routingRow.length; col++) {
+          if (data.routingRow[col] != null) {
+            routingTable.setEntry(data.rowNum, col, data.routingRow[col]);
+          }
+        }
+      }
     }
   }
 
@@ -231,31 +235,24 @@ public class MessageHandler {
     NodeInfo currentLeft = leafSet.getLeft();
     NodeInfo currentRight = leafSet.getRight();
 
-    boolean leftChanged =
-        (previousLeft == null && currentLeft != null)
-            || (previousLeft != null
-                && currentLeft != null
-                && !previousLeft.getId().equals(currentLeft.getId()));
-    boolean rightChanged =
-        (previousRight == null && currentRight != null)
-            || (previousRight != null
-                && currentRight != null
-                && !previousRight.getId().equals(currentRight.getId()));
+    boolean leftChanged = (previousLeft == null && currentLeft != null)
+        || (previousLeft != null
+            && currentLeft != null
+            && !previousLeft.getId().equals(currentLeft.getId()));
+    boolean rightChanged = (previousRight == null && currentRight != null)
+        || (previousRight != null
+            && currentRight != null
+            && !previousRight.getId().equals(currentRight.getId()));
 
-    // If our leaf set changed, send reciprocal update and notify all leaf neighbors
     if (leftChanged || rightChanged) {
-      // Check if the incoming node is now in our leaf set
       boolean isNewLeftNeighbor = currentLeft != null && currentLeft.getId().equals(node.getId());
-      boolean isNewRightNeighbor =
-          currentRight != null && currentRight.getId().equals(node.getId());
+      boolean isNewRightNeighbor = currentRight != null && currentRight.getId().equals(node.getId());
 
       if (isNewLeftNeighbor || isNewRightNeighbor) {
         logger.info(
             "Sending reciprocal LEAF_SET_UPDATE to " + node.getId() + " (new leaf neighbor)");
         sendUpdateToNode(node, MessageType.LEAF_SET_UPDATE);
 
-        // Notify ALL current leaf neighbors about our updated state
-        // This helps propagate information through the ring
         if (currentLeft != null && !currentLeft.getId().equals(node.getId())) {
           logger.info("Notifying left neighbor " + currentLeft.getId() + " about leaf set change");
           sendUpdateToNode(currentLeft, MessageType.LEAF_SET_UPDATE);
@@ -270,21 +267,17 @@ public class MessageHandler {
   }
 
   private void handleLeave(Message request) throws IOException {
-    csx55.pastry.transport.UpdateMessages.LeaveNotificationData data =
-        MessageFactory.extractLeaveNotification(request);
+    csx55.pastry.transport.UpdateMessages.LeaveNotificationData data = MessageFactory.extractLeaveNotification(request);
 
     NodeInfo departingNode = data.departingNode;
     NodeInfo replacementNeighbor = data.replacementNeighbor;
 
     logger.info("Node " + departingNode.getId() + " is leaving the network");
 
-    // Remove the departing node from routing table
     routingTable.removeNode(departingNode.getId());
 
-    // Remove the departing node from leaf set WITHOUT auto-finding replacements
     leafSet.removeNodeWithoutReplacement(departingNode.getId());
 
-    // If we received a replacement neighbor, add it first (priority placement)
     if (replacementNeighbor != null) {
       logger.info(
           "Replacement neighbor provided: "
@@ -295,7 +288,6 @@ public class MessageHandler {
       leafSet.addNode(replacementNeighbor);
     }
 
-    // Fill any remaining vacant slots from routing table
     leafSet.findReplacementsIfNeeded(routingTable);
   }
 
@@ -324,8 +316,7 @@ public class MessageHandler {
         try (Socket socket = new Socket(nextHop.getHost(), nextHop.getPort());
             DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
 
-          Message forwardMsg =
-              MessageFactory.createLookupRequest(data.targetId, data.origin, data.path);
+          Message forwardMsg = MessageFactory.createLookupRequest(data.targetId, data.origin, data.path);
           forwardMsg.write(dos);
         }
       } else {
@@ -389,10 +380,9 @@ public class MessageHandler {
     try (Socket socket = new Socket(node.getHost(), node.getPort());
         DataOutputStream dos = new DataOutputStream(socket.getOutputStream())) {
 
-      Message updateMsg =
-          updateType == MessageType.ROUTING_TABLE_UPDATE
-              ? MessageFactory.createRoutingTableUpdate(selfInfo)
-              : MessageFactory.createLeafSetUpdate(selfInfo);
+      Message updateMsg = updateType == MessageType.ROUTING_TABLE_UPDATE
+          ? MessageFactory.createRoutingTableUpdate(selfInfo)
+          : MessageFactory.createLeafSetUpdate(selfInfo);
 
       updateMsg.write(dos);
     } catch (IOException e) {
