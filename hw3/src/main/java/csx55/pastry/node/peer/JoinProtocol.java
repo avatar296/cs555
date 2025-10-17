@@ -57,7 +57,26 @@ public class JoinProtocol {
       Thread.currentThread().interrupt();
     }
 
-    sendUpdatesToNetwork();
+    // Broadcast to ALL nodes in the network (not just those in routing table)
+    // This ensures comprehensive routing table population in distributed environments
+    try {
+      List<NodeInfo> allNodes = discoveryClient.getAllNodes();
+      logger.info(
+          "Broadcasting ROUTING_TABLE_UPDATE to all " + allNodes.size() + " nodes in network");
+
+      for (NodeInfo node : allNodes) {
+        if (!node.getId().equals(selfInfo.getId())) {
+          sendUpdateToNode(node, MessageType.ROUTING_TABLE_UPDATE);
+        }
+      }
+
+      // Wait for reciprocal updates to arrive
+      Thread.sleep(500);
+    } catch (Exception e) {
+      logger.warning("Failed to broadcast to all nodes: " + e.getMessage());
+      // Fall back to routing table-based updates
+      sendUpdatesToNetwork();
+    }
 
     logger.info("Join protocol complete");
   }

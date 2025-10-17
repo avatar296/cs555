@@ -214,7 +214,29 @@ public class MessageHandler {
   private void handleRoutingTableUpdate(Message request) throws IOException {
     statistics.incrementRoutingTableUpdates();
     NodeInfo node = MessageFactory.extractNodeInfo(request);
+
+    // Check if this node is already in our routing table
+    boolean wasNew = !isNodeInRoutingTable(node.getId());
+
     routingTable.addNode(node);
+
+    // Send reciprocal update only if this was a new node (prevents infinite loop)
+    if (wasNew) {
+      logger.info("Sending reciprocal ROUTING_TABLE_UPDATE to " + node.getId());
+      sendUpdateToNode(node, MessageType.ROUTING_TABLE_UPDATE);
+    }
+  }
+
+  private boolean isNodeInRoutingTable(String nodeId) {
+    for (int row = 0; row < 4; row++) {
+      for (int col = 0; col < 16; col++) {
+        NodeInfo entry = routingTable.getEntry(row, col);
+        if (entry != null && entry.getId().equals(nodeId)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private void handleLeafSetUpdate(Message request) throws IOException {
