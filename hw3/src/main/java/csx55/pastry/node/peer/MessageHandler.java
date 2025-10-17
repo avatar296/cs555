@@ -88,6 +88,13 @@ public class MessageHandler {
             + ")");
 
     boolean isDestination = routingEngine.isClosestNode(data.destination);
+    logger.info(
+        "isClosestNode("
+            + data.destination
+            + ") returned "
+            + isDestination
+            + " for node "
+            + selfInfo.getId());
 
     if (isDestination) {
       NodeInfo left = leafSet.getLeft();
@@ -107,14 +114,24 @@ public class MessageHandler {
       sendUpdateToNode(data.requester, MessageType.ROUTING_TABLE_UPDATE);
 
       NodeInfo nextHop = routingEngine.route(data.destination);
+      logger.info(
+          "Routing next hop for "
+              + data.destination
+              + ": "
+              + (nextHop != null ? nextHop.getId() : "null"));
 
       if (nextHop != null && nextHop.getId().equals(data.requester.getId())) {
+        logger.info(
+            "Next hop is requester itself ("
+                + data.requester.getId()
+                + "), sending leaf set response");
         NodeInfo left = leafSet.getLeft();
         NodeInfo right = leafSet.getRight();
         sendJoinResponse(data.requester, -1, new NodeInfo[0], left, right);
         leafSet.addNode(data.requester);
         sendUpdateToNode(data.requester, MessageType.LEAF_SET_UPDATE);
       } else if (nextHop != null) {
+        logger.info("Forwarding JOIN to " + nextHop.getId());
         forwardJoinRequest(data.requester, data.destination, newHopCount, data.path, nextHop);
       } else {
         logger.warning("No next hop found for " + data.destination);
@@ -199,7 +216,57 @@ public class MessageHandler {
   private void handleLeafSetUpdate(Message request) throws IOException {
     statistics.incrementLeafSetUpdates();
     NodeInfo node = MessageFactory.extractNodeInfo(request);
+
+    // ALWAYS add to routing table for better connectivity
+    routingTable.addNode(node);
+
+    // Store previous leaf neighbors
+    NodeInfo previousLeft = leafSet.getLeft();
+    NodeInfo previousRight = leafSet.getRight();
+
+    // Add the node to our leaf set
     leafSet.addNode(node);
+
+    // Check if this update changed our leaf set
+    NodeInfo currentLeft = leafSet.getLeft();
+    NodeInfo currentRight = leafSet.getRight();
+
+    boolean leftChanged =
+        (previousLeft == null && currentLeft != null)
+            || (previousLeft != null
+                && currentLeft != null
+                && !previousLeft.getId().equals(currentLeft.getId()));
+    boolean rightChanged =
+        (previousRight == null && currentRight != null)
+            || (previousRight != null
+                && currentRight != null
+                && !previousRight.getId().equals(currentRight.getId()));
+
+    // If our leaf set changed, send reciprocal update and notify all leaf neighbors
+    if (leftChanged || rightChanged) {
+      // Check if the incoming node is now in our leaf set
+      boolean isNewLeftNeighbor = currentLeft != null && currentLeft.getId().equals(node.getId());
+      boolean isNewRightNeighbor =
+          currentRight != null && currentRight.getId().equals(node.getId());
+
+      if (isNewLeftNeighbor || isNewRightNeighbor) {
+        logger.info(
+            "Sending reciprocal LEAF_SET_UPDATE to " + node.getId() + " (new leaf neighbor)");
+        sendUpdateToNode(node, MessageType.LEAF_SET_UPDATE);
+
+        // Notify ALL current leaf neighbors about our updated state
+        // This helps propagate information through the ring
+        if (currentLeft != null && !currentLeft.getId().equals(node.getId())) {
+          logger.info("Notifying left neighbor " + currentLeft.getId() + " about leaf set change");
+          sendUpdateToNode(currentLeft, MessageType.LEAF_SET_UPDATE);
+        }
+        if (currentRight != null && !currentRight.getId().equals(node.getId())) {
+          logger.info(
+              "Notifying right neighbor " + currentRight.getId() + " about leaf set change");
+          sendUpdateToNode(currentRight, MessageType.LEAF_SET_UPDATE);
+        }
+      }
+    }
   }
 
   private void handleLeave(Message request) throws IOException {
@@ -211,11 +278,13 @@ public class MessageHandler {
 
     logger.info("Node " + departingNode.getId() + " is leaving the network");
 
-    // Remove the departing node from leaf set and routing table
-    leafSet.removeNode(departingNode.getId(), routingTable);
+    // Remove the departing node from routing table
     routingTable.removeNode(departingNode.getId());
 
-    // If we received a replacement neighbor, add it to our leaf set
+    // Remove the departing node from leaf set WITHOUT auto-finding replacements
+    leafSet.removeNodeWithoutReplacement(departingNode.getId());
+
+    // If we received a replacement neighbor, add it first (priority placement)
     if (replacementNeighbor != null) {
       logger.info(
           "Replacement neighbor provided: "
@@ -225,6 +294,9 @@ public class MessageHandler {
               + ")");
       leafSet.addNode(replacementNeighbor);
     }
+
+    // Fill any remaining vacant slots from routing table
+    leafSet.findReplacementsIfNeeded(routingTable);
   }
 
   private void handleLookup(Message request) throws IOException {

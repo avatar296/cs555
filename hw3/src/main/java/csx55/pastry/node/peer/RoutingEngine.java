@@ -33,7 +33,10 @@ public class RoutingEngine {
 
     NodeInfo nextHop = routingTable.getEntry(prefixLength, nextDigit);
     if (nextHop != null) {
-      return nextHop;
+      // Don't return the target itself as next hop
+      if (!nextHop.getId().equals(key)) {
+        return nextHop;
+      }
     }
 
     return findCloserNode(key);
@@ -85,6 +88,10 @@ public class RoutingEngine {
     long minDist = selfDist;
 
     for (NodeInfo node : leafSet.getAllNodes()) {
+      // Skip if this node IS the key we're looking for
+      if (node.getId().equals(key)) {
+        continue;
+      }
       long dist = computeDistance(node.getId(), key);
       if (dist < minDist) {
         minDist = dist;
@@ -100,6 +107,10 @@ public class RoutingEngine {
       for (int col = 0; col < 16; col++) {
         NodeInfo node = routingTable.getEntry(row, col);
         if (node != null) {
+          // Skip if this node IS the key we're looking for
+          if (node.getId().equals(key)) {
+            continue;
+          }
           long dist = computeDistance(node.getId(), key);
           if (dist < minDist) {
             minDist = dist;

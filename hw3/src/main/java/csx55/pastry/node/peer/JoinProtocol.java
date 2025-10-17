@@ -63,6 +63,7 @@ public class JoinProtocol {
   }
 
   public void sendUpdatesToNetwork() {
+    // Send ROUTING_TABLE_UPDATE to all routing table entries
     for (int row = 0; row < 4; row++) {
       for (int col = 0; col < 16; col++) {
         NodeInfo node = routingTable.getEntry(row, col);
@@ -72,8 +73,20 @@ public class JoinProtocol {
       }
     }
 
+    // Send LEAF_SET_UPDATE to leaf set neighbors
     for (NodeInfo node : leafSet.getAllNodes()) {
       sendUpdateToNode(node, MessageType.LEAF_SET_UPDATE);
+    }
+
+    // ALSO send LEAF_SET_UPDATE to all routing table entries
+    // This ensures broader propagation and helps nodes discover closer neighbors
+    for (int row = 0; row < 4; row++) {
+      for (int col = 0; col < 16; col++) {
+        NodeInfo node = routingTable.getEntry(row, col);
+        if (node != null) {
+          sendUpdateToNode(node, MessageType.LEAF_SET_UPDATE);
+        }
+      }
     }
   }
 

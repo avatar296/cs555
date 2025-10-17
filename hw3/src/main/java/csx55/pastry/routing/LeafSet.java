@@ -35,8 +35,22 @@ public class LeafSet {
 
     long counterClockwiseDistance = 0x10000 - clockwiseDistance;
 
-    // Node is RIGHT if closer going clockwise, LEFT if closer going counter-clockwise
-    boolean isRightNeighbor = clockwiseDistance <= counterClockwiseDistance;
+    // Special case: if distances are equal (node is exactly opposite), fill whichever slot is empty
+    boolean isRightNeighbor;
+    if (clockwiseDistance == counterClockwiseDistance) {
+      // Node is exactly opposite (0x8000 away)
+      if (left == null && right != null) {
+        isRightNeighbor = false; // Fill empty LEFT slot
+      } else if (right == null && left != null) {
+        isRightNeighbor = true; // Fill empty RIGHT slot
+      } else {
+        // Both empty or both full - default to RIGHT
+        isRightNeighbor = true;
+      }
+    } else {
+      // Normal case: node is closer in one direction
+      isRightNeighbor = clockwiseDistance < counterClockwiseDistance;
+    }
 
     logger.info(
         String.format(
@@ -183,6 +197,42 @@ public class LeafSet {
             right != null ? right.getId() : "null"));
   }
 
+  public synchronized void removeNodeWithoutReplacement(String nodeId) {
+    logger.info(
+        String.format(
+            "[%s] BEFORE removeNodeWithoutReplacement(%s): LEFT=%s, RIGHT=%s",
+            localId,
+            nodeId,
+            left != null ? left.getId() : "null",
+            right != null ? right.getId() : "null"));
+
+    if (left != null && left.getId().equals(nodeId)) {
+      logger.info(
+          String.format("[%s] Removing LEFT neighbor (no auto-replacement): %s", localId, nodeId));
+      left = null;
+    }
+    if (right != null && right.getId().equals(nodeId)) {
+      logger.info(
+          String.format("[%s] Removing RIGHT neighbor (no auto-replacement): %s", localId, nodeId));
+      right = null;
+    }
+
+    logger.info(
+        String.format(
+            "[%s] AFTER removeNodeWithoutReplacement(%s): LEFT=%s, RIGHT=%s",
+            localId,
+            nodeId,
+            left != null ? left.getId() : "null",
+            right != null ? right.getId() : "null"));
+  }
+
+  public synchronized void findReplacementsIfNeeded(RoutingTable routingTable) {
+    if (left == null || right == null) {
+      logger.info(String.format("[%s] Finding replacements for vacant leaf slots", localId));
+      findReplacements(routingTable);
+    }
+  }
+
   private void findReplacements(RoutingTable routingTable) {
     logger.info(String.format("[%s] findReplacements() scanning routing table...", localId));
 
@@ -292,17 +342,18 @@ public class LeafSet {
   }
 
   public synchronized String toOutputFormat() {
-    List<NodeInfo> nodes = getAllNodes();
-    if (nodes.isEmpty()) {
-      return "";
-    }
-
-    nodes.sort((a, b) -> compareIds(a.getId(), b.getId()));
-
+    // IMPORTANT: Output must be in LEFT, RIGHT order (not sorted)
+    // This matches the expected format for the leaf-set command
     StringBuilder sb = new StringBuilder();
-    for (NodeInfo node : nodes) {
-      sb.append(node.toOutputFormat()).append("\n");
+
+    if (left != null) {
+      sb.append(left.toOutputFormat()).append("\n");
     }
+
+    if (right != null) {
+      sb.append(right.toOutputFormat()).append("\n");
+    }
+
     return sb.toString().trim();
   }
 
