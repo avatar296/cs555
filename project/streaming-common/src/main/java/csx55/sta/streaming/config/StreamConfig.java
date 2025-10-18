@@ -40,8 +40,16 @@ public class StreamConfig {
         return config.getString("iceberg.warehouse.path");
     }
 
-    public String getHiveMetastoreUri() {
-        return config.getString("iceberg.hive.metastore.uri");
+    public String getJdbcUri() {
+        return config.getString("iceberg.jdbc.uri");
+    }
+
+    public String getJdbcUser() {
+        return config.getString("iceberg.jdbc.user");
+    }
+
+    public String getJdbcPassword() {
+        return config.getString("iceberg.jdbc.password");
     }
 
     // S3/MinIO Configuration

@@ -21,6 +21,9 @@ dependencies {
     compileOnly("org.apache.spark:spark-sql-kafka-0-10_2.12:$sparkVersion")
     compileOnly("org.apache.spark:spark-avro_2.12:$sparkVersion")
 
+    // ABRiS for Schema Registry integration
+    compileOnly("za.co.absa:abris_2.12:6.4.0")
+
     // Apache Iceberg
     compileOnly("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:$icebergVersion")
 

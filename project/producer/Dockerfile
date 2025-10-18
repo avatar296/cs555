@@ -11,7 +11,6 @@ COPY gradle ./gradle
 # Copy all source code (common and producer modules)
 COPY common ./common
 COPY producer ./producer
-COPY consumer ./consumer
 
 # Build the producer fat JAR
 RUN gradle :producer:fatJar --no-daemon

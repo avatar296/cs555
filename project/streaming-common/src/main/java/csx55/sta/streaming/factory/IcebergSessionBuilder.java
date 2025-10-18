@@ -38,11 +38,13 @@ public class IcebergSessionBuilder {
                 .config(String.format("spark.sql.catalog.%s.type", catalogName), catalogType)
                 .config(String.format("spark.sql.catalog.%s.warehouse", catalogName), warehousePath);
 
-        // Add Hive Metastore URI if catalog type is "hive"
-        if ("hive".equalsIgnoreCase(catalogType)) {
-            String hiveUri = config.getHiveMetastoreUri();
-            builder.config(String.format("spark.sql.catalog.%s.uri", catalogName), hiveUri);
-            logger.info("Configured Hive Metastore URI: {}", hiveUri);
+        // Add JDBC configuration if catalog type is "jdbc"
+        if ("jdbc".equalsIgnoreCase(catalogType)) {
+            String jdbcUri = config.getJdbcUri();
+            builder.config(String.format("spark.sql.catalog.%s.uri", catalogName), jdbcUri);
+            builder.config(String.format("spark.sql.catalog.%s.jdbc.user", catalogName), config.getJdbcUser());
+            builder.config(String.format("spark.sql.catalog.%s.jdbc.password", catalogName), config.getJdbcPassword());
+            logger.info("Configured JDBC Catalog URI: {}", jdbcUri);
         }
 
         SparkSession spark = builder

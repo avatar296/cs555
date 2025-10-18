@@ -2,6 +2,8 @@ package csx55.sta.streaming.utils;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import za.co.absa.abris.config.AbrisConfig;
+import za.co.absa.abris.config.FromAvroConfig;
 
 import static org.apache.spark.sql.functions.*;
 
@@ -11,7 +13,7 @@ import static org.apache.spark.sql.functions.*;
 public class AvroUtils {
 
     /**
-     * Deserialize Avro-encoded Kafka messages using Schema Registry
+     * Deserialize Avro-encoded Kafka messages using Schema Registry (ABRiS)
      *
      * @param kafkaStream     The raw Kafka stream with value column
      * @param topic           The Kafka topic name
@@ -23,6 +25,13 @@ public class AvroUtils {
             String topic,
             String schemaRegistryUrl) {
 
+        // ABRiS configuration for reading from Confluent Schema Registry
+        FromAvroConfig abrisConfig = AbrisConfig
+                .fromConfluentAvro()
+                .downloadReaderSchemaByLatestVersion()
+                .andTopicNameStrategy(topic, false)
+                .usingSchemaRegistry(schemaRegistryUrl);
+
         return kafkaStream
                 .selectExpr(
                         "CAST(key AS STRING) as kafka_key",
@@ -33,11 +42,7 @@ public class AvroUtils {
                         "timestamp as kafka_timestamp"
                 )
                 .withColumn("avro_value",
-                        expr(String.format(
-                                "from_avro(value, '%s', map('schema.registry.url', '%s'))",
-                                topic + "-value",
-                                schemaRegistryUrl
-                        )))
+                        za.co.absa.abris.avro.functions.from_avro(col("value"), abrisConfig))
                 .select(
                         col("kafka_key"),
                         col("topic"),

@@ -27,6 +27,63 @@ public abstract class AbstractBronzeJob extends BaseStreamingJob {
     }
 
     @Override
+    protected void initialize() {
+        super.initialize();
+        ensureNamespaceExists();
+        ensureTableExists();
+    }
+
+    /**
+     * Create the bronze namespace if it doesn't exist
+     */
+    private void ensureNamespaceExists() {
+        try {
+            spark.sql("CREATE NAMESPACE IF NOT EXISTS lakehouse.bronze");
+            logger.info("Ensured namespace exists: lakehouse.bronze");
+        } catch (Exception e) {
+            logger.warn("Could not create namespace (may already exist): {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Create the Iceberg table if it doesn't exist
+     * Uses a micro-batch read to infer schema from Kafka + Schema Registry
+     */
+    private void ensureTableExists() {
+        try {
+            // Check if table already exists
+            spark.table(streamConfig.table);
+            logger.info("Table already exists: {}", streamConfig.table);
+        } catch (Exception e) {
+            logger.info("Table does not exist, creating: {}", streamConfig.table);
+            createTableFromKafkaSample();
+        }
+    }
+
+    /**
+     * Read one micro-batch from Kafka to infer schema and create the table
+     */
+    private void createTableFromKafkaSample() {
+        // Read ONE micro-batch to infer schema (not streaming, just batch)
+        Dataset<Row> sampleBatch = readStream()
+                .limit(10);  // Get a small sample
+
+        // Transform using same logic as streaming
+        Dataset<Row> transformedSample = transform(sampleBatch);
+
+        logger.info("Creating table with inferred schema: {}", streamConfig.table);
+        logger.info("Schema: \n{}", transformedSample.schema().treeString());
+
+        // Write sample data to create the table
+        transformedSample.write()
+                .format("iceberg")
+                .mode("append")
+                .save(streamConfig.table);
+
+        logger.info("Table created successfully: {}", streamConfig.table);
+    }
+
+    @Override
     protected Dataset<Row> readStream() {
         logger.info("Reading from Kafka topic: {}", streamConfig.topic);
 
@@ -63,7 +120,7 @@ public abstract class AbstractBronzeJob extends BaseStreamingJob {
                 .outputMode("append")
                 .trigger(Trigger.ProcessingTime(config.getTriggerInterval()))
                 .option("checkpointLocation", streamConfig.checkpointPath)
-                .option("path", streamConfig.table)
-                .start();
+                .option("fanout-enabled", "true")  // Enable table creation
+                .toTable(streamConfig.table);
     }
 }

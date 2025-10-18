@@ -16,18 +16,21 @@ dependencies {
     implementation(project(":common"))
     implementation(project(":streaming-common"))
 
-    // Apache Spark
-    implementation("org.apache.spark:spark-sql_2.12:$sparkVersion")
-    implementation("org.apache.spark:spark-streaming_2.12:$sparkVersion")
-    implementation("org.apache.spark:spark-sql-kafka-0-10_2.12:$sparkVersion")
-    implementation("org.apache.spark:spark-avro_2.12:$sparkVersion")
+    // Apache Spark (provided by cluster, not bundled in JAR)
+    compileOnly("org.apache.spark:spark-sql_2.12:$sparkVersion")
+    compileOnly("org.apache.spark:spark-streaming_2.12:$sparkVersion")
+    compileOnly("org.apache.spark:spark-sql-kafka-0-10_2.12:$sparkVersion")
+    compileOnly("org.apache.spark:spark-avro_2.12:$sparkVersion")
 
-    // Apache Iceberg
-    implementation("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:$icebergVersion")
+    // Apache Iceberg (provided by cluster)
+    compileOnly("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:$icebergVersion")
 
-    // Hadoop AWS for MinIO S3 support
-    implementation("org.apache.hadoop:hadoop-aws:$hadoopVersion")
-    implementation("com.amazonaws:aws-java-sdk-bundle:1.12.262")
+    // Hadoop AWS (provided by cluster)
+    compileOnly("org.apache.hadoop:hadoop-aws:$hadoopVersion")
+    compileOnly("com.amazonaws:aws-java-sdk-bundle:1.12.262")
+
+    // ABRiS (provided via --packages)
+    compileOnly("za.co.absa:abris_2.12:6.4.0")
 
     // Logging
     implementation("org.slf4j:slf4j-api:$slf4jVersion")
@@ -40,6 +43,8 @@ application {
 
 // Create fat JAR for Spark submission
 tasks.jar {
+    dependsOn(":streaming-common:jar")
+
     archiveBaseName.set("bronze-layer")
     archiveVersion.set("")
 

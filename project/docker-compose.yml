@@ -62,38 +62,38 @@ services:
       - "8080:8080"
 
   # NYC Taxi Event Stream Producer
-  producer:
-    build:
-      context: .
-      dockerfile: producer/Dockerfile
-    container_name: producer
-    depends_on:
-      kafka:
-        condition: service_healthy
-      schema-registry:
-        condition: service_healthy
-    environment:
-      # Kafka Connection (internal Docker network)
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
+  # producer:
+  #   build:
+  #     context: .
+  #     dockerfile: producer/Dockerfile
+  #   container_name: producer
+  #   depends_on:
+  #     kafka:
+  #       condition: service_healthy
+  #     schema-registry:
+  #       condition: service_healthy
+  #   environment:
+  #     # Kafka Connection (internal Docker network)
+  #     - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+  #     - SCHEMA_REGISTRY_URL=http://schema-registry:8081
 
-      # Stream Configuration (continuous mode)
-      - TRIP_RATE=500
-      - TRIP_TOTAL_EVENTS=-1
-      - TRIP_ERROR_RATE=0.0
+  #     # Stream Configuration (continuous mode)
+  #     - TRIP_RATE=500
+  #     - TRIP_TOTAL_EVENTS=-1
+  #     - TRIP_ERROR_RATE=0.0
 
-      - WEATHER_RATE=10
-      - WEATHER_TOTAL_EVENTS=-1
-      - WEATHER_ERROR_RATE=0.0
+  #     - WEATHER_RATE=10
+  #     - WEATHER_TOTAL_EVENTS=-1
+  #     - WEATHER_ERROR_RATE=0.0
 
-      - EVENT_RATE=0.1
-      - EVENT_TOTAL_EVENTS=-1
-      - EVENT_ERROR_RATE=0.0
+  #     - EVENT_RATE=0.1
+  #     - EVENT_TOTAL_EVENTS=-1
+  #     - EVENT_ERROR_RATE=0.0
 
-      # Timing
-      - USE_REALTIME=true
-      - TIME_PROGRESSION_SECONDS=1
-    restart: unless-stopped
+  #     # Timing
+  #     - USE_REALTIME=true
+  #     - TIME_PROGRESSION_SECONDS=1
+  #   restart: unless-stopped
 
   # MinIO Object Storage
   minio:
@@ -130,69 +130,47 @@ services:
       exit 0;
       "
 
-  # PostgreSQL for Hive Metastore
-  postgres-metastore:
+  # PostgreSQL for Iceberg Catalog (JDBC)
+  postgres-iceberg:
     image: postgres:15
-    container_name: postgres-metastore
+    container_name: postgres-iceberg
     environment:
-      - POSTGRES_DB=metastore
-      - POSTGRES_USER=hive
-      - POSTGRES_PASSWORD=hive123
+      - POSTGRES_DB=iceberg
+      - POSTGRES_USER=iceberg
+      - POSTGRES_PASSWORD=iceberg123
     ports:
       - "5432:5432"
     volumes:
-      - postgres-metastore-data:/var/lib/postgresql/data
+      - postgres-iceberg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hive -d metastore"]
+      test: ["CMD-SHELL", "pg_isready -U iceberg -d iceberg"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  # Hive Metastore
-  hive-metastore:
-    image: apache/hive:4.0.0
-    container_name: hive-metastore
-    depends_on:
-      postgres-metastore:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      - SERVICE_NAME=metastore
-      - DB_DRIVER=postgres
-      - SERVICE_OPTS=-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres-metastore:5432/metastore -Djavax.jdo.option.ConnectionUserName=hive -Djavax.jdo.option.ConnectionPassword=hive123
-      - AWS_ACCESS_KEY_ID=admin
-      - AWS_SECRET_ACCESS_KEY=admin123
-      - AWS_REGION=us-east-1
-    ports:
-      - "9083:9083"
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "9083"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
   # Spark Master
   spark-master:
     build: ./spark
     image: project-spark:3.5.0
     container_name: spark-master
-    command: bash -c "mkdir -p /tmp/checkpoint/bronze && chmod -R 777 /tmp/checkpoint && /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master"
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     depends_on:
       minio:
         condition: service_healthy
-      hive-metastore:
+      postgres-iceberg:
         condition: service_healthy
     environment:
       - SPARK_MASTER_HOST=spark-master
       - SPARK_MASTER_PORT=7077
       - SPARK_MASTER_WEBUI_PORT=8080
       - SPARK_NO_DAEMONIZE=true
-      # Iceberg Catalog Configuration (Hive Metastore)
+      # Iceberg Catalog Configuration (JDBC)
       - SPARK_DEFAULTS_spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
       - SPARK_DEFAULTS_spark.sql.catalog.lakehouse=org.apache.iceberg.spark.SparkCatalog
-      - SPARK_DEFAULTS_spark.sql.catalog.lakehouse.type=hive
-      - SPARK_DEFAULTS_spark.sql.catalog.lakehouse.uri=thrift://hive-metastore:9083
+      - SPARK_DEFAULTS_spark.sql.catalog.lakehouse.type=jdbc
+      - SPARK_DEFAULTS_spark.sql.catalog.lakehouse.uri=jdbc:postgresql://postgres-iceberg:5432/iceberg
+      - SPARK_DEFAULTS_spark.sql.catalog.lakehouse.jdbc.user=iceberg
+      - SPARK_DEFAULTS_spark.sql.catalog.lakehouse.jdbc.password=iceberg123
       - SPARK_DEFAULTS_spark.sql.catalog.lakehouse.warehouse=s3a://lakehouse/warehouse
       # MinIO S3 Configuration
       - AWS_ACCESS_KEY_ID=admin
@@ -214,11 +192,11 @@ services:
     build: ./spark
     image: project-spark:3.5.0
     container_name: spark-worker-1
-    command: bash -c "mkdir -p /tmp/checkpoint/bronze && chmod -R 777 /tmp/checkpoint && /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077"
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     depends_on:
       - spark-master
       - minio
-      - hive-metastore
+      - postgres-iceberg
     environment:
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_MEMORY=2g
@@ -240,11 +218,11 @@ services:
     build: ./spark
     image: project-spark:3.5.0
     container_name: spark-worker-2
-    command: bash -c "mkdir -p /tmp/checkpoint/bronze && chmod -R 777 /tmp/checkpoint && /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077"
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     depends_on:
       - spark-master
       - minio
-      - hive-metastore
+      - postgres-iceberg
     environment:
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_MEMORY=2g
@@ -261,9 +239,175 @@ services:
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
 
+  # Bronze Layer Streaming Jobs
+  bronze-trips-consumer:
+    image: project-spark:3.5.0
+    container_name: bronze-trips-consumer
+    command: >
+      /opt/spark/bin/spark-submit
+      --class csx55.sta.bronze.jobs.TripsBronzeJob
+      --master spark://spark-master:7077
+      --deploy-mode client
+      --conf spark.driver.memory=1g
+      --conf spark.executor.memory=2g
+      --conf spark.streaming.kafka.maxRatePerPartition=1000
+      --conf spark.sql.streaming.minBatchesToRetain=10
+      --conf spark.hadoop.fs.s3a.access.key=admin
+      --conf spark.hadoop.fs.s3a.secret.key=admin123
+      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+      --conf spark.hadoop.fs.s3a.path.style.access=true
+      /opt/spark/work-dir/jars/bronze/bronze-layer.jar
+    depends_on:
+      spark-master:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres-iceberg:
+        condition: service_healthy
+    environment:
+      # MinIO S3 Configuration (for checkpoints)
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=admin123
+      - AWS_REGION=us-east-1
+    volumes:
+      - ./bronze-layer/build/libs:/opt/spark/work-dir/jars/bronze
+      - ./streaming-common/src/main/resources:/opt/spark/work-dir/conf
+      - spark-logs:/opt/spark/logs
+      - spark-state:/tmp/state-store
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 120s
+    restart: unless-stopped
+
+  bronze-weather-consumer:
+    image: project-spark:3.5.0
+    container_name: bronze-weather-consumer
+    command: >
+      /opt/spark/bin/spark-submit
+      --class csx55.sta.bronze.jobs.WeatherBronzeJob
+      --master spark://spark-master:7077
+      --deploy-mode client
+      --conf spark.driver.memory=1g
+      --conf spark.executor.memory=2g
+      --conf spark.streaming.kafka.maxRatePerPartition=1000
+      --conf spark.sql.streaming.minBatchesToRetain=10
+      --conf spark.hadoop.fs.s3a.access.key=admin
+      --conf spark.hadoop.fs.s3a.secret.key=admin123
+      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+      --conf spark.hadoop.fs.s3a.path.style.access=true
+      /opt/spark/work-dir/jars/bronze/bronze-layer.jar
+    depends_on:
+      spark-master:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres-iceberg:
+        condition: service_healthy
+    environment:
+      # MinIO S3 Configuration (for checkpoints)
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=admin123
+      - AWS_REGION=us-east-1
+    volumes:
+      - ./bronze-layer/build/libs:/opt/spark/work-dir/jars/bronze
+      - ./streaming-common/src/main/resources:/opt/spark/work-dir/conf
+      - spark-logs:/opt/spark/logs
+      - spark-state:/tmp/state-store
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 120s
+    restart: unless-stopped
+
+  bronze-events-consumer:
+    image: project-spark:3.5.0
+    container_name: bronze-events-consumer
+    command: >
+      /opt/spark/bin/spark-submit
+      --class csx55.sta.bronze.jobs.EventsBronzeJob
+      --master spark://spark-master:7077
+      --deploy-mode client
+      --conf spark.driver.memory=1g
+      --conf spark.executor.memory=2g
+      --conf spark.streaming.kafka.maxRatePerPartition=1000
+      --conf spark.sql.streaming.minBatchesToRetain=10
+      --conf spark.hadoop.fs.s3a.access.key=admin
+      --conf spark.hadoop.fs.s3a.secret.key=admin123
+      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+      --conf spark.hadoop.fs.s3a.path.style.access=true
+      /opt/spark/work-dir/jars/bronze/bronze-layer.jar
+    depends_on:
+      spark-master:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres-iceberg:
+        condition: service_healthy
+    environment:
+      # MinIO S3 Configuration (for checkpoints)
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=admin123
+      - AWS_REGION=us-east-1
+    volumes:
+      - ./bronze-layer/build/libs:/opt/spark/work-dir/jars/bronze
+      - ./streaming-common/src/main/resources:/opt/spark/work-dir/conf
+      - spark-logs:/opt/spark/logs
+      - spark-state:/tmp/state-store
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 120s
+    restart: unless-stopped
+
 volumes:
   kafka-data:
   spark-logs:
   spark-state:
   minio-data:
-  postgres-metastore-data:
+  postgres-iceberg-data:
