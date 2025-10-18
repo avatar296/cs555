@@ -64,9 +64,25 @@ public abstract class AbstractBronzeJob extends BaseStreamingJob {
      * Read one micro-batch from Kafka to infer schema and create the table
      */
     private void createTableFromKafkaSample() {
-        // Read ONE micro-batch to infer schema (not streaming, just batch)
-        Dataset<Row> sampleBatch = readStream()
+        logger.info("Reading sample batch from Kafka topic: {}", streamConfig.topic);
+
+        // Read a small batch from Kafka (NOT streaming - use batch read)
+        Dataset<Row> sampleBatch = spark
+                .read()  // Batch read, not readStream()
+                .format("kafka")
+                .option("kafka.bootstrap.servers", config.getKafkaBootstrapServers())
+                .option("subscribe", streamConfig.topic)
+                .option("startingOffsets", "earliest")
+                .option("endingOffsets", "latest")  // Read up to latest available
+                .load()
                 .limit(10);  // Get a small sample
+
+        // Check if we got any data
+        if (sampleBatch.isEmpty()) {
+            logger.warn("No data available in topic {} to infer schema. Table creation will be deferred.",
+                        streamConfig.topic);
+            return;  // Skip table creation if no data yet
+        }
 
         // Transform using same logic as streaming
         Dataset<Row> transformedSample = transform(sampleBatch);
@@ -74,11 +90,11 @@ public abstract class AbstractBronzeJob extends BaseStreamingJob {
         logger.info("Creating table with inferred schema: {}", streamConfig.table);
         logger.info("Schema: \n{}", transformedSample.schema().treeString());
 
-        // Write sample data to create the table
+        // Write sample data to create the table (batch write)
         transformedSample.write()
                 .format("iceberg")
                 .mode("append")
-                .save(streamConfig.table);
+                .saveAsTable(streamConfig.table);
 
         logger.info("Table created successfully: {}", streamConfig.table);
     }

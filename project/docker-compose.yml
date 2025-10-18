@@ -62,38 +62,38 @@ services:
       - "8080:8080"
 
   # NYC Taxi Event Stream Producer
-  # producer:
-  #   build:
-  #     context: .
-  #     dockerfile: producer/Dockerfile
-  #   container_name: producer
-  #   depends_on:
-  #     kafka:
-  #       condition: service_healthy
-  #     schema-registry:
-  #       condition: service_healthy
-  #   environment:
-  #     # Kafka Connection (internal Docker network)
-  #     - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-  #     - SCHEMA_REGISTRY_URL=http://schema-registry:8081
+  producer:
+    build:
+      context: .
+      dockerfile: producer/Dockerfile
+    container_name: producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    environment:
+      # Kafka Connection (internal Docker network)
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
 
-  #     # Stream Configuration (continuous mode)
-  #     - TRIP_RATE=500
-  #     - TRIP_TOTAL_EVENTS=-1
-  #     - TRIP_ERROR_RATE=0.0
+      # Stream Configuration (continuous mode)
+      - TRIP_RATE=500
+      - TRIP_TOTAL_EVENTS=-1
+      - TRIP_ERROR_RATE=0.0
 
-  #     - WEATHER_RATE=10
-  #     - WEATHER_TOTAL_EVENTS=-1
-  #     - WEATHER_ERROR_RATE=0.0
+      - WEATHER_RATE=10
+      - WEATHER_TOTAL_EVENTS=-1
+      - WEATHER_ERROR_RATE=0.0
 
-  #     - EVENT_RATE=0.1
-  #     - EVENT_TOTAL_EVENTS=-1
-  #     - EVENT_ERROR_RATE=0.0
+      - EVENT_RATE=0.1
+      - EVENT_TOTAL_EVENTS=-1
+      - EVENT_ERROR_RATE=0.0
 
-  #     # Timing
-  #     - USE_REALTIME=true
-  #     - TIME_PROGRESSION_SECONDS=1
-  #   restart: unless-stopped
+      # Timing
+      - USE_REALTIME=true
+      - TIME_PROGRESSION_SECONDS=1
+    restart: unless-stopped
 
   # MinIO Object Storage
   minio:
