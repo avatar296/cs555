@@ -267,8 +267,7 @@ services:
         condition: service_healthy
       postgres-iceberg:
         condition: service_healthy
-      producer:
-        condition: service_started
+
     environment:
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=admin123

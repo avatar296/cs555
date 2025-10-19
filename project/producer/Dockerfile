@@ -8,8 +8,8 @@ WORKDIR /build
 COPY settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle ./gradle
 
-# Copy all source code (common and producer modules)
-COPY common ./common
+# Copy all source code (schemas and producer modules)
+COPY schemas ./schemas
 COPY producer ./producer
 
 # Build the producer fat JAR
