@@ -39,7 +39,8 @@ application {
 
 // Create fat JAR for Spark submission
 tasks.jar {
-    archiveBaseName.set("silver-layer")
+    dependsOn(":lakehouse:streaming:jar")
+    archiveBaseName.set("silver")
     archiveVersion.set("")
 
     // Enable zip64 for large JARs

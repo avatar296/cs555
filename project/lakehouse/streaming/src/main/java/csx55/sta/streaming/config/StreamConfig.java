@@ -116,6 +116,31 @@ public class StreamConfig {
         );
     }
 
+    // Silver Layer Configuration
+    public SilverStreamConfig getSilverTripsCleanedConfig() {
+        return new SilverStreamConfig(
+            config.getString("silver.trips_cleaned.source"),
+            config.getString("silver.trips_cleaned.table"),
+            config.getString("silver.trips_cleaned.checkpoint")
+        );
+    }
+
+    public SilverStreamConfig getSilverWeatherCleanedConfig() {
+        return new SilverStreamConfig(
+            config.getString("silver.weather_cleaned.source"),
+            config.getString("silver.weather_cleaned.table"),
+            config.getString("silver.weather_cleaned.checkpoint")
+        );
+    }
+
+    public SilverStreamConfig getSilverEventsCleanedConfig() {
+        return new SilverStreamConfig(
+            config.getString("silver.events_cleaned.source"),
+            config.getString("silver.events_cleaned.table"),
+            config.getString("silver.events_cleaned.checkpoint")
+        );
+    }
+
     /**
      * Bronze layer stream configuration
      */
@@ -134,6 +159,27 @@ public class StreamConfig {
         public String toString() {
             return String.format("BronzeStreamConfig{topic='%s', table='%s', checkpoint='%s'}",
                     topic, table, checkpointPath);
+        }
+    }
+
+    /**
+     * Silver layer stream configuration
+     */
+    public static class SilverStreamConfig {
+        public final String sourceTable;
+        public final String targetTable;
+        public final String checkpointPath;
+
+        public SilverStreamConfig(String sourceTable, String targetTable, String checkpointPath) {
+            this.sourceTable = sourceTable;
+            this.targetTable = targetTable;
+            this.checkpointPath = checkpointPath;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("SilverStreamConfig{source='%s', target='%s', checkpoint='%s'}",
+                    sourceTable, targetTable, checkpointPath);
         }
     }
 }

@@ -1,6 +1,7 @@
 package csx55.sta.schema;
 
 import csx55.sta.schema.bronze.BronzeTableSetup;
+import csx55.sta.schema.silver.SilverTableSetup;
 import csx55.sta.streaming.config.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +40,7 @@ public class SchemaManagementApp {
                     break;
 
                 case "silver":
-                    logger.warn("Silver layer setup not yet implemented");
+                    setupSilver(config);
                     break;
 
                 case "gold":
@@ -48,7 +49,8 @@ public class SchemaManagementApp {
 
                 case "all":
                     setupBronze(config);
-                    logger.warn("Silver and Gold layer setup not yet implemented");
+                    setupSilver(config);
+                    logger.warn("Gold layer setup not yet implemented");
                     break;
 
                 default:
@@ -70,6 +72,12 @@ public class SchemaManagementApp {
     private static void setupBronze(StreamConfig config) {
         logger.info("Setting up Bronze layer tables...");
         BronzeTableSetup setup = new BronzeTableSetup(config);
+        setup.run();
+    }
+
+    private static void setupSilver(StreamConfig config) {
+        logger.info("Setting up Silver layer tables...");
+        SilverTableSetup setup = new SilverTableSetup(config);
         setup.run();
     }
 }
