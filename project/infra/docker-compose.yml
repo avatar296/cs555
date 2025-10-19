@@ -187,11 +187,10 @@ services:
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
 
-  # Spark Worker 1
-  spark-worker-1:
+  # Spark Workers (Scaled for Bronze Layer)
+  spark-worker:
     build: ./spark
     image: project-spark:3.5.0
-    container_name: spark-worker-1
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     depends_on:
       - spark-master
@@ -201,6 +200,8 @@ services:
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_MEMORY=2g
       - SPARK_NO_DAEMONIZE=true
+      # Enable External Shuffle Service (required for dynamic allocation)
+      - SPARK_WORKER_OPTS=-Dspark.shuffle.service.enabled=true -Dspark.shuffle.service.port=7337
       # MinIO S3 Configuration
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=admin123
@@ -212,32 +213,8 @@ services:
       - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
-
-  # Spark Worker 2
-  spark-worker-2:
-    build: ./spark
-    image: project-spark:3.5.0
-    container_name: spark-worker-2
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
-    depends_on:
-      - spark-master
-      - minio
-      - postgres-iceberg
-    environment:
-      - SPARK_WORKER_CORES=2
-      - SPARK_WORKER_MEMORY=2g
-      - SPARK_NO_DAEMONIZE=true
-      # MinIO S3 Configuration
-      - AWS_ACCESS_KEY_ID=admin
-      - AWS_SECRET_ACCESS_KEY=admin123
-      - AWS_REGION=us-east-1
-    volumes:
-      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
-      - ../lakehouse/silver/build/libs:/opt/spark/work-dir/jars/silver
-      - ../lakehouse/gold/build/libs:/opt/spark/work-dir/jars/gold
-      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
-      - spark-logs:/opt/spark/logs
-      - spark-state:/tmp/state-store
+    deploy:
+      replicas: 2  # 2 workers = 4 cores, 4GB total
 
   # Schema Management - Bronze Layer Table Setup
   bronze-table-setup:
@@ -291,8 +268,17 @@ services:
       --class csx55.sta.bronze.jobs.TripsBronzeJob
       --master spark://spark-master:7077
       --deploy-mode client
-      --conf spark.driver.memory=1g
-      --conf spark.executor.memory=2g
+      --conf spark.driver.memory=512m
+      --conf spark.executor.memory=1g
+      --conf spark.executor.cores=1
+      --conf spark.dynamicAllocation.enabled=true
+      --conf spark.dynamicAllocation.shuffleTracking.enabled=true
+      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.maxExecutors=2
+      --conf spark.dynamicAllocation.initialExecutors=1
+      --conf spark.dynamicAllocation.executorIdleTimeout=60s
+      --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
+      --conf spark.shuffle.service.enabled=true
       --conf spark.streaming.kafka.maxRatePerPartition=1000
       --conf spark.sql.streaming.minBatchesToRetain=10
       --conf spark.hadoop.fs.s3a.access.key=admin
@@ -326,11 +312,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 4G
-        reservations:
           cpus: '1.0'
           memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
       interval: 30s
@@ -348,8 +334,17 @@ services:
       --class csx55.sta.bronze.jobs.WeatherBronzeJob
       --master spark://spark-master:7077
       --deploy-mode client
-      --conf spark.driver.memory=1g
-      --conf spark.executor.memory=2g
+      --conf spark.driver.memory=512m
+      --conf spark.executor.memory=1g
+      --conf spark.executor.cores=1
+      --conf spark.dynamicAllocation.enabled=true
+      --conf spark.dynamicAllocation.shuffleTracking.enabled=true
+      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.maxExecutors=2
+      --conf spark.dynamicAllocation.initialExecutors=1
+      --conf spark.dynamicAllocation.executorIdleTimeout=60s
+      --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
+      --conf spark.shuffle.service.enabled=true
       --conf spark.streaming.kafka.maxRatePerPartition=1000
       --conf spark.sql.streaming.minBatchesToRetain=10
       --conf spark.hadoop.fs.s3a.access.key=admin
@@ -383,11 +378,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 4G
-        reservations:
           cpus: '1.0'
           memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
       interval: 30s
@@ -405,8 +400,17 @@ services:
       --class csx55.sta.bronze.jobs.EventsBronzeJob
       --master spark://spark-master:7077
       --deploy-mode client
-      --conf spark.driver.memory=1g
-      --conf spark.executor.memory=2g
+      --conf spark.driver.memory=512m
+      --conf spark.executor.memory=1g
+      --conf spark.executor.cores=1
+      --conf spark.dynamicAllocation.enabled=true
+      --conf spark.dynamicAllocation.shuffleTracking.enabled=true
+      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.maxExecutors=2
+      --conf spark.dynamicAllocation.initialExecutors=1
+      --conf spark.dynamicAllocation.executorIdleTimeout=60s
+      --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
+      --conf spark.shuffle.service.enabled=true
       --conf spark.streaming.kafka.maxRatePerPartition=1000
       --conf spark.sql.streaming.minBatchesToRetain=10
       --conf spark.hadoop.fs.s3a.access.key=admin
@@ -440,11 +444,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 4G
-        reservations:
           cpus: '1.0'
           memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
       interval: 30s
