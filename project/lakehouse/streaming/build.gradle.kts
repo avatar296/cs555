@@ -12,8 +12,8 @@ val hadoopVersion = "3.3.4"
 val typesafeConfigVersion = "1.4.3"
 
 dependencies {
-    // Common module (Avro schemas)
-    api(project(":common"))
+    // Schemas module (Avro schemas) - explicitly reference root project's schemas
+    api(rootProject.project(":schemas"))
 
     // Apache Spark (provided scope - will be available in cluster)
     compileOnly("org.apache.spark:spark-sql_2.12:$sparkVersion")

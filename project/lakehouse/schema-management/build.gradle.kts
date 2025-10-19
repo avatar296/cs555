@@ -13,8 +13,8 @@ val hadoopVersion = "3.3.4"
 
 dependencies {
     // Shared modules
-    implementation(project(":common"))
-    implementation(project(":streaming-common"))
+    implementation(rootProject.project(":schemas"))
+    implementation(project(":lakehouse:streaming"))
 
     // Apache Spark (provided by cluster, not bundled in JAR)
     compileOnly("org.apache.spark:spark-sql_2.12:$sparkVersion")
@@ -38,21 +38,21 @@ dependencies {
 }
 
 application {
-    mainClass.set("csx55.sta.bronze.BronzeLayerApp")
+    mainClass.set("csx55.sta.schema.SchemaManagementApp")
 }
 
 // Create fat JAR for Spark submission
 tasks.jar {
-    dependsOn(":streaming-common:jar")
+    dependsOn(":lakehouse:streaming:jar")
 
-    archiveBaseName.set("bronze-layer")
+    archiveBaseName.set("schema-management")
     archiveVersion.set("")
 
     // Enable zip64 for large JARs
     isZip64 = true
 
     manifest {
-        attributes["Main-Class"] = "csx55.sta.bronze.BronzeLayerApp"
+        attributes["Main-Class"] = "csx55.sta.schema.SchemaManagementApp"
     }
 
     // Include dependencies (fat jar)

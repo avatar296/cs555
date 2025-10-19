@@ -13,12 +13,11 @@ val hadoopVersion = "3.3.4"
 
 dependencies {
     // Shared modules
-    implementation(project(":common"))
-    implementation(project(":streaming-common"))
+    implementation(rootProject.project(":schemas"))
+    implementation(project(":lakehouse:streaming"))
 
     // Apache Spark
     implementation("org.apache.spark:spark-sql_2.12:$sparkVersion")
-    implementation("org.apache.spark:spark-streaming_2.12:$sparkVersion")
     implementation("org.apache.spark:spark-avro_2.12:$sparkVersion")
 
     // Apache Iceberg
@@ -34,19 +33,19 @@ dependencies {
 }
 
 application {
-    mainClass.set("csx55.sta.silver.SilverLayerApp")
+    mainClass.set("csx55.sta.gold.GoldLayerApp")
 }
 
 // Create fat JAR for Spark submission
 tasks.jar {
-    archiveBaseName.set("silver-layer")
+    archiveBaseName.set("gold-layer")
     archiveVersion.set("")
 
     // Enable zip64 for large JARs
     isZip64 = true
 
     manifest {
-        attributes["Main-Class"] = "csx55.sta.silver.SilverLayerApp"
+        attributes["Main-Class"] = "csx55.sta.gold.GoldLayerApp"
     }
 
     // Include dependencies (fat jar)

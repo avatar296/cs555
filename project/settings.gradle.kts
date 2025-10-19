@@ -8,13 +8,15 @@
 rootProject.name = "sta"
 
 // Shared modules
-include("common")           // Avro schemas
-include("streaming-common") // Shared streaming utilities
+include("schemas")          // Avro schema definitions
 
 // Data generation
 include("producer")         // Synthetic data producer
 
-// Lakehouse layers (Medallion Architecture)
-include("bronze-layer")     // Raw ingestion from Kafka
-include("silver-layer")     // Cleaned, transformed data
-include("gold-layer")       // Analytics-ready aggregations
+// Lakehouse (Medallion Architecture)
+include("lakehouse")                        // Parent project (grouping)
+include("lakehouse:streaming")              // Lakehouse streaming utilities
+include("lakehouse:schema-management")      // Table creation and schema management
+include("lakehouse:bronze")                 // Raw ingestion from Kafka
+include("lakehouse:silver")                 // Cleaned, transformed data
+include("lakehouse:gold")                   // Analytics-ready aggregations

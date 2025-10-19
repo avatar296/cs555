@@ -64,7 +64,7 @@ services:
   # NYC Taxi Event Stream Producer
   producer:
     build:
-      context: .
+      context: ..
       dockerfile: producer/Dockerfile
     container_name: producer
     depends_on:
@@ -180,10 +180,10 @@ services:
       - "8081:8080"  # Spark Master Web UI
       - "7077:7077"  # Spark Master Port
     volumes:
-      - ./bronze-layer/build/libs:/opt/spark/work-dir/jars/bronze
-      - ./silver-layer/build/libs:/opt/spark/work-dir/jars/silver
-      - ./gold-layer/build/libs:/opt/spark/work-dir/jars/gold
-      - ./streaming-common/src/main/resources:/opt/spark/work-dir/conf
+      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
+      - ../lakehouse/silver/build/libs:/opt/spark/work-dir/jars/silver
+      - ../lakehouse/gold/build/libs:/opt/spark/work-dir/jars/gold
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
 
@@ -206,10 +206,10 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ./bronze-layer/build/libs:/opt/spark/work-dir/jars/bronze
-      - ./silver-layer/build/libs:/opt/spark/work-dir/jars/silver
-      - ./gold-layer/build/libs:/opt/spark/work-dir/jars/gold
-      - ./streaming-common/src/main/resources:/opt/spark/work-dir/conf
+      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
+      - ../lakehouse/silver/build/libs:/opt/spark/work-dir/jars/silver
+      - ../lakehouse/gold/build/libs:/opt/spark/work-dir/jars/gold
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
 
@@ -232,12 +232,56 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ./bronze-layer/build/libs:/opt/spark/work-dir/jars/bronze
-      - ./silver-layer/build/libs:/opt/spark/work-dir/jars/silver
-      - ./gold-layer/build/libs:/opt/spark/work-dir/jars/gold
-      - ./streaming-common/src/main/resources:/opt/spark/work-dir/conf
+      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
+      - ../lakehouse/silver/build/libs:/opt/spark/work-dir/jars/silver
+      - ../lakehouse/gold/build/libs:/opt/spark/work-dir/jars/gold
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
+
+  # Schema Management - Bronze Layer Table Setup
+  bronze-table-setup:
+    image: project-spark:3.5.0
+    container_name: bronze-table-setup
+    command: >
+      /opt/spark/bin/spark-submit
+      --class csx55.sta.schema.SchemaManagementApp
+      --master spark://spark-master:7077
+      --deploy-mode client
+      --conf spark.driver.memory=1g
+      --conf spark.executor.memory=1g
+      --conf spark.hadoop.fs.s3a.access.key=admin
+      --conf spark.hadoop.fs.s3a.secret.key=admin123
+      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+      --conf spark.hadoop.fs.s3a.path.style.access=true
+      /opt/spark/work-dir/jars/schema/schema-management.jar
+      bronze
+    depends_on:
+      spark-master:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres-iceberg:
+        condition: service_healthy
+      producer:
+        condition: service_started
+    environment:
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=admin123
+      - AWS_REGION=us-east-1
+    volumes:
+      - ../lakehouse/schema-management/build/libs:/opt/spark/work-dir/jars/schema
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
 
   # Bronze Layer Streaming Jobs
   bronze-trips-consumer:
@@ -256,8 +300,10 @@ services:
       --conf spark.hadoop.fs.s3a.secret.key=admin123
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
       --conf spark.hadoop.fs.s3a.path.style.access=true
-      /opt/spark/work-dir/jars/bronze/bronze-layer.jar
+      /opt/spark/work-dir/jars/bronze/bronze.jar
     depends_on:
+      bronze-table-setup:
+        condition: service_completed_successfully
       spark-master:
         condition: service_started
       kafka:
@@ -274,8 +320,8 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ./bronze-layer/build/libs:/opt/spark/work-dir/jars/bronze
-      - ./streaming-common/src/main/resources:/opt/spark/work-dir/conf
+      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
     deploy:
@@ -311,8 +357,10 @@ services:
       --conf spark.hadoop.fs.s3a.secret.key=admin123
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
       --conf spark.hadoop.fs.s3a.path.style.access=true
-      /opt/spark/work-dir/jars/bronze/bronze-layer.jar
+      /opt/spark/work-dir/jars/bronze/bronze.jar
     depends_on:
+      bronze-table-setup:
+        condition: service_completed_successfully
       spark-master:
         condition: service_started
       kafka:
@@ -329,8 +377,8 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ./bronze-layer/build/libs:/opt/spark/work-dir/jars/bronze
-      - ./streaming-common/src/main/resources:/opt/spark/work-dir/conf
+      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
     deploy:
@@ -366,8 +414,10 @@ services:
       --conf spark.hadoop.fs.s3a.secret.key=admin123
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
       --conf spark.hadoop.fs.s3a.path.style.access=true
-      /opt/spark/work-dir/jars/bronze/bronze-layer.jar
+      /opt/spark/work-dir/jars/bronze/bronze.jar
     depends_on:
+      bronze-table-setup:
+        condition: service_completed_successfully
       spark-master:
         condition: service_started
       kafka:
@@ -384,8 +434,8 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ./bronze-layer/build/libs:/opt/spark/work-dir/jars/bronze
-      - ./streaming-common/src/main/resources:/opt/spark/work-dir/conf
+      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
     deploy:
