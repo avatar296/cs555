@@ -2,6 +2,7 @@ package csx55.sta.schema;
 
 import csx55.sta.schema.bronze.BronzeTableSetup;
 import csx55.sta.schema.silver.SilverTableSetup;
+import csx55.sta.schema.monitoring.MonitoringSetup;
 import csx55.sta.streaming.config.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +22,7 @@ public class SchemaManagementApp {
     public static void main(String[] args) {
         if (args.length == 0) {
             logger.error("Usage: SchemaManagementApp <layer>");
-            logger.error("  layer: bronze | silver | gold | all");
+            logger.error("  layer: bronze | silver | gold | monitoring | all");
             System.exit(1);
         }
 
@@ -47,14 +48,19 @@ public class SchemaManagementApp {
                     logger.warn("Gold layer setup not yet implemented");
                     break;
 
+                case "monitoring":
+                    setupMonitoring(config);
+                    break;
+
                 case "all":
                     setupBronze(config);
                     setupSilver(config);
+                    setupMonitoring(config);
                     logger.warn("Gold layer setup not yet implemented");
                     break;
 
                 default:
-                    logger.error("Unknown layer: {}. Valid options: bronze, silver, gold, all", layer);
+                    logger.error("Unknown layer: {}. Valid options: bronze, silver, gold, monitoring, all", layer);
                     System.exit(1);
             }
 
@@ -78,6 +84,12 @@ public class SchemaManagementApp {
     private static void setupSilver(StreamConfig config) {
         logger.info("Setting up Silver layer tables...");
         SilverTableSetup setup = new SilverTableSetup(config);
+        setup.run();
+    }
+
+    private static void setupMonitoring(StreamConfig config) {
+        logger.info("Setting up Monitoring infrastructure...");
+        MonitoringSetup setup = new MonitoringSetup(config);
         setup.run();
     }
 }

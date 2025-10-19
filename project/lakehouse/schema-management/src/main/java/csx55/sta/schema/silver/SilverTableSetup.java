@@ -145,15 +145,18 @@ public class SilverTableSetup {
         logger.info("  Inferred Silver schema:");
         silverSample.schema().printTreeString();
 
-        // Step 5: Create Silver table with inferred schema
-        logger.info("  Creating table: {}", tableName);
+        // Step 5: Create Silver table with inferred schema and daily partitioning
+        logger.info("  Creating table with DAILY partitioning: {}", tableName);
         try {
-            silverSample.write()
-                    .format("iceberg")
-                    .mode("append")
-                    .saveAsTable(tableName);
+            // Iceberg partitioning uses string-based partition specs
+            // Format: "transform_function(column_name)"
+            // days(timestamp) = partition by day (YYYY-MM-DD)
+            silverSample.writeTo(tableName)
+                    .using("iceberg")
+                    .partitionedBy("days(timestamp)")
+                    .create();
 
-            logger.info("  ✓ Table created successfully: {}", tableName);
+            logger.info("  ✓ Table created successfully with daily partitioning: {}", tableName);
         } catch (Exception e) {
             logger.error("  ✗ Failed to create table: {}", tableName, e);
             throw new RuntimeException("Failed to create Silver table: " + tableName, e);
@@ -197,8 +200,12 @@ public class SilverTableSetup {
         logger.info("  Inferred Silver schema:");
         silverSample.schema().printTreeString();
 
-        silverSample.write().format("iceberg").mode("append").saveAsTable(tableName);
-        logger.info("  ✓ Table created successfully: {}", tableName);
+        logger.info("  Creating table with DAILY partitioning: {}", tableName);
+        silverSample.writeTo(tableName)
+                .using("iceberg")
+                .partitionedBy("days(timestamp)")
+                .create();
+        logger.info("  ✓ Table created successfully with daily partitioning: {}", tableName);
     }
 
     /**
@@ -238,8 +245,12 @@ public class SilverTableSetup {
         logger.info("  Inferred Silver schema:");
         silverSample.schema().printTreeString();
 
-        silverSample.write().format("iceberg").mode("append").saveAsTable(tableName);
-        logger.info("  ✓ Table created successfully: {}", tableName);
+        logger.info("  Creating table with DAILY partitioning: {}", tableName);
+        silverSample.writeTo(tableName)
+                .using("iceberg")
+                .partitionedBy("days(timestamp)")
+                .create();
+        logger.info("  ✓ Table created successfully with daily partitioning: {}", tableName);
     }
 
     /**

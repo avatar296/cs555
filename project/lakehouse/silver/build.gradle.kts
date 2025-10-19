@@ -1,5 +1,6 @@
 plugins {
     java
+    scala
     application
 }
 
@@ -10,11 +11,19 @@ val logbackVersion: String by rootProject.extra
 val sparkVersion = "3.5.0"
 val icebergVersion = "1.6.1"
 val hadoopVersion = "3.3.4"
+val deequVersion = "2.0.12-spark-3.5"
+val typesafeConfigVersion = "1.4.3"
 
 dependencies {
+    // Scala runtime (matches Spark 3.5.0 - Scala 2.12)
+    implementation("org.scala-lang:scala-library:2.12.18")
+
     // Shared modules
     implementation(rootProject.project(":schemas"))
     implementation(project(":lakehouse:streaming"))
+
+    // Configuration management (needed for StreamConfig)
+    implementation("com.typesafe:config:$typesafeConfigVersion")
 
     // Apache Spark
     implementation("org.apache.spark:spark-sql_2.12:$sparkVersion")
@@ -23,6 +32,9 @@ dependencies {
 
     // Apache Iceberg
     implementation("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:$icebergVersion")
+
+    // AWS Deequ for data quality validation
+    implementation("com.amazon.deequ:deequ:$deequVersion")
 
     // Hadoop AWS for MinIO S3 support
     implementation("org.apache.hadoop:hadoop-aws:$hadoopVersion")

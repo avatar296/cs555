@@ -1,173 +1,149 @@
 -- ============================================================================
--- Silver Layer: Trips Cleaning
+-- Silver Layer: Trips Transformation
 -- ============================================================================
--- Purpose: Data Quality and Validation
--- Pattern: SQL-First Transformation (90% SQL, 10% Java wrapper)
+-- Purpose: Clean and enrich trip data
+-- Pattern: SQL for transformation, Deequ for validation
 --
 -- TEACHING NOTE - LOAN ORIGINATION PARALLEL:
--- This pattern validates taxi trips, but the same logic applies to loans:
---   - trip_distance validation    → loan_amount range validation
---   - fare_amount validation       → income verification
---   - location validation          → address validation
---   - passenger_count validation   → number of co-borrowers
---   - data_quality_flag            → application completeness
---   - quality_score                → underwriting score
+-- This SQL handles data transformation and feature engineering:
+--   - Pass-through core fields      → loan_amount, applicant_id, etc.
+--   - Derived features              → DTI ratio, credit utilization, etc.
+--   - Time-based features           → application_hour, is_business_day
 --
--- BEST PRACTICE: Business rules in SQL = visible, auditable, testable
+-- VALIDATION: Handled by Deequ (not SQL)
+--   - Range checks (distance, fare) → Deequ checks
+--   - Completeness checks           → Deequ checks
+--   - Uniqueness checks             → Deequ checks
+--
+-- BEST PRACTICE: Separation of concerns
+--   - SQL  = Data transformation (WHAT data looks like)
+--   - Deequ = Data validation (WHETHER data is valid)
 -- ============================================================================
 
+-- ============================================================================
+-- DEDUPLICATION CTE
+-- Handles duplicate records from Kafka (retries, network issues, etc.)
+-- For loans: Prevents duplicate application submissions
+--
+-- NOTE: Incremental processing is handled by Spark Structured Streaming
+-- checkpoint, not by SQL WHERE clause. Each micro-batch contains only
+-- new data from Bronze layer.
+-- ============================================================================
+WITH
+  deduplicated_trips
+  AS
+  (
+    SELECT
+      *,
+      ROW_NUMBER() OVER (
+      PARTITION BY timestamp, pickupLocationId, dropoffLocationId
+      ORDER BY bronze_ingestion_time DESC  -- Keep most recent
+    ) AS row_num
+    FROM lakehouse_bronze_trips  -- Temp view created from streaming source
+  )
 SELECT
   -- ========================================================================
-  -- Original Fields (pass-through from Bronze)
+  -- Core Fields (pass-through from Bronze)
+  -- NOTE: Standardized to snake_case for consistency
   -- ========================================================================
   timestamp,
-  pickupLocationId,
-  dropoffLocationId,
-  tripDistance,
-  fareAmount,
-  passengerCount,
+  pickupLocationId AS pickup_location_id,
+  dropoffLocationId AS dropoff_location_id,
+  tripDistance AS trip_distance,
+  fareAmount AS fare_amount,
+  passengerCount AS passenger_count,
   bronze_ingestion_time,
   bronze_offset,
   bronze_partition,
 
   -- ========================================================================
-  -- Data Quality Flag (TEACHABLE PATTERN)
-  -- Each CASE branch represents a business rule
-  -- For loans: Replace with credit rules (credit_score < 600, debt_to_income > 43%, etc.)
-  -- ========================================================================
-  CASE
-    -- Rule 1: Minimum distance threshold
-    WHEN tripDistance < 0.1 THEN 'invalid_distance_too_short'
-
-    -- Rule 2: Maximum reasonable distance (NYC to Boston = ~200mi)
-    WHEN tripDistance > 200.0 THEN 'invalid_distance_too_long'
-
-    -- Rule 3: NYC yellow cab minimum fare is $2.50
-    WHEN fareAmount < 2.50 THEN 'invalid_fare_below_minimum'
-
-    -- Rule 4: Suspicious high fare (fraud detection)
-    WHEN fareAmount > 1000.0 THEN 'suspicious_fare_too_high'
-
-    -- Rule 5: Required field - pickup location
-    WHEN pickupLocationId IS NULL THEN 'missing_required_pickup_location'
-
-    -- Rule 6: Required field - dropoff location
-    WHEN dropoffLocationId IS NULL THEN 'missing_required_dropoff_location'
-
-    -- Rule 7: Passenger count validation (NYC taxis fit 1-6 passengers)
-    WHEN passengerCount IS NULL THEN 'missing_passenger_count'
-    WHEN passengerCount < 1 THEN 'invalid_passenger_count_zero'
-    WHEN passengerCount > 6 THEN 'invalid_passenger_count_exceeds_capacity'
-
-    -- Rule 8: All validations passed
-    ELSE 'valid'
-  END AS data_quality_flag,
-
-  -- ========================================================================
-  -- Quality Score (0.0 to 1.0)
-  -- TEACHABLE: Numeric score for analytics/ML
-  -- For loans: Becomes application completeness score or pre-screening score
-  -- ========================================================================
-  CASE
-    -- Perfect record: All validations pass
-    WHEN tripDistance BETWEEN 0.1 AND 200.0
-      AND fareAmount BETWEEN 2.50 AND 1000.0
-      AND pickupLocationId IS NOT NULL
-      AND dropoffLocationId IS NOT NULL
-      AND passengerCount BETWEEN 1 AND 6
-    THEN 1.0
-
-    -- Minor issues: Missing optional field (e.g., passengerCount could be inferred)
-    WHEN passengerCount IS NULL
-      AND tripDistance BETWEEN 0.1 AND 200.0
-      AND fareAmount BETWEEN 2.50 AND 1000.0
-      AND pickupLocationId IS NOT NULL
-      AND dropoffLocationId IS NOT NULL
-    THEN 0.75
-
-    -- Major issues: Invalid required fields
-    ELSE 0.0
-  END AS quality_score,
-
-  -- ========================================================================
-  -- Derived Business Fields (FEATURE ENGINEERING)
+  -- Derived Business Features (FEATURE ENGINEERING)
   -- TEACHABLE: Business logic for analytics
-  -- For loans: Time-based features (application_hour, is_business_day)
+  -- For loans: application_hour, is_business_day, tenure_months, etc.
   -- ========================================================================
 
   -- Is this a rush hour trip? (affects demand patterns)
+  -- Loan parallel: is_business_hours (application timing affects conversion)
   CASE
-    WHEN HOUR(timestamp) BETWEEN 7 AND 9 THEN true   -- Morning rush
-    WHEN HOUR(timestamp) BETWEEN 16 AND 19 THEN true -- Evening rush
+    WHEN HOUR(timestamp) BETWEEN ${MORNING_RUSH_START} AND ${MORNING_RUSH_END} THEN true   -- Morning rush
+    WHEN HOUR(timestamp) BETWEEN ${EVENING_RUSH_START} AND ${EVENING_RUSH_END} THEN true -- Evening rush
     ELSE false
   END AS is_rush_hour,
 
   -- Is this a weekend trip? (affects pricing patterns)
+  -- Loan parallel: is_weekend (weekend applications less likely to convert)
   CASE
     WHEN DAYOFWEEK(timestamp) IN (1, 7) THEN true -- Sunday=1, Saturday=7
     ELSE false
   END AS is_weekend,
 
   -- Hour of day (0-23) for time-series analysis
+  -- Loan parallel: application_hour (behavioral patterns)
   HOUR(timestamp) AS hour_of_day,
 
   -- Day of week name for reporting
+  -- Loan parallel: application_day_name (reporting grouping)
   DAYNAME(timestamp) AS day_of_week,
 
-  -- Trip efficiency: fare per mile (outlier detection)
+  -- Trip efficiency: fare per mile (derived metric)
+  -- Loan parallel: debt_to_income_ratio (key underwriting metric)
   CASE
     WHEN tripDistance > 0 THEN fareAmount / tripDistance
     ELSE NULL
   END AS fare_per_mile,
 
+  -- Distance category for segmentation
+  -- Loan parallel: loan_size_category (small, medium, large, jumbo)
+  CASE
+    WHEN tripDistance < ${DISTANCE_SHORT_MAX} THEN 'short'
+    WHEN tripDistance < ${DISTANCE_MEDIUM_MAX} THEN 'medium'
+    WHEN tripDistance < ${DISTANCE_LONG_MAX} THEN 'long'
+    ELSE 'very_long'
+  END AS distance_category,
+
+  -- Fare category for segmentation
+  -- Loan parallel: risk_category (prime, near-prime, subprime)
+  CASE
+    WHEN fareAmount < ${FARE_ECONOMY_MAX} THEN 'economy'
+    WHEN fareAmount < ${FARE_STANDARD_MAX} THEN 'standard'
+    WHEN fareAmount < ${FARE_PREMIUM_MAX} THEN 'premium'
+    ELSE 'luxury'
+  END AS fare_category,
+
+  -- ========================================================================
+  -- QUALITY VALIDATION
+  -- Validation now handled by Deequ in TripsCleanedJob.scala
+  -- Deequ enforces:
+  --   - Completeness checks (timestamp, pickup_location_id, dropoff_location_id)
+  --   - Range validation (trip_distance: 0.1-200, fare_amount: 2.50-1000, passenger_count: 1-6)
+  -- Invalid batches are rejected before reaching Silver layer
+  -- ========================================================================
+
+  -- ========================================================================
+  -- Deduplication Flag (AUDIT TRAIL)
+  -- Tracks if record was a duplicate (for monitoring)
+  -- For loans: Track duplicate application submissions
+  -- ========================================================================
+  CASE WHEN row_num > 1 THEN true ELSE false END AS was_duplicate,
+
   -- ========================================================================
   -- Metadata (AUDIT TRAIL)
-  -- TEACHABLE: Track data lineage
-  -- For loans: Track application_received_at, processed_at, approved_at
+  -- TEACHABLE: Track data lineage and processing timestamps
+  -- For loans: application_received_at, validated_at, decision_at
   -- ========================================================================
-  current_timestamp() AS silver_processed_at,
+  current_timestamp
+() AS silver_processed_at,
 
-  'trips_cleaned_v1' AS silver_transformation_version
-
--- ========================================================================
--- Source: Bronze Layer (Raw Data)
--- ========================================================================
-FROM lakehouse.bronze.trips
+  'trips_cleaned_v1_deequ' AS silver_transformation_version
 
 -- ========================================================================
--- INCREMENTAL PROCESSING (CRITICAL BEST PRACTICE)
--- Only process NEW records from Bronze that haven't been processed yet
---
--- TEACHABLE: This prevents reprocessing all historical data every 5 minutes
--- For loans: Process only new applications since last run
---
--- How it works:
---   1. Find the latest silver_processed_at timestamp in Silver
---   2. Only read Bronze records newer than that timestamp
---   3. If Silver is empty (first run), read everything (1970-01-01)
+-- Source: Deduplicated Bronze Layer (from CTE above)
 -- ========================================================================
-WHERE bronze_ingestion_time > (
-  SELECT COALESCE(MAX(silver_processed_at), TIMESTAMP('1970-01-01 00:00:00'))
-  FROM lakehouse.silver.trips_cleaned
-)
+FROM deduplicated_trips
 
 -- ========================================================================
--- TEACHING NOTES:
---
--- 1. IDEMPOTENCY: This query can be run multiple times safely
---    - Same input always produces same output
---    - Rerunning doesn't create duplicates (incremental WHERE clause)
---
--- 2. DATA QUALITY: Rules are explicit and visible
---    - Easy to audit: "Why was this trip rejected?"
---    - Easy to modify: Change threshold in SQL, not buried in code
---
--- 3. PERFORMANCE: Incremental processing
---    - Only reads new data (partition pruning on bronze_ingestion_time)
---    - Spark can parallelize across partitions
---
--- 4. LOAN ORIGINATION MAPPING:
---    - Replace trip validation rules with credit rules
---    - Add loan-specific features (DTI ratio, credit utilization)
---    - Same pattern: SQL for business logic, Java wrapper for execution
--- ============================================================================
+-- DEDUPLICATION FILTER
+-- Only keep the first occurrence of each unique trip
+-- For loans: Only keep first submission of each application
+-- ========================================================================
+WHERE row_num = 1

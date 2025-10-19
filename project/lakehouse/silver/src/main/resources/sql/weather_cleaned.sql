@@ -1,12 +1,12 @@
 -- ============================================================================
--- Silver Layer: Weather Cleaning
+-- Silver Layer: Weather Transformation
 -- ============================================================================
--- Purpose: Data Quality and Validation for Weather Data
--- Pattern: SQL-First Transformation (90% SQL, 10% Java wrapper)
+-- Purpose: Transform and enrich weather data from external sources
+-- Pattern: SQL for transformation, Deequ for validation
 --
 -- TEACHING NOTE - LOAN ORIGINATION PARALLEL:
--- This pattern validates weather data from external sources.
--- For loan originations, this is like validating:
+-- This SQL handles transformation of external enrichment data.
+-- For loan originations, this is like transforming:
 --   - Credit bureau data (Experian, Equifax, TransUnion)
 --   - Employment verification from third parties
 --   - Bank statement data from aggregators
@@ -14,160 +14,165 @@
 -- Weather is ENRICHMENT data (adds context to trips).
 -- Similarly, credit bureau data enriches loan applications.
 --
--- BEST PRACTICE: External data needs validation too!
+-- VALIDATION: Handled by Deequ (not SQL)
+--   - Temperature range checks  → Deequ checks
+--   - Precipitation validation  → Deequ checks
+--   - Wind speed validation     → Deequ checks
+--   - Required field checks     → Deequ checks
+--
+-- BEST PRACTICE: External data transformation separated from validation
 -- ============================================================================
 
+-- ============================================================================
+-- DEDUPLICATION CTE
+-- Handles duplicate records from external API calls
+-- For loans: Prevents duplicate credit bureau pulls
+--
+-- NOTE: Incremental processing is handled by Spark Structured Streaming
+-- checkpoint, not by SQL WHERE clause. Each micro-batch contains only
+-- new data from Bronze layer.
+-- ============================================================================
+WITH deduplicated_weather AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY timestamp, locationId
+      ORDER BY bronze_ingestion_time DESC  -- Keep most recent
+    ) AS row_num
+  FROM lakehouse_bronze_weather  -- Temp view created from streaming source
+)
 SELECT
   -- ========================================================================
-  -- Original Fields (pass-through from Bronze)
+  -- Core Fields (pass-through from Bronze)
+  -- NOTE: Standardized to snake_case for consistency
   -- ========================================================================
   timestamp,
-  locationId,
+  locationId AS location_id,
   temperature,
   precipitation,
-  windSpeed,
+  windSpeed AS wind_speed,
   condition,
   bronze_ingestion_time,
   bronze_offset,
   bronze_partition,
 
   -- ========================================================================
-  -- Data Quality Flag (TEACHABLE PATTERN)
-  -- Validates weather data ranges and required fields
-  -- For loans: Validate credit bureau data completeness and ranges
-  -- ========================================================================
-  CASE
-    -- Rule 1: Temperature range validation (NYC: -20°F to 120°F)
-    WHEN temperature < -20.0 THEN 'invalid_temperature_too_cold'
-    WHEN temperature > 120.0 THEN 'invalid_temperature_too_hot'
-
-    -- Rule 2: Precipitation validation (0 to 10 inches/hour max)
-    WHEN precipitation < 0 THEN 'invalid_precipitation_negative'
-    WHEN precipitation > 10.0 THEN 'invalid_precipitation_excessive'
-
-    -- Rule 3: Wind speed validation (0 to 100 mph, hurricane threshold)
-    WHEN windSpeed < 0 THEN 'invalid_windspeed_negative'
-    WHEN windSpeed > 100.0 THEN 'invalid_windspeed_hurricane_level'
-
-    -- Rule 4: Required field - location
-    WHEN locationId IS NULL THEN 'missing_required_location'
-
-    -- Rule 5: Weather condition must be valid
-    WHEN condition IS NULL THEN 'missing_weather_condition'
-
-    -- Rule 6: All validations passed
-    ELSE 'valid'
-  END AS data_quality_flag,
-
-  -- ========================================================================
-  -- Quality Score (0.0 to 1.0)
-  -- TEACHABLE: Numeric score for analytics
-  -- For loans: Credit bureau data completeness score
-  -- ========================================================================
-  CASE
-    -- Perfect record: All validations pass
-    WHEN temperature BETWEEN -20.0 AND 120.0
-      AND precipitation BETWEEN 0.0 AND 10.0
-      AND windSpeed BETWEEN 0.0 AND 100.0
-      AND locationId IS NOT NULL
-      AND condition IS NOT NULL
-    THEN 1.0
-
-    -- Minor issues: Extreme but plausible values
-    WHEN (temperature < 0 OR temperature > 100)
-      AND precipitation BETWEEN 0.0 AND 10.0
-      AND windSpeed BETWEEN 0.0 AND 100.0
-      AND locationId IS NOT NULL
-      AND condition IS NOT NULL
-    THEN 0.75
-
-    -- Major issues: Invalid data
-    ELSE 0.0
-  END AS quality_score,
-
-  -- ========================================================================
-  -- Derived Business Fields (FEATURE ENGINEERING)
-  -- TEACHABLE: Business logic for analytics
-  -- For loans: Derived credit risk indicators
+  -- Derived Business Features (FEATURE ENGINEERING)
+  -- TEACHABLE: Transform raw weather data into business insights
+  -- For loans: Transform credit bureau data into risk indicators
   -- ========================================================================
 
-  -- Is this severe weather? (affects trip demand)
+  -- Severe weather flag (affects trip demand and safety)
+  -- Loan parallel: high_credit_risk_flag (DTI > 43%, credit < 620)
   CASE
     WHEN condition IN ('SNOW', 'STORM') THEN true
-    WHEN precipitation > 1.0 THEN true
-    WHEN windSpeed > 30.0 THEN true
+    WHEN precipitation > ${SEVERE_PRECIPITATION_THRESHOLD} THEN true
+    WHEN windSpeed > ${SEVERE_WIND_SPEED_THRESHOLD} THEN true
     ELSE false
   END AS is_severe_weather,
 
-  -- Weather impact level (1-3 scale)
+  -- Weather impact level (1-3 scale for trip demand modeling)
+  -- Loan parallel: credit_risk_tier (1=prime, 2=near-prime, 3=subprime)
   CASE
-    WHEN condition IN ('STORM') OR windSpeed > 50.0 THEN 3  -- High impact
-    WHEN condition IN ('SNOW', 'RAIN') OR precipitation > 0.5 THEN 2  -- Medium impact
+    WHEN condition IN ('STORM') OR windSpeed > ${HIGH_IMPACT_WIND_THRESHOLD} THEN 3  -- High impact
+    WHEN condition IN ('SNOW', 'RAIN') OR precipitation > ${MEDIUM_IMPACT_PRECIP_THRESHOLD} THEN 2  -- Medium impact
     WHEN condition IN ('FOG') THEN 1  -- Low impact
     ELSE 0  -- No impact
   END AS weather_impact_level,
 
-  -- Temperature category (for analysis)
+  -- Temperature category (for seasonal analysis)
+  -- Loan parallel: income_bracket (for loan product targeting)
   CASE
-    WHEN temperature < 32.0 THEN 'freezing'
-    WHEN temperature < 50.0 THEN 'cold'
-    WHEN temperature < 70.0 THEN 'mild'
-    WHEN temperature < 85.0 THEN 'warm'
+    WHEN temperature < ${TEMP_FREEZING_MAX} THEN 'freezing'
+    WHEN temperature < ${TEMP_COLD_MAX} THEN 'cold'
+    WHEN temperature < ${TEMP_MILD_MAX} THEN 'mild'
+    WHEN temperature < ${TEMP_WARM_MAX} THEN 'warm'
     ELSE 'hot'
   END AS temperature_category,
 
-  -- Precipitation category
+  -- Precipitation category (for demand forecasting)
+  -- Loan parallel: debt_level (none, low, moderate, high)
   CASE
     WHEN precipitation = 0 THEN 'none'
-    WHEN precipitation < 0.1 THEN 'light'
-    WHEN precipitation < 0.5 THEN 'moderate'
+    WHEN precipitation < ${PRECIP_LIGHT_MAX} THEN 'light'
+    WHEN precipitation < ${PRECIP_MODERATE_MAX} THEN 'moderate'
     ELSE 'heavy'
   END AS precipitation_category,
 
+  -- Wind category (safety considerations)
+  -- Loan parallel: employment_stability (stable, moderate, unstable)
+  CASE
+    WHEN windSpeed < ${WIND_CALM_MAX} THEN 'calm'
+    WHEN windSpeed < ${WIND_BREEZY_MAX} THEN 'breezy'
+    WHEN windSpeed < ${WIND_WINDY_MAX} THEN 'windy'
+    ELSE 'dangerous'
+  END AS wind_category,
+
+  -- Is weather condition likely to impact trip patterns?
+  -- Loan parallel: requires_manual_review (complex credit scenarios)
+  CASE
+    WHEN condition IN ('STORM', 'SNOW', 'FOG') THEN true
+    WHEN precipitation > ${MEDIUM_IMPACT_PRECIP_THRESHOLD} THEN true
+    WHEN temperature < ${EXTREME_COLD_THRESHOLD} OR temperature > ${EXTREME_HOT_THRESHOLD} THEN true
+    ELSE false
+  END AS impacts_travel,
+
+  -- ========================================================================
+  -- QUALITY VALIDATION
+  -- Validation now handled by Deequ in WeatherCleanedJob.scala
+  -- Deequ enforces:
+  --   - Completeness checks (timestamp, location_id, condition)
+  --   - Range validation (temperature: -20 to 120, precipitation: 0-10, wind_speed: 0-100)
+  -- Invalid batches are rejected before reaching Silver layer
+  -- ========================================================================
+
+  -- ========================================================================
+  -- Deduplication Flag
+  -- ========================================================================
+  CASE WHEN row_num > 1 THEN true ELSE false END AS was_duplicate,
+
   -- ========================================================================
   -- Metadata (AUDIT TRAIL)
+  -- TEACHABLE: Track when external data was processed
+  -- For loans: Track when credit bureau data was pulled and validated
   -- ========================================================================
   current_timestamp() AS silver_processed_at,
-  'weather_cleaned_v1' AS silver_transformation_version
+  'weather_cleaned_v1_deequ' AS silver_transformation_version
 
 -- ========================================================================
--- Source: Bronze Layer (Raw Weather Data)
+-- Source: Deduplicated Bronze Layer (from CTE above)
 -- ========================================================================
-FROM lakehouse.bronze.weather
+FROM deduplicated_weather
 
 -- ========================================================================
--- INCREMENTAL PROCESSING (CRITICAL BEST PRACTICE)
--- Only process NEW records from Bronze
---
--- TEACHABLE: Prevents reprocessing credit bureau pulls every time
--- For loans: Only process new credit report data since last run
+-- DEDUPLICATION FILTER
 -- ========================================================================
-WHERE bronze_ingestion_time > (
-  SELECT COALESCE(MAX(silver_processed_at), TIMESTAMP('1970-01-01 00:00:00'))
-  FROM lakehouse.silver.weather_cleaned
-)
+WHERE row_num = 1
 
 -- ========================================================================
 -- TEACHING NOTES:
 --
--- 1. EXTERNAL DATA VALIDATION:
+-- 1. EXTERNAL DATA TRANSFORMATION:
 --    - Weather comes from external API (like credit bureau)
---    - Must validate: ranges, completeness, consistency
---    - Can't assume external data is always correct!
+--    - SQL transforms raw values into business categories
+--    - Deequ validates ranges and completeness (separate concern)
 --
--- 2. LOAN ORIGINATION MAPPING:
---    Weather Data              → Credit Bureau Data
---    ─────────────────────────────────────────────────
---    temperature validation    → credit score range (300-850)
---    precipitation validation  → debt-to-income ratio validation
---    windSpeed validation      → monthly income validation
---    condition enum            → employment status enum
---    is_severe_weather         → high_credit_risk_flag
---    weather_impact_level      → credit_risk_tier (1-3)
+-- 2. ENRICHMENT PATTERN:
+--    - Weather enriches trips (adds context for demand modeling)
+--    - Credit bureau enriches loan applications (adds context for underwriting)
+--    - Both are external, both need transformation AND validation
 --
--- 3. ENRICHMENT PATTERN:
---    - Weather enriches trips (adds context)
---    - Credit bureau enriches loan applications
---    - Both are external, both need validation
---    - Both affect downstream decisions
+-- 3. LOAN ORIGINATION MAPPING:
+--    Weather Feature              → Credit Bureau Feature
+--    ─────────────────────────────────────────────────────────
+--    is_severe_weather            → high_credit_risk_flag
+--    weather_impact_level         → credit_risk_tier (1-3)
+--    temperature_category         → income_bracket
+--    precipitation_category       → debt_level_category
+--    impacts_travel               → requires_manual_review
+--
+-- 4. VALIDATION (Moved to Deequ):
+--    - Range checks: temperature (-20 to 120), precipitation (0-10), windSpeed (0-100)
+--    - Completeness: locationId, condition must not be null
+--    - Consistency: precipitation and windSpeed must be non-negative
 -- ============================================================================
