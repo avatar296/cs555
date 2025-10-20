@@ -38,6 +38,10 @@ class TripsCleanedJob(config: StreamConfig)
       "FARE_PREMIUM_MAX" -> BusinessRules.FARE_PREMIUM_MAX
     )
   }
+
+  override protected def getDeduplicationColumns(): Array[String] = {
+    Array("timestamp", "pickup_location_id", "dropoff_location_id")
+  }
 }
 
 object TripsCleanedJob {

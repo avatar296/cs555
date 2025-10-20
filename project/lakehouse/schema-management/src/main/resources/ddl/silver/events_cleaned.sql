@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS lakehouse.silver.events_cleaned (
   start_time BIGINT NOT NULL COMMENT 'Event start time (epoch milliseconds)',
   end_time BIGINT NOT NULL COMMENT 'Event end time (epoch milliseconds)',
   venue_name STRING COMMENT 'Venue name',
-  bronze_ingestion_time TIMESTAMP NOT NULL COMMENT 'Bronze layer ingestion timestamp',
+  ingestion_timestamp TIMESTAMP NOT NULL COMMENT 'Bronze layer ingestion timestamp',
   bronze_offset BIGINT NOT NULL COMMENT 'Kafka offset for traceability',
   bronze_partition INT NOT NULL COMMENT 'Kafka partition for traceability',
 
@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS lakehouse.silver.events_cleaned (
   duration_category STRING NOT NULL COMMENT 'Duration: brief, moderate, extended, multi_day',
 
   -- Quality tracking
-  was_duplicate BOOLEAN NOT NULL COMMENT 'Record identified as duplicate during deduplication'
 )
 USING iceberg
 COMMENT 'Silver layer: Cleaned and enriched special events data';

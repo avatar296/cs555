@@ -29,8 +29,8 @@ RUN cd ${SPARK_HOME}/jars && \
 
 # Download Hadoop AWS + S3A for MinIO support
 RUN cd ${SPARK_HOME}/jars && \
-    curl -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar && \
-    curl -O https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
+    curl --retry 5 --retry-delay 2 --retry-max-time 300 -C - -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar && \
+    curl --retry 5 --retry-delay 2 --retry-max-time 300 -C - -O https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
 
 # Download Kafka connector dependencies (pre-baked for production, no --packages needed)
 RUN cd ${SPARK_HOME}/jars && \

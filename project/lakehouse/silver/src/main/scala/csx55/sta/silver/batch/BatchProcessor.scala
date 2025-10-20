@@ -50,7 +50,7 @@ class BatchProcessor(
     batch.write
       .format("iceberg")
       .mode(SaveMode.Append)
-      .save(targetTable)
+      .saveAsTable(targetTable)
 
     metricsRecorder.record(
       batchId = batchId,

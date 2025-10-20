@@ -40,6 +40,10 @@ class EventsCleanedJob(config: StreamConfig)
       "DURATION_EXTENDED_MAX" -> BusinessRules.DURATION_EXTENDED_MAX
     )
   }
+
+  override protected def getDeduplicationColumns(): Array[String] = {
+    Array("timestamp", "location_id", "event_type", "start_time")
+  }
 }
 
 object EventsCleanedJob {

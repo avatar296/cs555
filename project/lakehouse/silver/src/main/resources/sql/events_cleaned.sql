@@ -1,29 +1,18 @@
 -- Silver Layer: Events Transformation
+-- Note: Deduplication is handled by Spark streaming dropDuplicates, not in SQL
 
-WITH
-  deduplicated_events
-  AS
-  (
-    SELECT
-      *,
-      ROW_NUMBER() OVER (
-      PARTITION BY timestamp, locationId, eventType
-      ORDER BY bronze_ingestion_time DESC
-    ) AS row_num
-    FROM lakehouse_bronze_events
-  )
 SELECT
   -- Core fields
-  timestamp,
+  TIMESTAMP_MILLIS(timestamp) AS timestamp,
   locationId AS location_id,
   eventType AS event_type,
   attendanceEstimate AS attendance_estimate,
   startTime AS start_time,
   endTime AS end_time,
   venueName AS venue_name,
-  bronze_ingestion_time,
-  bronze_offset,
-  bronze_partition,
+  ingestion_timestamp,
+  offset AS bronze_offset,
+  partition AS bronze_partition,
 
   -- Derived features
   CASE
@@ -73,10 +62,7 @@ SELECT
     WHEN (endTime - startTime) / 3600000.0 < ${DURATION_MODERATE_MAX} THEN 'moderate'
     WHEN (endTime - startTime) / 3600000.0 < ${DURATION_EXTENDED_MAX} THEN 'extended'
     ELSE 'multi_day'
-  END AS duration_category,
+  END AS duration_category
 
-  CASE WHEN row_num > 1 THEN true ELSE false END AS was_duplicate
-
-FROM deduplicated_events
-WHERE row_num = 1
-  AND startTime < endTime
+FROM lakehouse_bronze_events
+WHERE startTime < endTime

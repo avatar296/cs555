@@ -9,7 +9,7 @@ import csx55.sta.silver.validation.{DataQualityValidator, DeequValidator}
 import csx55.sta.streaming.base.BaseStreamingJob
 import csx55.sta.streaming.config.StreamConfig
 import org.apache.spark.sql.{Dataset, Row}
-import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
+import org.apache.spark.sql.streaming.Trigger
 
 import scala.io.Source
 
@@ -37,6 +37,8 @@ abstract class AbstractSilverJob(
 
   protected def getBusinessRuleReplacements(): Map[String, Any]
 
+  protected def getDeduplicationColumns(): Array[String]
+
   protected def createValidator(): DataQualityValidator = {
     new DeequValidator(getDeequChecks())
   }
@@ -53,8 +55,8 @@ abstract class AbstractSilverJob(
     throw new UnsupportedOperationException(s"Transformation in SQL file: ${getSqlFilePath()}")
   }
 
-  override protected def writeStream(output: Dataset[Row]): StreamingQuery = {
-    throw new UnsupportedOperationException("Deequ pattern uses foreachBatch for validation")
+  override protected def writeStream(output: Dataset[Row]): org.apache.spark.sql.streaming.StreamingQuery = {
+    throw new UnsupportedOperationException("Deequ pattern uses custom run() method")
   }
 
   override protected def getNamespace(): String = {
@@ -91,7 +93,7 @@ abstract class AbstractSilverJob(
   }
 
   override def run(): Unit = {
-    logger.info("Starting {}: {} → {}", getClass.getSimpleName, streamConfig.sourceTable, streamConfig.targetTable)
+    logger.info("Starting streaming {}: {} → {}", getClass.getSimpleName, streamConfig.sourceTable, streamConfig.targetTable)
 
     this.spark = createSparkSession()
     initialize()
@@ -108,17 +110,25 @@ abstract class AbstractSilverJob(
     bronzeStream.createOrReplaceTempView(tempViewName)
     logger.debug("Created temp view: {}", tempViewName)
 
-    val silverStream = spark.sql(sql)
+    val transformedData = spark.sql(sql)
 
-    val query = silverStream
+    val dedupColumns = getDeduplicationColumns()
+    val silverData = transformedData
+      .withWatermark("ingestion_timestamp", "10 minutes")
+      .dropDuplicates(dedupColumns.toSeq)
+
+    logger.info("Configured watermarking and deduplication on columns: {}", getDeduplicationColumns().mkString(", "))
+
+    val query = silverData
       .writeStream
       .foreachBatch { (batchDF: Dataset[Row], batchId: Long) =>
         batchProcessor.process(batchDF, batchId)
       }
-      .trigger(Trigger.ProcessingTime(config.getTriggerInterval))
+      .trigger(Trigger.ProcessingTime("30 seconds"))
       .option("checkpointLocation", streamConfig.checkpointPath)
       .start()
 
+    logger.info("Streaming query started: {}", query.id)
     query.awaitTermination()
   }
 

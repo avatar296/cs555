@@ -44,6 +44,10 @@ class WeatherCleanedJob(config: StreamConfig)
       "EXTREME_HOT_THRESHOLD" -> BusinessRules.EXTREME_HOT_THRESHOLD
     )
   }
+
+  override protected def getDeduplicationColumns(): Array[String] = {
+    Array("timestamp", "location_id")
+  }
 }
 
 object WeatherCleanedJob {

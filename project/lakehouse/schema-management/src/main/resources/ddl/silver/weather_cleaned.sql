@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS lakehouse.silver.weather_cleaned (
   precipitation DOUBLE NOT NULL COMMENT 'Precipitation amount in inches',
   wind_speed DOUBLE NOT NULL COMMENT 'Wind speed in miles per hour',
   condition STRING NOT NULL COMMENT 'Weather condition: CLEAR, RAIN, SNOW, FOG, STORM',
-  bronze_ingestion_time TIMESTAMP NOT NULL COMMENT 'Bronze layer ingestion timestamp',
+  ingestion_timestamp TIMESTAMP NOT NULL COMMENT 'Bronze layer ingestion timestamp',
   bronze_offset BIGINT NOT NULL COMMENT 'Kafka offset for traceability',
   bronze_partition INT NOT NULL COMMENT 'Kafka partition for traceability',
 
@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS lakehouse.silver.weather_cleaned (
   impacts_travel BOOLEAN NOT NULL COMMENT 'Whether conditions impact travel patterns',
 
   -- Quality tracking
-  was_duplicate BOOLEAN NOT NULL COMMENT 'Record identified as duplicate during deduplication'
 )
 USING iceberg
 COMMENT 'Silver layer: Cleaned and enriched weather data';

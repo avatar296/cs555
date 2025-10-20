@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS lakehouse.silver.trips_cleaned (
   trip_distance DOUBLE NOT NULL COMMENT 'Trip distance in miles',
   fare_amount DOUBLE NOT NULL COMMENT 'Fare amount in USD',
   passenger_count INT NOT NULL COMMENT 'Number of passengers',
-  bronze_ingestion_time TIMESTAMP NOT NULL COMMENT 'Bronze layer ingestion timestamp',
+  ingestion_timestamp TIMESTAMP NOT NULL COMMENT 'Bronze layer ingestion timestamp',
   bronze_offset BIGINT NOT NULL COMMENT 'Kafka offset for traceability',
   bronze_partition INT NOT NULL COMMENT 'Kafka partition for traceability',
 
@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS lakehouse.silver.trips_cleaned (
   fare_category STRING NOT NULL COMMENT 'Fare category: economy, standard, premium, luxury',
 
   -- Quality tracking
-  was_duplicate BOOLEAN NOT NULL COMMENT 'Record identified as duplicate during deduplication'
 )
 USING iceberg
 COMMENT 'Silver layer: Cleaned and enriched NYC taxi trips';

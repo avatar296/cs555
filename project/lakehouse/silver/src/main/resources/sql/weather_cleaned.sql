@@ -1,28 +1,17 @@
 -- Silver Layer: Weather Transformation
+-- Note: Deduplication is handled by Spark streaming dropDuplicates, not in SQL
 
-WITH
-  deduplicated_weather
-  AS
-  (
-    SELECT
-      *,
-      ROW_NUMBER() OVER (
-      PARTITION BY timestamp, locationId
-      ORDER BY bronze_ingestion_time DESC
-    ) AS row_num
-    FROM lakehouse_bronze_weather
-  )
 SELECT
   -- Core fields
-  timestamp,
+  TIMESTAMP_MILLIS(timestamp) AS timestamp,
   locationId AS location_id,
   temperature,
   precipitation,
   windSpeed AS wind_speed,
   condition,
-  bronze_ingestion_time,
-  bronze_offset,
-  bronze_partition,
+  ingestion_timestamp,
+  offset AS bronze_offset,
+  partition AS bronze_partition,
 
   -- Derived features
   CASE
@@ -66,9 +55,6 @@ SELECT
     WHEN precipitation > ${MEDIUM_IMPACT_PRECIP_THRESHOLD} THEN true
     WHEN temperature < ${EXTREME_COLD_THRESHOLD} OR temperature > ${EXTREME_HOT_THRESHOLD} THEN true
     ELSE false
-  END AS impacts_travel,
+  END AS impacts_travel
 
-  CASE WHEN row_num > 1 THEN true ELSE false END AS was_duplicate
-
-FROM deduplicated_weather
-WHERE row_num = 1
+FROM lakehouse_bronze_weather
