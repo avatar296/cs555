@@ -502,6 +502,44 @@ services:
           cpus: '1.0'
           memory: 2G
 
+  monitoring-table-setup:
+    image: project-spark:3.5.0
+    container_name: monitoring-table-setup
+    command: >
+      /opt/spark/bin/spark-submit
+      --class csx55.sta.schema.SchemaManagementApp
+      --master spark://spark-master:7077
+      --deploy-mode client
+      --conf spark.driver.memory=512m
+      --conf spark.hadoop.fs.s3a.access.key=admin
+      --conf spark.hadoop.fs.s3a.secret.key=admin123
+      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+      --conf spark.hadoop.fs.s3a.path.style.access=true
+      /opt/spark/work-dir/jars/schema/schema-management.jar
+      monitoring
+    depends_on:
+      silver-table-setup:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_started
+      minio:
+        condition: service_healthy
+      postgres-iceberg:
+        condition: service_healthy
+    environment:
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=admin123
+      - AWS_REGION=us-east-1
+    volumes:
+      - ../lakehouse/schema-management/build/libs:/opt/spark/work-dir/jars/schema
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
   # Silver Trips Cleaned Job (SQL-First Pattern)
   # silver-trips-consumer:
   #   image: project-spark:3.5.0
