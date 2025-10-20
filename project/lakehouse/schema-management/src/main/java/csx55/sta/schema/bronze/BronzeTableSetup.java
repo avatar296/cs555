@@ -75,11 +75,86 @@ public class BronzeTableSetup {
 
         logger.debug("Schema: {}", transformedSample.schema().treeString());
 
+        // Create table with partition spec using SQL DDL
+        String partitionSpec = getPartitionSpec(streamConfig.topic);
+        logger.info("Creating table {} with partition spec: {}", streamConfig.table, partitionSpec);
+
+        String createTableDDL = generateCreateTableSQL(streamConfig.table, transformedSample, partitionSpec);
+        logger.debug("Executing DDL: {}", createTableDDL);
+        spark.sql(createTableDDL);
+
+        // Write sample data to verify table creation
         transformedSample.write()
                 .format("iceberg")
                 .mode("append")
                 .saveAsTable(streamConfig.table);
 
-        logger.info("Table created: {}", streamConfig.table);
+        logger.info("Table created: {} (partitioned by {})", streamConfig.table, partitionSpec);
+    }
+
+    private String getPartitionSpec(String topic) {
+        // Events have lower volume, use daily partitioning
+        if (topic.contains("events")) {
+            return "days(ingestion_timestamp)";
+        }
+        // Trips and weather have high volume, use hourly partitioning
+        return "hours(ingestion_timestamp)";
+    }
+
+    private String generateCreateTableSQL(String tableName, Dataset<Row> sample, String partitionSpec) {
+        StringBuilder ddl = new StringBuilder();
+        ddl.append("CREATE TABLE IF NOT EXISTS ").append(tableName).append(" (\n");
+
+        // Add columns from schema
+        org.apache.spark.sql.types.StructField[] fields = sample.schema().fields();
+        for (int i = 0; i < fields.length; i++) {
+            org.apache.spark.sql.types.StructField field = fields[i];
+            ddl.append("  ").append(field.name()).append(" ").append(sqlTypeFor(field.dataType()));
+
+            if (!field.nullable()) {
+                ddl.append(" NOT NULL");
+            }
+
+            if (i < fields.length - 1) {
+                ddl.append(",\n");
+            } else {
+                ddl.append("\n");
+            }
+        }
+
+        ddl.append(")\n");
+        ddl.append("USING iceberg\n");
+        ddl.append("PARTITIONED BY (").append(partitionSpec).append(")\n");
+        ddl.append("TBLPROPERTIES (\n");
+        ddl.append("  'write.format.default' = 'parquet',\n");
+        ddl.append("  'write.metadata.compression-codec' = 'gzip',\n");
+        ddl.append("  'write.distribution-mode' = 'hash'\n");
+        ddl.append(")");
+
+        return ddl.toString();
+    }
+
+    private String sqlTypeFor(org.apache.spark.sql.types.DataType dataType) {
+        if (dataType instanceof org.apache.spark.sql.types.StringType) {
+            return "STRING";
+        } else if (dataType instanceof org.apache.spark.sql.types.LongType) {
+            return "BIGINT";
+        } else if (dataType instanceof org.apache.spark.sql.types.IntegerType) {
+            return "INT";
+        } else if (dataType instanceof org.apache.spark.sql.types.DoubleType) {
+            return "DOUBLE";
+        } else if (dataType instanceof org.apache.spark.sql.types.FloatType) {
+            return "FLOAT";
+        } else if (dataType instanceof org.apache.spark.sql.types.BooleanType) {
+            return "BOOLEAN";
+        } else if (dataType instanceof org.apache.spark.sql.types.TimestampType) {
+            return "TIMESTAMP";
+        } else if (dataType instanceof org.apache.spark.sql.types.DateType) {
+            return "DATE";
+        } else if (dataType instanceof org.apache.spark.sql.types.BinaryType) {
+            return "BINARY";
+        } else {
+            return dataType.sql();
+        }
     }
 }

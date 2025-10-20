@@ -14,4 +14,10 @@ CREATE TABLE IF NOT EXISTS lakehouse.monitoring.silver_quality_metrics (
   batch_quarantined BOOLEAN NOT NULL COMMENT 'True if batch was sent to quarantine tables'
 )
 USING iceberg
+PARTITIONED BY (days(timestamp))
+TBLPROPERTIES (
+  'write.format.default' = 'parquet',
+  'write.metadata.compression-codec' = 'gzip',
+  'write.distribution-mode' = 'hash'
+)
 COMMENT 'Deequ quality validation metrics for Silver layer';

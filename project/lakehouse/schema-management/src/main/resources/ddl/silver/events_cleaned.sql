@@ -23,9 +23,14 @@ CREATE TABLE IF NOT EXISTS lakehouse.silver.events_cleaned (
   event_start_hour INT NOT NULL COMMENT 'Hour when event starts (0-23)',
   event_end_hour INT NOT NULL COMMENT 'Hour when event ends (0-23)',
   has_venue_details BOOLEAN NOT NULL COMMENT 'Whether venue name is available',
-  duration_category STRING NOT NULL COMMENT 'Duration: brief, moderate, extended, multi_day',
-
-  -- Quality tracking
+  duration_category STRING NOT NULL COMMENT 'Duration: brief, moderate, extended, multi_day'
 )
 USING iceberg
+PARTITIONED BY (months(timestamp))
+TBLPROPERTIES (
+  'write.format.default' = 'parquet',
+  'write.metadata.compression-codec' = 'gzip',
+  'write.parquet.compression-codec' = 'zstd',
+  'write.distribution-mode' = 'hash'
+)
 COMMENT 'Silver layer: Cleaned and enriched special events data';

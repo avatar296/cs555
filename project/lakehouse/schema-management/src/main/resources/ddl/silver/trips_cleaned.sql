@@ -19,9 +19,14 @@ CREATE TABLE IF NOT EXISTS lakehouse.silver.trips_cleaned (
   day_of_week STRING NOT NULL COMMENT 'Day name',
   fare_per_mile DOUBLE COMMENT 'Fare amount divided by trip distance',
   distance_category STRING NOT NULL COMMENT 'Distance category: short, medium, long, very_long',
-  fare_category STRING NOT NULL COMMENT 'Fare category: economy, standard, premium, luxury',
-
-  -- Quality tracking
+  fare_category STRING NOT NULL COMMENT 'Fare category: economy, standard, premium, luxury'
 )
 USING iceberg
+PARTITIONED BY (days(timestamp))
+TBLPROPERTIES (
+  'write.format.default' = 'parquet',
+  'write.metadata.compression-codec' = 'gzip',
+  'write.parquet.compression-codec' = 'zstd',
+  'write.distribution-mode' = 'hash'
+)
 COMMENT 'Silver layer: Cleaned and enriched NYC taxi trips';

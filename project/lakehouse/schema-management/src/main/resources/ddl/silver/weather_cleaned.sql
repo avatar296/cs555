@@ -18,9 +18,14 @@ CREATE TABLE IF NOT EXISTS lakehouse.silver.weather_cleaned (
   temperature_category STRING NOT NULL COMMENT 'Temperature category: freezing, cold, mild, warm, hot',
   precipitation_category STRING NOT NULL COMMENT 'Precipitation category: none, light, moderate, heavy',
   wind_category STRING NOT NULL COMMENT 'Wind category: calm, breezy, windy, dangerous',
-  impacts_travel BOOLEAN NOT NULL COMMENT 'Whether conditions impact travel patterns',
-
-  -- Quality tracking
+  impacts_travel BOOLEAN NOT NULL COMMENT 'Whether conditions impact travel patterns'
 )
 USING iceberg
+PARTITIONED BY (days(timestamp))
+TBLPROPERTIES (
+  'write.format.default' = 'parquet',
+  'write.metadata.compression-codec' = 'gzip',
+  'write.parquet.compression-codec' = 'zstd',
+  'write.distribution-mode' = 'hash'
+)
 COMMENT 'Silver layer: Cleaned and enriched weather data';
