@@ -9,10 +9,7 @@ import org.apache.spark.sql.streaming.StreamingQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Base class for all streaming jobs (Bronze, Silver, Gold)
- * Provides common functionality and template method pattern
- */
+/** Base class for all streaming jobs using Template Method pattern. */
 public abstract class BaseStreamingJob {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     protected final StreamConfig config;
@@ -22,9 +19,7 @@ public abstract class BaseStreamingJob {
         this.config = config;
     }
 
-    /**
-     * Main entry point - implements template method pattern
-     */
+    /** Main entry point - executes the streaming job lifecycle. */
     public void run() throws Exception {
         try {
             logger.info("Starting streaming job: {}", getJobName());
@@ -57,58 +52,41 @@ public abstract class BaseStreamingJob {
         }
     }
 
-    /**
-     * Create Spark session - can be overridden for custom configuration
-     */
+    /** Create Spark session - can be overridden for custom configuration. */
     protected SparkSession createSparkSession() {
         return IcebergSessionBuilder.createSession(getJobName(), config);
     }
 
-    /**
-     * Get the job name for logging and Spark app name
-     */
+    /** Get the job name for logging and Spark app name. */
     protected abstract String getJobName();
 
-    /**
-     * Initialize resources (namespaces, tables, etc.)
-     */
+    /** Initialize resources (namespaces, tables, etc.). */
     protected void initialize() {
-        // Default: create lakehouse namespace
         String namespace = getNamespace();
         if (namespace != null) {
-            logger.info("Creating namespace if not exists: {}", namespace);
+            logger.debug("Creating namespace if not exists: {}", namespace);
             spark.sql(String.format("CREATE NAMESPACE IF NOT EXISTS %s", namespace));
         }
     }
 
-    /**
-     * Read streaming data from source
-     */
+    /** Read streaming data from source. */
     protected abstract Dataset<Row> readStream();
 
-    /**
-     * Transform the data
-     */
+    /** Transform the data. */
     protected abstract Dataset<Row> transform(Dataset<Row> input);
 
-    /**
-     * Write the transformed stream to destination
-     */
+    /** Write the transformed stream to destination. */
     protected abstract StreamingQuery writeStream(Dataset<Row> output) throws Exception;
 
-    /**
-     * Get the namespace for this job's tables (e.g., "lakehouse.bronze")
-     */
+    /** Get the namespace for this job's tables (e.g., "lakehouse.bronze"). */
     protected String getNamespace() {
         return null; // Override in subclasses if needed
     }
 
-    /**
-     * Cleanup resources
-     */
+    /** Cleanup resources. */
     protected void cleanup() {
         if (spark != null) {
-            logger.info("Stopping Spark session");
+            logger.debug("Stopping Spark session");
             spark.stop();
         }
     }

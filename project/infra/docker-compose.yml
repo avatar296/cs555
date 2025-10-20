@@ -1,4 +1,7 @@
 services:
+  # =========================================================================
+  # KAFKA
+  # =========================================================================
   kafka:
     image: bitnami/kafka:3.7
     container_name: kafka
@@ -61,6 +64,10 @@ services:
     ports:
       - "8080:8080"
 
+  # =========================================================================
+  # PRODUCER
+  # =========================================================================
+
   # NYC Taxi Event Stream Producer
   # producer:
   #   build:
@@ -94,6 +101,11 @@ services:
   #     - USE_REALTIME=true
   #     - TIME_PROGRESSION_SECONDS=1
   #   restart: unless-stopped
+
+
+  # =========================================================================
+  # STORAGE & CATALOG
+  # =========================================================================
 
   # MinIO Object Storage
   minio:
@@ -130,7 +142,7 @@ services:
       exit 0;
       "
 
-  # PostgreSQL for Iceberg Catalog (JDBC)
+  # PostgreSQL for Iceberg Catalog
   postgres-iceberg:
     image: postgres:15
     container_name: postgres-iceberg
@@ -147,6 +159,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+
+  # =========================================================================
+  # SPARK
+  # =========================================================================
 
   # Spark Master
   spark-master:
@@ -187,7 +204,7 @@ services:
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
 
-  # Spark Workers (Scaled for Bronze Layer)
+  # Spark Workers
   spark-worker:
     build: ./spark
     image: project-spark:3.5.0
@@ -216,7 +233,12 @@ services:
     deploy:
       replicas: 2  # 2 workers = 4 cores, 4GB total
 
-  # Schema Management - Bronze Layer Table Setup
+
+  # =========================================================================
+  # BRONZE
+  # =========================================================================
+
+  # Schema Management
   bronze-table-setup:
     image: project-spark:3.5.0
     container_name: bronze-table-setup
@@ -260,209 +282,209 @@ services:
           memory: 2G
 
   # Bronze Layer Streaming Jobs
-  # bronze-trips-consumer:
-  #   image: project-spark:3.5.0
-  #   container_name: bronze-trips-consumer
-  #   command: >
-  #     /opt/spark/bin/spark-submit
-  #     --class csx55.sta.bronze.jobs.TripsBronzeJob
-  #     --master spark://spark-master:7077
-  #     --deploy-mode client
-  #     --conf spark.driver.memory=512m
-  #     --conf spark.executor.memory=1g
-  #     --conf spark.executor.cores=1
-  #     --conf spark.dynamicAllocation.enabled=true
-  #     --conf spark.dynamicAllocation.shuffleTracking.enabled=true
-  #     --conf spark.dynamicAllocation.minExecutors=0
-  #     --conf spark.dynamicAllocation.maxExecutors=2
-  #     --conf spark.dynamicAllocation.initialExecutors=1
-  #     --conf spark.dynamicAllocation.executorIdleTimeout=60s
-  #     --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
-  #     --conf spark.shuffle.service.enabled=true
-  #     --conf spark.streaming.kafka.maxRatePerPartition=1000
-  #     --conf spark.sql.streaming.minBatchesToRetain=10
-  #     --conf spark.hadoop.fs.s3a.access.key=admin
-  #     --conf spark.hadoop.fs.s3a.secret.key=admin123
-  #     --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
-  #     --conf spark.hadoop.fs.s3a.path.style.access=true
-  #     /opt/spark/work-dir/jars/bronze/bronze.jar
-  #   depends_on:
-  #     bronze-table-setup:
-  #       condition: service_completed_successfully
-  #     spark-master:
-  #       condition: service_started
-  #     kafka:
-  #       condition: service_healthy
-  #     schema-registry:
-  #       condition: service_healthy
-  #     minio:
-  #       condition: service_healthy
-  #     postgres-iceberg:
-  #       condition: service_healthy
-  #   environment:
-  #     # MinIO S3 Configuration (for checkpoints)
-  #     - AWS_ACCESS_KEY_ID=admin
-  #     - AWS_SECRET_ACCESS_KEY=admin123
-  #     - AWS_REGION=us-east-1
-  #   volumes:
-  #     - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
-  #     - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
-  #     - spark-logs:/opt/spark/logs
-  #     - spark-state:/tmp/state-store
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1.0'
-  #         memory: 2G
-  #       reservations:
-  #         cpus: '0.5'
-  #         memory: 1G
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 60s
-  #   stop_grace_period: 120s
-  #   restart: unless-stopped
+  bronze-trips-consumer:
+    image: project-spark:3.5.0
+    container_name: bronze-trips-consumer
+    command: >
+      /opt/spark/bin/spark-submit
+      --class csx55.sta.bronze.jobs.TripsBronzeJob
+      --master spark://spark-master:7077
+      --deploy-mode client
+      --conf spark.driver.memory=512m
+      --conf spark.executor.memory=1g
+      --conf spark.executor.cores=1
+      --conf spark.dynamicAllocation.enabled=true
+      --conf spark.dynamicAllocation.shuffleTracking.enabled=true
+      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.maxExecutors=2
+      --conf spark.dynamicAllocation.initialExecutors=1
+      --conf spark.dynamicAllocation.executorIdleTimeout=60s
+      --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
+      --conf spark.shuffle.service.enabled=true
+      --conf spark.streaming.kafka.maxRatePerPartition=1000
+      --conf spark.sql.streaming.minBatchesToRetain=10
+      --conf spark.hadoop.fs.s3a.access.key=admin
+      --conf spark.hadoop.fs.s3a.secret.key=admin123
+      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+      --conf spark.hadoop.fs.s3a.path.style.access=true
+      /opt/spark/work-dir/jars/bronze/bronze.jar
+    depends_on:
+      bronze-table-setup:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres-iceberg:
+        condition: service_healthy
+    environment:
+      # MinIO S3 Configuration (for checkpoints)
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=admin123
+      - AWS_REGION=us-east-1
+    volumes:
+      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
+      - spark-logs:/opt/spark/logs
+      - spark-state:/tmp/state-store
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 120s
+    restart: unless-stopped
 
-  # bronze-weather-consumer:
-  #   image: project-spark:3.5.0
-  #   container_name: bronze-weather-consumer
-  #   command: >
-  #     /opt/spark/bin/spark-submit
-  #     --class csx55.sta.bronze.jobs.WeatherBronzeJob
-  #     --master spark://spark-master:7077
-  #     --deploy-mode client
-  #     --conf spark.driver.memory=512m
-  #     --conf spark.executor.memory=1g
-  #     --conf spark.executor.cores=1
-  #     --conf spark.dynamicAllocation.enabled=true
-  #     --conf spark.dynamicAllocation.shuffleTracking.enabled=true
-  #     --conf spark.dynamicAllocation.minExecutors=0
-  #     --conf spark.dynamicAllocation.maxExecutors=2
-  #     --conf spark.dynamicAllocation.initialExecutors=1
-  #     --conf spark.dynamicAllocation.executorIdleTimeout=60s
-  #     --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
-  #     --conf spark.shuffle.service.enabled=true
-  #     --conf spark.streaming.kafka.maxRatePerPartition=1000
-  #     --conf spark.sql.streaming.minBatchesToRetain=10
-  #     --conf spark.hadoop.fs.s3a.access.key=admin
-  #     --conf spark.hadoop.fs.s3a.secret.key=admin123
-  #     --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
-  #     --conf spark.hadoop.fs.s3a.path.style.access=true
-  #     /opt/spark/work-dir/jars/bronze/bronze.jar
-  #   depends_on:
-  #     bronze-table-setup:
-  #       condition: service_completed_successfully
-  #     spark-master:
-  #       condition: service_started
-  #     kafka:
-  #       condition: service_healthy
-  #     schema-registry:
-  #       condition: service_healthy
-  #     minio:
-  #       condition: service_healthy
-  #     postgres-iceberg:
-  #       condition: service_healthy
-  #   environment:
-  #     # MinIO S3 Configuration (for checkpoints)
-  #     - AWS_ACCESS_KEY_ID=admin
-  #     - AWS_SECRET_ACCESS_KEY=admin123
-  #     - AWS_REGION=us-east-1
-  #   volumes:
-  #     - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
-  #     - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
-  #     - spark-logs:/opt/spark/logs
-  #     - spark-state:/tmp/state-store
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1.0'
-  #         memory: 2G
-  #       reservations:
-  #         cpus: '0.5'
-  #         memory: 1G
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 60s
-  #   stop_grace_period: 120s
-  #   restart: unless-stopped
+  bronze-weather-consumer:
+    image: project-spark:3.5.0
+    container_name: bronze-weather-consumer
+    command: >
+      /opt/spark/bin/spark-submit
+      --class csx55.sta.bronze.jobs.WeatherBronzeJob
+      --master spark://spark-master:7077
+      --deploy-mode client
+      --conf spark.driver.memory=512m
+      --conf spark.executor.memory=1g
+      --conf spark.executor.cores=1
+      --conf spark.dynamicAllocation.enabled=true
+      --conf spark.dynamicAllocation.shuffleTracking.enabled=true
+      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.maxExecutors=2
+      --conf spark.dynamicAllocation.initialExecutors=1
+      --conf spark.dynamicAllocation.executorIdleTimeout=60s
+      --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
+      --conf spark.shuffle.service.enabled=true
+      --conf spark.streaming.kafka.maxRatePerPartition=1000
+      --conf spark.sql.streaming.minBatchesToRetain=10
+      --conf spark.hadoop.fs.s3a.access.key=admin
+      --conf spark.hadoop.fs.s3a.secret.key=admin123
+      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+      --conf spark.hadoop.fs.s3a.path.style.access=true
+      /opt/spark/work-dir/jars/bronze/bronze.jar
+    depends_on:
+      bronze-table-setup:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres-iceberg:
+        condition: service_healthy
+    environment:
+      # MinIO S3 Configuration (for checkpoints)
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=admin123
+      - AWS_REGION=us-east-1
+    volumes:
+      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
+      - spark-logs:/opt/spark/logs
+      - spark-state:/tmp/state-store
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 120s
+    restart: unless-stopped
 
-  # bronze-events-consumer:
-  #   image: project-spark:3.5.0
-  #   container_name: bronze-events-consumer
-  #   command: >
-  #     /opt/spark/bin/spark-submit
-  #     --class csx55.sta.bronze.jobs.EventsBronzeJob
-  #     --master spark://spark-master:7077
-  #     --deploy-mode client
-  #     --conf spark.driver.memory=512m
-  #     --conf spark.executor.memory=1g
-  #     --conf spark.executor.cores=1
-  #     --conf spark.dynamicAllocation.enabled=true
-  #     --conf spark.dynamicAllocation.shuffleTracking.enabled=true
-  #     --conf spark.dynamicAllocation.minExecutors=0
-  #     --conf spark.dynamicAllocation.maxExecutors=2
-  #     --conf spark.dynamicAllocation.initialExecutors=1
-  #     --conf spark.dynamicAllocation.executorIdleTimeout=60s
-  #     --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
-  #     --conf spark.shuffle.service.enabled=true
-  #     --conf spark.streaming.kafka.maxRatePerPartition=1000
-  #     --conf spark.sql.streaming.minBatchesToRetain=10
-  #     --conf spark.hadoop.fs.s3a.access.key=admin
-  #     --conf spark.hadoop.fs.s3a.secret.key=admin123
-  #     --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
-  #     --conf spark.hadoop.fs.s3a.path.style.access=true
-  #     /opt/spark/work-dir/jars/bronze/bronze.jar
-  #   depends_on:
-  #     bronze-table-setup:
-  #       condition: service_completed_successfully
-  #     spark-master:
-  #       condition: service_started
-  #     kafka:
-  #       condition: service_healthy
-  #     schema-registry:
-  #       condition: service_healthy
-  #     minio:
-  #       condition: service_healthy
-  #     postgres-iceberg:
-  #       condition: service_healthy
-  #   environment:
-  #     # MinIO S3 Configuration (for checkpoints)
-  #     - AWS_ACCESS_KEY_ID=admin
-  #     - AWS_SECRET_ACCESS_KEY=admin123
-  #     - AWS_REGION=us-east-1
-  #   volumes:
-  #     - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
-  #     - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
-  #     - spark-logs:/opt/spark/logs
-  #     - spark-state:/tmp/state-store
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1.0'
-  #         memory: 2G
-  #       reservations:
-  #         cpus: '0.5'
-  #         memory: 1G
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 60s
-  #   stop_grace_period: 120s
-  #   restart: unless-stopped
+  bronze-events-consumer:
+    image: project-spark:3.5.0
+    container_name: bronze-events-consumer
+    command: >
+      /opt/spark/bin/spark-submit
+      --class csx55.sta.bronze.jobs.EventsBronzeJob
+      --master spark://spark-master:7077
+      --deploy-mode client
+      --conf spark.driver.memory=512m
+      --conf spark.executor.memory=1g
+      --conf spark.executor.cores=1
+      --conf spark.dynamicAllocation.enabled=true
+      --conf spark.dynamicAllocation.shuffleTracking.enabled=true
+      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.maxExecutors=2
+      --conf spark.dynamicAllocation.initialExecutors=1
+      --conf spark.dynamicAllocation.executorIdleTimeout=60s
+      --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
+      --conf spark.shuffle.service.enabled=true
+      --conf spark.streaming.kafka.maxRatePerPartition=1000
+      --conf spark.sql.streaming.minBatchesToRetain=10
+      --conf spark.hadoop.fs.s3a.access.key=admin
+      --conf spark.hadoop.fs.s3a.secret.key=admin123
+      --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+      --conf spark.hadoop.fs.s3a.path.style.access=true
+      /opt/spark/work-dir/jars/bronze/bronze.jar
+    depends_on:
+      bronze-table-setup:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres-iceberg:
+        condition: service_healthy
+    environment:
+      # MinIO S3 Configuration (for checkpoints)
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=admin123
+      - AWS_REGION=us-east-1
+    volumes:
+      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
+      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
+      - spark-logs:/opt/spark/logs
+      - spark-state:/tmp/state-store
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 120s
+    restart: unless-stopped
 
   # =========================================================================
-  # SILVER LAYER - SQL-First Data Quality & Transformation
+  # SILVER
   # =========================================================================
 
-  # Silver Layer Table Setup
+  # Schema Management
   silver-table-setup:
     image: project-spark:3.5.0
     container_name: silver-table-setup
@@ -540,7 +562,7 @@ services:
           cpus: '1.0'
           memory: 2G
 
-  # Silver Trips Cleaned Job (SQL-First Pattern)
+  # Silver Trips Cleaned
   # silver-trips-consumer:
   #   image: project-spark:3.5.0
   #   container_name: silver-trips-consumer
@@ -600,7 +622,7 @@ services:
   #   stop_grace_period: 120s
   #   restart: unless-stopped
 
-  # Silver Weather Cleaned Job (SQL-First Pattern)
+  # Silver Weather Cleaned
   # silver-weather-consumer:
   #   image: project-spark:3.5.0
   #   container_name: silver-weather-consumer
@@ -660,7 +682,7 @@ services:
   #   stop_grace_period: 120s
   #   restart: unless-stopped
 
-  # # Silver Events Cleaned Job (SQL-First Pattern)
+  # # Silver Events Cleaned
   # silver-events-consumer:
   #   image: project-spark:3.5.0
   #   container_name: silver-events-consumer
@@ -719,6 +741,11 @@ services:
   #     start_period: 60s
   #   stop_grace_period: 120s
   #   restart: unless-stopped
+
+  # =========================================================================
+  # GOLD
+  # =========================================================================
+
 
 volumes:
   kafka-data:

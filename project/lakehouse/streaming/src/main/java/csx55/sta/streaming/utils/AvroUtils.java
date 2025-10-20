@@ -7,19 +7,10 @@ import za.co.absa.abris.config.FromAvroConfig;
 
 import static org.apache.spark.sql.functions.*;
 
-/**
- * Utilities for working with Avro data in Spark
- */
+/** Utilities for working with Avro data in Spark. */
 public class AvroUtils {
 
-    /**
-     * Deserialize Avro-encoded Kafka messages using Schema Registry (ABRiS)
-     *
-     * @param kafkaStream     The raw Kafka stream with value column
-     * @param topic           The Kafka topic name
-     * @param schemaRegistryUrl The Schema Registry URL
-     * @return Dataset with deserialized Avro data and Kafka metadata
-     */
+    /** Deserialize Avro-encoded Kafka messages using Schema Registry (ABRiS). */
     public static Dataset<Row> deserializeAvro(
             Dataset<Row> kafkaStream,
             String topic,
@@ -53,21 +44,14 @@ public class AvroUtils {
                 );
     }
 
-    /**
-     * Add bronze layer metadata columns
-     *
-     * @param stream The input stream
-     * @return Stream with ingestion metadata added
-     */
+    /** Add bronze layer metadata columns (ingestion_timestamp, ingestion_date). */
     public static Dataset<Row> addBronzeMetadata(Dataset<Row> stream) {
         return stream
                 .withColumn("ingestion_timestamp", current_timestamp())
                 .withColumn("ingestion_date", current_date());
     }
 
-    /**
-     * Deserialize Avro and add bronze metadata in one step
-     */
+    /** Deserialize Avro and add bronze metadata in one step. */
     public static Dataset<Row> prepareBronzeData(
             Dataset<Row> kafkaStream,
             String topic,

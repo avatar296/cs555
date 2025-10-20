@@ -3,10 +3,7 @@ package csx55.sta.streaming.config;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
-/**
- * Configuration management for streaming jobs
- * Loads configuration from application.conf with environment variable overrides
- */
+/** Configuration management for streaming jobs (loads from application.conf). */
 public class StreamConfig {
     private final Config config;
 
@@ -141,9 +138,7 @@ public class StreamConfig {
         );
     }
 
-    /**
-     * Bronze layer stream configuration
-     */
+    /** Bronze layer stream configuration. */
     public static class BronzeStreamConfig {
         public final String topic;
         public final String table;
@@ -162,9 +157,7 @@ public class StreamConfig {
         }
     }
 
-    /**
-     * Silver layer stream configuration
-     */
+    /** Silver layer stream configuration. */
     public static class SilverStreamConfig {
         public final String sourceTable;
         public final String targetTable;

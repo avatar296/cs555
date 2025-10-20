@@ -5,9 +5,7 @@ import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Factory for creating Spark sessions configured for Iceberg and S3/MinIO
- */
+/** Factory for creating Spark sessions configured for Iceberg and S3/MinIO. */
 public class IcebergSessionBuilder {
     private static final Logger logger = LoggerFactory.getLogger(IcebergSessionBuilder.class);
 
@@ -19,11 +17,9 @@ public class IcebergSessionBuilder {
         this.config = config;
     }
 
-    /**
-     * Build a Spark session with Iceberg and S3 configuration
-     */
+    /** Build a Spark session with Iceberg and S3 configuration. */
     public SparkSession build() {
-        logger.info("Creating Spark session: {}", appName);
+        logger.debug("Creating Spark session: {}", appName);
 
         String catalogName = config.getIcebergCatalogName();
         String catalogType = config.getIcebergCatalogType();
@@ -44,7 +40,7 @@ public class IcebergSessionBuilder {
             builder.config(String.format("spark.sql.catalog.%s.uri", catalogName), jdbcUri);
             builder.config(String.format("spark.sql.catalog.%s.jdbc.user", catalogName), config.getJdbcUser());
             builder.config(String.format("spark.sql.catalog.%s.jdbc.password", catalogName), config.getJdbcPassword());
-            logger.info("Configured JDBC Catalog URI: {}", jdbcUri);
+            logger.debug("Configured JDBC Catalog URI: {}", jdbcUri);
         }
 
         SparkSession spark = builder
@@ -57,16 +53,14 @@ public class IcebergSessionBuilder {
                 .config("spark.hadoop.fs.s3a.connection.ssl.enabled", String.valueOf(config.getS3SslEnabled()))
                 .getOrCreate();
 
-        logger.info("Spark session created successfully");
-        logger.info("Iceberg catalog: {} (type: {}, warehouse: {})", catalogName, catalogType, warehousePath);
-        logger.info("S3 endpoint: {}", config.getS3Endpoint());
+        logger.info("Spark session created: {}", appName);
+        logger.debug("Iceberg catalog: {} (type: {}, warehouse: {})", catalogName, catalogType, warehousePath);
+        logger.debug("S3 endpoint: {}", config.getS3Endpoint());
 
         return spark;
     }
 
-    /**
-     * Convenience method to create and return a session
-     */
+    /** Convenience method to create and return a session. */
     public static SparkSession createSession(String appName, StreamConfig config) {
         return new IcebergSessionBuilder(appName, config).build();
     }
