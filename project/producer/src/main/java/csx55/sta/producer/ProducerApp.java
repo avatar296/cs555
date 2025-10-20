@@ -33,7 +33,7 @@ public class ProducerApp {
             producers.add(tripProducer);
             Thread tripThread = new Thread(tripProducer, "TripStream");
             threads.add(tripThread);
-            logger.info("Trip stream enabled: {}", config.tripConfig);
+            logger.info("Trip stream enabled");
         }
 
         if (config.weatherConfig.isEnabled()) {
@@ -41,7 +41,7 @@ public class ProducerApp {
             producers.add(weatherProducer);
             Thread weatherThread = new Thread(weatherProducer, "WeatherStream");
             threads.add(weatherThread);
-            logger.info("Weather stream enabled: {}", config.weatherConfig);
+            logger.info("Weather stream enabled");
         }
 
         if (config.eventConfig.isEnabled()) {
@@ -49,7 +49,7 @@ public class ProducerApp {
             producers.add(eventProducer);
             Thread eventThread = new Thread(eventProducer, "EventStream");
             threads.add(eventThread);
-            logger.info("Event stream enabled: {}", config.eventConfig);
+            logger.info("Event stream enabled");
         }
 
         if (producers.isEmpty()) {
@@ -86,9 +86,7 @@ public class ProducerApp {
     }
 
     private static void printFinalStatistics(List<EventStreamProducer<?>> producers) {
-        logger.info("========================================");
-        logger.info("=== FINAL STATISTICS ===");
-        logger.info("========================================");
+        logger.info("Final Statistics:");
 
         long totalSent = 0;
         long totalFailed = 0;
@@ -97,20 +95,9 @@ public class ProducerApp {
 
         for (EventStreamProducer<?> producer : producers) {
             EventStreamProducer.StreamStatistics stats = producer.getStatistics();
-
-            logger.info("");
-            logger.info("=== {} Stream ===", stats.streamName);
-            logger.info("Topic: {}", stats.topicName);
-            logger.info("Successfully sent:  {}", stats.successCount);
-            logger.info("Failed to send:     {}", stats.errorCount);
-            logger.info("Valid events:       {} ({} %)",
-                    stats.validCount,
-                    String.format("%.2f", 100.0 * stats.validCount /
-                            Math.max(1, stats.validCount + stats.invalidCount)));
-            logger.info("Invalid events:     {} ({} %)",
-                    stats.invalidCount,
-                    String.format("%.2f", 100.0 * stats.invalidCount /
-                            Math.max(1, stats.validCount + stats.invalidCount)));
+            logger.info("{}: {} sent, {} failed, {} valid, {} invalid",
+                    stats.streamName, stats.successCount, stats.errorCount,
+                    stats.validCount, stats.invalidCount);
 
             totalSent += stats.successCount;
             totalFailed += stats.errorCount;
@@ -118,16 +105,7 @@ public class ProducerApp {
             totalInvalid += stats.invalidCount;
         }
 
-        logger.info("");
-        logger.info("=== TOTALS (All Streams) ===");
-        logger.info("Total sent:         {}", totalSent);
-        logger.info("Total failed:       {}", totalFailed);
-        logger.info("Total valid:        {} ({} %)",
-                totalValid,
-                String.format("%.2f", 100.0 * totalValid / Math.max(1, totalValid + totalInvalid)));
-        logger.info("Total invalid:      {} ({} %)",
-                totalInvalid,
-                String.format("%.2f", 100.0 * totalInvalid / Math.max(1, totalValid + totalInvalid)));
-        logger.info("========================================");
+        logger.info("Total: {} sent, {} failed, {} valid, {} invalid",
+                totalSent, totalFailed, totalValid, totalInvalid);
     }
 }

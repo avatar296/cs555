@@ -8,27 +8,22 @@ import csx55.sta.schema.SpecialEvent;
 
 import java.util.Random;
 
-/**
- * Injects various types of errors into trip events to simulate bad data
- * for testing error handling and data quality validation.
- */
 public class ErrorInjector {
 
     private final Random random;
     private final double errorRate;
 
-    // Error types and their relative probabilities
     private enum ErrorType {
-        NULL_FARE(0.20),              // Nullify optional fareAmount
-        NULL_PASSENGERS(0.15),         // Nullify optional passengerCount
-        INVALID_PICKUP_ZONE(0.15),     // Set pickup location to invalid zone (0 or > 263)
-        INVALID_DROPOFF_ZONE(0.15),    // Set dropoff location to invalid zone
-        NEGATIVE_DISTANCE(0.10),       // Negative trip distance
-        ZERO_DISTANCE(0.10),           // Zero trip distance
-        EXCESSIVE_DISTANCE(0.05),      // Unrealistic high distance (> 100 miles)
-        NEGATIVE_FARE(0.05),           // Negative fare amount
-        ZERO_PASSENGERS(0.03),         // Zero passengers
-        EXCESSIVE_PASSENGERS(0.02);    // Unrealistic passenger count (> 10)
+        NULL_FARE(0.20), // Nullify optional fareAmount
+        NULL_PASSENGERS(0.15), // Nullify optional passengerCount
+        INVALID_PICKUP_ZONE(0.15), // Set pickup location to invalid zone (0 or > 263)
+        INVALID_DROPOFF_ZONE(0.15), // Set dropoff location to invalid zone
+        NEGATIVE_DISTANCE(0.10), // Negative trip distance
+        ZERO_DISTANCE(0.10), // Zero trip distance
+        EXCESSIVE_DISTANCE(0.05), // Unrealistic high distance (> 100 miles)
+        NEGATIVE_FARE(0.05), // Negative fare amount
+        ZERO_PASSENGERS(0.03), // Zero passengers
+        EXCESSIVE_PASSENGERS(0.02); // Unrealistic passenger count (> 10)
 
         final double weight;
 
@@ -56,10 +51,6 @@ public class ErrorInjector {
         this.errorRate = errorRate;
     }
 
-    /**
-     * Potentially inject an error into the event based on the error rate.
-     * Returns the original event if no error should be injected.
-     */
     public TripEvent maybeInjectError(TripEvent event) {
         if (errorRate == 0.0 || random.nextDouble() >= errorRate) {
             return event; // No error injection
@@ -134,29 +125,28 @@ public class ErrorInjector {
         return builder.build();
     }
 
-    /**
-     * Check if an event is considered "bad" (has errors)
-     */
     public static boolean isInvalidEvent(TripEvent event) {
         // Check for various invalid conditions
         if (event.getPickupLocationId() < NycConstants.MIN_ZONE_ID ||
-            event.getPickupLocationId() > NycConstants.MAX_ZONE_ID) return true;
+                event.getPickupLocationId() > NycConstants.MAX_ZONE_ID)
+            return true;
         if (event.getDropoffLocationId() < NycConstants.MIN_ZONE_ID ||
-            event.getDropoffLocationId() > NycConstants.MAX_ZONE_ID) return true;
-        if (event.getTripDistance() <= 0.0) return true;
-        if (event.getTripDistance() > 100.0) return true;
-        if (event.getFareAmount() != null && event.getFareAmount() < 0.0) return true;
-        if (event.getPassengerCount() != null && event.getPassengerCount() <= 0) return true;
-        if (event.getPassengerCount() != null && event.getPassengerCount() > 10) return true;
+                event.getDropoffLocationId() > NycConstants.MAX_ZONE_ID)
+            return true;
+        if (event.getTripDistance() <= 0.0)
+            return true;
+        if (event.getTripDistance() > 100.0)
+            return true;
+        if (event.getFareAmount() != null && event.getFareAmount() < 0.0)
+            return true;
+        if (event.getPassengerCount() != null && event.getPassengerCount() <= 0)
+            return true;
+        if (event.getPassengerCount() != null && event.getPassengerCount() > 10)
+            return true;
 
         return false;
     }
 
-    // ==================== Weather Event Error Injection ====================
-
-    /**
-     * Potentially inject an error into a weather event
-     */
     public WeatherEvent maybeInjectError(WeatherEvent event) {
         if (errorRate == 0.0 || random.nextDouble() >= errorRate) {
             return event;
@@ -187,29 +177,28 @@ public class ErrorInjector {
         return builder.build();
     }
 
-    /**
-     * Check if a weather event is invalid
-     */
     public static boolean isInvalidEvent(WeatherEvent event) {
         if (event.getLocationId() < NycConstants.MIN_ZONE_ID ||
-            event.getLocationId() > NycConstants.MAX_ZONE_ID) return true;
-        if (event.getTemperature() < -50.0 || event.getTemperature() > 150.0) return true;
-        if (event.getPrecipitation() < 0.0) return true;
-        if (event.getWindSpeed() < 0.0) return true;
+                event.getLocationId() > NycConstants.MAX_ZONE_ID)
+            return true;
+        if (event.getTemperature() < -50.0 || event.getTemperature() > 150.0)
+            return true;
+        if (event.getPrecipitation() < 0.0)
+            return true;
+        if (event.getWindSpeed() < 0.0)
+            return true;
 
         // Invalid combination: CLEAR weather with precipitation
-        if (event.getCondition() == WeatherCondition.CLEAR && event.getPrecipitation() > 0.1) return true;
-        if (event.getCondition() == WeatherCondition.CLOUDY && event.getPrecipitation() > 0.1) return true;
-        if (event.getCondition() == WeatherCondition.FOG && event.getPrecipitation() > 0.1) return true;
+        if (event.getCondition() == WeatherCondition.CLEAR && event.getPrecipitation() > 0.1)
+            return true;
+        if (event.getCondition() == WeatherCondition.CLOUDY && event.getPrecipitation() > 0.1)
+            return true;
+        if (event.getCondition() == WeatherCondition.FOG && event.getPrecipitation() > 0.1)
+            return true;
 
         return false;
     }
 
-    // ==================== Special Event Error Injection ====================
-
-    /**
-     * Potentially inject an error into a special event
-     */
     public SpecialEvent maybeInjectError(SpecialEvent event) {
         if (errorRate == 0.0 || random.nextDouble() >= errorRate) {
             return event;
@@ -236,15 +225,16 @@ public class ErrorInjector {
         return builder.build();
     }
 
-    /**
-     * Check if a special event is invalid
-     */
     public static boolean isInvalidEvent(SpecialEvent event) {
         if (event.getLocationId() < NycConstants.MIN_ZONE_ID ||
-            event.getLocationId() > NycConstants.MAX_ZONE_ID) return true;
-        if (event.getAttendanceEstimate() < 0) return true;
-        if (event.getAttendanceEstimate() > 100000) return true; // Unrealistic
-        if (event.getEndTime() <= event.getStartTime()) return true; // End before/at start
+                event.getLocationId() > NycConstants.MAX_ZONE_ID)
+            return true;
+        if (event.getAttendanceEstimate() < 0)
+            return true;
+        if (event.getAttendanceEstimate() > 100000)
+            return true; // Unrealistic
+        if (event.getEndTime() <= event.getStartTime())
+            return true; // End before/at start
 
         return false;
     }

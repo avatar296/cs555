@@ -2,10 +2,6 @@ package csx55.sta.bronze.jobs;
 
 import csx55.sta.streaming.config.StreamConfig;
 
-/**
- * Bronze layer ingestion job for Special Events
- * Reads special.events topic and writes to lakehouse.bronze.events
- */
 public class EventsBronzeJob extends AbstractBronzeJob {
 
     public EventsBronzeJob(StreamConfig config) {

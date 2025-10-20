@@ -2,10 +2,6 @@ package csx55.sta.bronze.jobs;
 
 import csx55.sta.streaming.config.StreamConfig;
 
-/**
- * Bronze layer ingestion job for Trip events
- * Reads trips.yellow topic and writes to lakehouse.bronze.trips
- */
 public class TripsBronzeJob extends AbstractBronzeJob {
 
     public TripsBronzeJob(StreamConfig config) {

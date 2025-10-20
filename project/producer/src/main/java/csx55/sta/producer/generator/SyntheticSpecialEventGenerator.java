@@ -5,12 +5,8 @@ import csx55.sta.schema.SpecialEvent;
 
 import java.util.concurrent.TimeUnit;
 
-/**
- * Generates synthetic special events (concerts, sports, etc.) with realistic patterns.
- */
 public class SyntheticSpecialEventGenerator extends AbstractSyntheticGenerator<SpecialEvent> {
 
-    // Famous NYC venues and their typical zones
     private static final VenueInfo[] VENUES = {
             new VenueInfo(186, "Madison Square Garden", EventType.SPORTS, 15000, 25000),
             new VenueInfo(186, "Madison Square Garden", EventType.CONCERT, 18000, 20000),
@@ -24,14 +20,13 @@ public class SyntheticSpecialEventGenerator extends AbstractSyntheticGenerator<S
             new VenueInfo(43, "Central Park", EventType.FESTIVAL, 10000, 50000)
     };
 
-    // Event type weights when not using venue
     private static final double[] EVENT_TYPE_WEIGHTS = {
-            0.30,  // CONCERT
-            0.25,  // SPORTS
-            0.20,  // CONFERENCE
-            0.15,  // FESTIVAL
-            0.05,  // THEATER
-            0.05   // OTHER
+            0.30, // CONCERT
+            0.25, // SPORTS
+            0.20, // CONFERENCE
+            0.15, // FESTIVAL
+            0.05, // THEATER
+            0.05 // OTHER
     };
 
     private static class VenueInfo {
@@ -54,9 +49,6 @@ public class SyntheticSpecialEventGenerator extends AbstractSyntheticGenerator<S
         super(useRealtime, timeProgressionSeconds);
     }
 
-    /**
-     * Generate a synthetic special event.
-     */
     @Override
     public SpecialEvent generateEvent() {
         long timestamp = getNextTimestamp();
@@ -93,7 +85,7 @@ public class SyntheticSpecialEventGenerator extends AbstractSyntheticGenerator<S
     }
 
     private SpecialEvent generateRandomEvent(long timestamp) {
-        int locationId = generateLocationId();  // Use inherited method
+        int locationId = generateLocationId();
         EventType eventType = generateEventType();
         int attendance = generateAttendance(eventType);
 
@@ -155,19 +147,19 @@ public class SyntheticSpecialEventGenerator extends AbstractSyntheticGenerator<S
 
         switch (type) {
             case SPORTS:
-                baseHours = 3;  // ~3 hours
+                baseHours = 3; // ~3 hours
                 break;
             case CONCERT:
-                baseHours = 2;  // ~2-3 hours
+                baseHours = 2; // ~2-3 hours
                 break;
             case CONFERENCE:
-                baseHours = 8;  // Full day
+                baseHours = 8; // Full day
                 break;
             case FESTIVAL:
-                baseHours = 6;  // Half day
+                baseHours = 6; // Half day
                 break;
             case THEATER:
-                baseHours = 2;  // ~2 hours
+                baseHours = 2; // ~2 hours
                 break;
             case OTHER:
             default:

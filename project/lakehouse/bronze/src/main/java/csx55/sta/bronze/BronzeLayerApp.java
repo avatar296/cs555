@@ -16,7 +16,7 @@ public class BronzeLayerApp {
 
     public static void main(String[] args) throws Exception {
         if (args.length == 0) {
-            printUsage();
+            logger.error("No job name provided. Expected: trips, weather, or events");
             System.exit(1);
         }
 
@@ -39,18 +39,8 @@ public class BronzeLayerApp {
                 break;
 
             default:
-                logger.error("Unknown job: {}", jobName);
-                printUsage();
+                logger.error("Unknown job: {}. Valid jobs: trips, weather, events", jobName);
                 System.exit(1);
         }
-    }
-
-    private static void printUsage() {
-        System.out.println("Usage: BronzeLayerApp <job-name>");
-        System.out.println();
-        System.out.println("Available jobs:");
-        System.out.println("  trips   - Ingest trip events from trips.yellow topic");
-        System.out.println("  weather - Ingest weather events from weather.updates topic");
-        System.out.println("  events  - Ingest special events from special.events topic");
     }
 }

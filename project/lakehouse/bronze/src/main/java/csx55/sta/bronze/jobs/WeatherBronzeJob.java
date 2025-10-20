@@ -2,10 +2,6 @@ package csx55.sta.bronze.jobs;
 
 import csx55.sta.streaming.config.StreamConfig;
 
-/**
- * Bronze layer ingestion job for Weather events
- * Reads weather.updates topic and writes to lakehouse.bronze.weather
- */
 public class WeatherBronzeJob extends AbstractBronzeJob {
 
     public WeatherBronzeJob(StreamConfig config) {

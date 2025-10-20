@@ -7,14 +7,6 @@ import csx55.sta.streaming.config.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Schema Management Application
- *
- * Centralized entry point for creating and managing Iceberg table schemas
- * across all medallion layers (Bronze, Silver, Gold).
- *
- * This separates schema management from data processing pipelines.
- */
 public class SchemaManagementApp {
 
     private static final Logger logger = LoggerFactory.getLogger(SchemaManagementApp.class);
@@ -29,10 +21,7 @@ public class SchemaManagementApp {
         String layer = args[0].toLowerCase();
 
         try {
-            logger.info("========================================");
             logger.info("Schema Management - Layer: {}", layer);
-            logger.info("========================================");
-
             StreamConfig config = new StreamConfig();
 
             switch (layer) {
@@ -64,9 +53,7 @@ public class SchemaManagementApp {
                     System.exit(1);
             }
 
-            logger.info("========================================");
-            logger.info("Schema management complete!");
-            logger.info("========================================");
+            logger.info("Schema management complete");
             System.exit(0);
 
         } catch (Exception e) {
@@ -76,20 +63,14 @@ public class SchemaManagementApp {
     }
 
     private static void setupBronze(StreamConfig config) {
-        logger.info("Setting up Bronze layer tables...");
-        BronzeTableSetup setup = new BronzeTableSetup(config);
-        setup.run();
+        new BronzeTableSetup(config).run();
     }
 
     private static void setupSilver(StreamConfig config) {
-        logger.info("Setting up Silver layer tables...");
-        SilverTableSetup setup = new SilverTableSetup(config);
-        setup.run();
+        new SilverTableSetup(config).run();
     }
 
     private static void setupMonitoring(StreamConfig config) {
-        logger.info("Setting up Monitoring infrastructure...");
-        MonitoringSetup setup = new MonitoringSetup(config);
-        setup.run();
+        new MonitoringSetup(config).run();
     }
 }

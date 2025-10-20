@@ -14,12 +14,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Base class for event stream producers.
- * Each stream runs in its own thread with independent rate limiting and statistics.
- *
- * @param <T> The Avro event type (TripEvent, WeatherEvent, or SpecialEvent)
- */
 public abstract class EventStreamProducer<T> implements Runnable {
     private static final Logger logger = LoggerFactory.getLogger(EventStreamProducer.class);
 
@@ -28,8 +22,6 @@ public abstract class EventStreamProducer<T> implements Runnable {
     protected final SyntheticProducerConfig globalConfig;
     protected final ErrorInjector errorInjector;
     protected final AtomicBoolean shouldStop = new AtomicBoolean(false);
-
-    // Statistics
     protected final AtomicLong successCount = new AtomicLong(0);
     protected final AtomicLong errorCount = new AtomicLong(0);
     protected final AtomicLong validEventsGenerated = new AtomicLong(0);
@@ -38,8 +30,8 @@ public abstract class EventStreamProducer<T> implements Runnable {
     private KafkaProducer<String, T> producer;
 
     public EventStreamProducer(String streamName,
-                               SyntheticProducerConfig.StreamConfig config,
-                               SyntheticProducerConfig globalConfig) {
+            SyntheticProducerConfig.StreamConfig config,
+            SyntheticProducerConfig globalConfig) {
         this.streamName = streamName;
         this.config = config;
         this.globalConfig = globalConfig;
@@ -51,8 +43,8 @@ public abstract class EventStreamProducer<T> implements Runnable {
         initializeProducer();
 
         try {
-            logger.info("[{}] Starting stream: topic={}, rate={}/s, errorRate={:.1f}%",
-                    streamName, config.topicName, config.arrivalRate, config.errorRate * 100);
+            logger.info("[{}] Starting stream: topic={}", streamName, config.topicName);
+            logger.debug("[{}] Rate={}/s, errorRate={:.1f}%", streamName, config.arrivalRate, config.errorRate * 100);
 
             long periodNanos = (long) (1_000_000_000.0 / config.arrivalRate);
             long count = 0;
@@ -116,7 +108,7 @@ public abstract class EventStreamProducer<T> implements Runnable {
             }
 
             producer.flush();
-            logger.info("[{}] Stream complete. Total events: {}", streamName, count);
+            logger.debug("[{}] Stream complete. Total events: {}", streamName, count);
 
         } finally {
             if (producer != null) {
@@ -137,14 +129,14 @@ public abstract class EventStreamProducer<T> implements Runnable {
         props.put("batch.size", "16384");
 
         // Connection resilience and timeout configurations
-        props.put("metadata.max.age.ms", "30000");           // Refresh metadata every 30s
-        props.put("connections.max.idle.ms", "540000");      // Keep connections alive (9 min)
-        props.put("request.timeout.ms", "30000");            // Fail fast on requests (30s)
-        props.put("delivery.timeout.ms", "120000");          // Total time for delivery (2 min)
+        props.put("metadata.max.age.ms", "30000"); // Refresh metadata every 30s
+        props.put("connections.max.idle.ms", "540000"); // Keep connections alive (9 min)
+        props.put("request.timeout.ms", "30000"); // Fail fast on requests (30s)
+        props.put("delivery.timeout.ms", "120000"); // Total time for delivery (2 min)
 
         // Retry behavior for transient failures
-        props.put("retries", "5");                           // Retry failed sends up to 5 times
-        props.put("retry.backoff.ms", "1000");               // Wait 1s between retries
+        props.put("retries", "5"); // Retry failed sends up to 5 times
+        props.put("retry.backoff.ms", "1000"); // Wait 1s between retries
 
         this.producer = new KafkaProducer<>(props);
     }
@@ -153,14 +145,9 @@ public abstract class EventStreamProducer<T> implements Runnable {
         long elapsedMillis = (System.nanoTime() - startTime) / 1_000_000;
         double actualRate = eventsGenerated / (elapsedMillis / 1000.0);
 
-        logger.info("[{}] Progress: {} events | {}/s | {} sent | {} failed | {} valid | {} invalid",
-                streamName,
-                eventsGenerated,
-                String.format("%.1f", actualRate),
-                successCount.get(),
-                errorCount.get(),
-                validEventsGenerated.get(),
-                invalidEventsGenerated.get());
+        logger.info("[{}] Progress: {} events ({}/s), {} sent, {} failed",
+                streamName, eventsGenerated, String.format("%.1f", actualRate),
+                successCount.get(), errorCount.get());
     }
 
     public void stop() {
@@ -174,14 +161,16 @@ public abstract class EventStreamProducer<T> implements Runnable {
                 successCount.get(),
                 errorCount.get(),
                 validEventsGenerated.get(),
-                invalidEventsGenerated.get()
-        );
+                invalidEventsGenerated.get());
     }
 
     // Abstract methods to be implemented by subclasses
     protected abstract T generateEvent();
+
     protected abstract T injectError(T event);
+
     protected abstract boolean isInvalid(T event);
+
     protected abstract String getPartitionKey(T event);
 
     public static class StreamStatistics {
@@ -193,7 +182,7 @@ public abstract class EventStreamProducer<T> implements Runnable {
         public final long invalidCount;
 
         public StreamStatistics(String streamName, String topicName, long successCount,
-                                long errorCount, long validCount, long invalidCount) {
+                long errorCount, long validCount, long invalidCount) {
             this.streamName = streamName;
             this.topicName = topicName;
             this.successCount = successCount;

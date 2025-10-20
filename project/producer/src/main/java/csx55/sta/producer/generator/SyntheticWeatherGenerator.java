@@ -3,34 +3,26 @@ package csx55.sta.producer.generator;
 import csx55.sta.schema.WeatherCondition;
 import csx55.sta.schema.WeatherEvent;
 
-/**
- * Generates synthetic weather events with realistic patterns.
- */
 public class SyntheticWeatherGenerator extends AbstractSyntheticGenerator<WeatherEvent> {
 
-    // Temperature ranges (Fahrenheit)
-    private static final double MIN_TEMP = 10.0;   // Cold winter
-    private static final double MAX_TEMP = 95.0;   // Hot summer
-    private static final double AVG_TEMP = 60.0;   // Annual average
+    private static final double MIN_TEMP = 10.0; // Cold winter
+    private static final double MAX_TEMP = 95.0; // Hot summer
+    private static final double AVG_TEMP = 60.0; // Annual average
     private static final double TEMP_STDDEV = 15.0;
 
-    // Weather condition probabilities
     private static final double[] CONDITION_WEIGHTS = {
-            0.40,  // CLEAR
-            0.30,  // CLOUDY
-            0.15,  // RAIN
-            0.08,  // SNOW
-            0.05,  // FOG
-            0.02   // STORM
+            0.40, // CLEAR
+            0.30, // CLOUDY
+            0.15, // RAIN
+            0.08, // SNOW
+            0.05, // FOG
+            0.02 // STORM
     };
 
     public SyntheticWeatherGenerator(boolean useRealtime, int timeProgressionSeconds) {
         super(useRealtime, timeProgressionSeconds);
     }
 
-    /**
-     * Generate a synthetic weather event.
-     */
     @Override
     public WeatherEvent generateEvent() {
         long timestamp = getNextTimestamp();

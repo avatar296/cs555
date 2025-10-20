@@ -9,14 +9,6 @@ import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Bronze Layer Table Setup
- *
- * One-time initialization job that creates all bronze Iceberg tables
- * by reading sample data from Kafka topics.
- *
- * This separates schema management from streaming execution.
- */
 public class BronzeTableSetup {
 
     private static final Logger logger = LoggerFactory.getLogger(BronzeTableSetup.class);
@@ -30,56 +22,36 @@ public class BronzeTableSetup {
     }
 
     public void run() {
-        logger.info("========================================");
-        logger.info("Bronze Layer Table Setup");
-        logger.info("========================================");
+        logger.info("Starting Bronze Layer table setup");
 
-        // Create bronze namespace
         ensureNamespaceExists();
 
-        // Create tables for each stream
         createTableForStream(config.getBronzeTripsConfig());
         createTableForStream(config.getBronzeWeatherConfig());
         createTableForStream(config.getBronzeEventsConfig());
 
-        logger.info("========================================");
-        logger.info("Bronze tables setup complete!");
-        logger.info("========================================");
-
+        logger.info("Bronze tables setup complete");
         spark.stop();
     }
 
-    /**
-     * Create the bronze namespace if it doesn't exist
-     */
     private void ensureNamespaceExists() {
         try {
             spark.sql("CREATE NAMESPACE IF NOT EXISTS lakehouse.bronze");
-            logger.info("✓ Ensured namespace exists: lakehouse.bronze");
+            logger.debug("Ensured namespace exists: lakehouse.bronze");
         } catch (Exception e) {
-            logger.warn("Could not create namespace (may already exist): {}", e.getMessage());
+            logger.warn("Could not create namespace: {}", e.getMessage());
         }
     }
 
-    /**
-     * Create a table for a specific stream
-     */
     private void createTableForStream(StreamConfig.BronzeStreamConfig streamConfig) {
-        logger.info("");
-        logger.info("Processing: {}", streamConfig.table);
-        logger.info("  Topic: {}", streamConfig.topic);
-
         try {
-            // Check if table already exists
             spark.table(streamConfig.table);
-            logger.info("  ✓ Table already exists: {}", streamConfig.table);
+            logger.info("Table already exists: {}", streamConfig.table);
             return;
         } catch (Exception e) {
-            logger.info("  Table does not exist, creating...");
+            logger.debug("Table does not exist, creating: {}", streamConfig.table);
         }
 
-        // Read sample data from Kafka
-        logger.info("  Reading sample from Kafka topic: {}", streamConfig.topic);
         Dataset<Row> sampleBatch = spark
                 .read()
                 .format("kafka")
@@ -90,31 +62,24 @@ public class BronzeTableSetup {
                 .load()
                 .limit(10);
 
-        // Check if we got any data
         if (sampleBatch.isEmpty()) {
-            logger.warn("  ⚠ No data available in topic {}. Skipping table creation.", streamConfig.topic);
-            logger.warn("  Table will be created when data becomes available.");
+            logger.warn("No data available in topic {}. Table will be created when data becomes available.",
+                    streamConfig.topic);
             return;
         }
 
-        // Transform using same logic as streaming
-        logger.info("  Transforming sample data...");
         Dataset<Row> transformedSample = AvroUtils.prepareBronzeData(
                 sampleBatch,
                 streamConfig.topic,
-                config.getSchemaRegistryUrl()
-        );
+                config.getSchemaRegistryUrl());
 
-        logger.info("  Creating table with inferred schema");
-        logger.info("  Schema:");
-        transformedSample.schema().printTreeString();
+        logger.debug("Schema: {}", transformedSample.schema().treeString());
 
-        // Write sample data to create the table
         transformedSample.write()
                 .format("iceberg")
                 .mode("append")
                 .saveAsTable(streamConfig.table);
 
-        logger.info("  ✓ Table created successfully: {}", streamConfig.table);
+        logger.info("Table created: {}", streamConfig.table);
     }
 }
