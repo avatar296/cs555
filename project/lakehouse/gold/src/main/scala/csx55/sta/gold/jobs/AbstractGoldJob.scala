@@ -31,12 +31,17 @@ abstract class AbstractGoldJob(
     val sqlTemplate = loadSqlFromResources(getSqlFilePath())
     logger.debug("Loaded SQL transformation from: {}", getSqlFilePath())
 
-    // Create temp view from source stream
+    // Add watermark for windowed aggregations in append mode
+    // Windows are considered complete 10 minutes after the latest event timestamp
+    val watermarkedInput = input.withWatermark("timestamp", "10 minutes")
+    logger.debug("Added watermark: 10 minutes on timestamp column")
+
+    // Create temp view from watermarked stream
     val tempViewName = getTempViewName()
-    input.createOrReplaceTempView(tempViewName)
+    watermarkedInput.createOrReplaceTempView(tempViewName)
     logger.debug("Created temp view: {}", tempViewName)
 
-    // Execute aggregation SQL
+    // Execute aggregation SQL and return
     spark.sql(sqlTemplate)
   }
 
@@ -45,7 +50,7 @@ abstract class AbstractGoldJob(
 
     output.writeStream
       .format("iceberg")
-      .outputMode("update")  // Update mode for continuous aggregation
+      .outputMode("append")  // Append mode - each closed window produces a new row
       .option("checkpointLocation", streamConfig.checkpointPath)
       .trigger(Trigger.ProcessingTime("30 seconds"))
       .toTable(streamConfig.targetTable)

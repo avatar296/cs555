@@ -4,8 +4,8 @@
 
 CREATE TABLE IF NOT EXISTS lakehouse.gold.trip_metrics_live (
   -- Time dimension
-  window_start TIMESTAMP NOT NULL COMMENT 'Start of 5-minute aggregation window',
-  window_end TIMESTAMP NOT NULL COMMENT 'End of 5-minute aggregation window',
+  window_start TIMESTAMP COMMENT 'Start of 5-minute aggregation window',
+  window_end TIMESTAMP COMMENT 'End of 5-minute aggregation window',
 
   -- Location dimensions
   pickup_location_id BIGINT NOT NULL COMMENT 'Pickup location (TLC Taxi Zone ID)',

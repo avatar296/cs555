@@ -13,31 +13,31 @@ SELECT
 
   -- Core aggregated metrics
   COUNT(*) AS trip_count,
-  SUM(fare_amount) AS total_revenue,
-  SUM(trip_distance) AS total_distance,
-  SUM(passenger_count) AS total_passengers,
+  COALESCE(SUM(fare_amount), 0.0) AS total_revenue,
+  COALESCE(SUM(trip_distance), 0.0) AS total_distance,
+  COALESCE(SUM(passenger_count), 0) AS total_passengers,
 
   -- Average metrics
-  AVG(fare_amount) AS avg_fare,
-  AVG(trip_distance) AS avg_distance,
-  AVG(passenger_count) AS avg_passengers,
+  COALESCE(AVG(fare_amount), 0.0) AS avg_fare,
+  COALESCE(AVG(trip_distance), 0.0) AS avg_distance,
+  COALESCE(AVG(passenger_count), 0.0) AS avg_passengers,
   AVG(fare_per_mile) AS avg_fare_per_mile,
 
   -- Conditional aggregations: Rush hour breakdown
-  SUM(CASE WHEN is_rush_hour = true THEN 1 ELSE 0 END) AS rush_hour_trip_count,
-  SUM(CASE WHEN is_weekend = true THEN 1 ELSE 0 END) AS weekend_trip_count,
+  COALESCE(SUM(CASE WHEN is_rush_hour = true THEN 1 ELSE 0 END), 0) AS rush_hour_trip_count,
+  COALESCE(SUM(CASE WHEN is_weekend = true THEN 1 ELSE 0 END), 0) AS weekend_trip_count,
 
   -- Fare category breakdown
-  SUM(CASE WHEN fare_category = 'economy' THEN 1 ELSE 0 END) AS economy_fare_count,
-  SUM(CASE WHEN fare_category = 'standard' THEN 1 ELSE 0 END) AS standard_fare_count,
-  SUM(CASE WHEN fare_category = 'premium' THEN 1 ELSE 0 END) AS premium_fare_count,
-  SUM(CASE WHEN fare_category = 'luxury' THEN 1 ELSE 0 END) AS luxury_fare_count,
+  COALESCE(SUM(CASE WHEN fare_category = 'economy' THEN 1 ELSE 0 END), 0) AS economy_fare_count,
+  COALESCE(SUM(CASE WHEN fare_category = 'standard' THEN 1 ELSE 0 END), 0) AS standard_fare_count,
+  COALESCE(SUM(CASE WHEN fare_category = 'premium' THEN 1 ELSE 0 END), 0) AS premium_fare_count,
+  COALESCE(SUM(CASE WHEN fare_category = 'luxury' THEN 1 ELSE 0 END), 0) AS luxury_fare_count,
 
   -- Distance category breakdown
-  SUM(CASE WHEN distance_category = 'short' THEN 1 ELSE 0 END) AS short_trip_count,
-  SUM(CASE WHEN distance_category = 'medium' THEN 1 ELSE 0 END) AS medium_trip_count,
-  SUM(CASE WHEN distance_category = 'long' THEN 1 ELSE 0 END) AS long_trip_count,
-  SUM(CASE WHEN distance_category = 'very_long' THEN 1 ELSE 0 END) AS very_long_trip_count,
+  COALESCE(SUM(CASE WHEN distance_category = 'short' THEN 1 ELSE 0 END), 0) AS short_trip_count,
+  COALESCE(SUM(CASE WHEN distance_category = 'medium' THEN 1 ELSE 0 END), 0) AS medium_trip_count,
+  COALESCE(SUM(CASE WHEN distance_category = 'long' THEN 1 ELSE 0 END), 0) AS long_trip_count,
+  COALESCE(SUM(CASE WHEN distance_category = 'very_long' THEN 1 ELSE 0 END), 0) AS very_long_trip_count,
 
   -- Metadata: when was this aggregate last updated
   CURRENT_TIMESTAMP() AS last_updated

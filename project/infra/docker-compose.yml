@@ -573,12 +573,12 @@ services:
       --class csx55.sta.silver.jobs.TripsCleanedJob
       --master spark://spark-master:7077
       --deploy-mode client
-      --conf spark.driver.memory=512m
-      --conf spark.executor.memory=512m
+      --conf spark.driver.memory=2g
+      --conf spark.executor.memory=2g
       --conf spark.executor.cores=1
       --conf spark.dynamicAllocation.enabled=true
       --conf spark.dynamicAllocation.shuffleTracking.enabled=true
-      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.minExecutors=1
       --conf spark.dynamicAllocation.maxExecutors=2
       --conf spark.dynamicAllocation.initialExecutors=1
       --conf spark.dynamicAllocation.executorIdleTimeout=60s
@@ -633,12 +633,12 @@ services:
       --class csx55.sta.silver.jobs.WeatherCleanedJob
       --master spark://spark-master:7077
       --deploy-mode client
-      --conf spark.driver.memory=512m
-      --conf spark.executor.memory=512m
+      --conf spark.driver.memory=2g
+      --conf spark.executor.memory=2g
       --conf spark.executor.cores=1
       --conf spark.dynamicAllocation.enabled=true
       --conf spark.dynamicAllocation.shuffleTracking.enabled=true
-      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.minExecutors=1
       --conf spark.dynamicAllocation.maxExecutors=2
       --conf spark.dynamicAllocation.initialExecutors=1
       --conf spark.dynamicAllocation.executorIdleTimeout=60s
@@ -693,12 +693,12 @@ services:
       --class csx55.sta.silver.jobs.EventsCleanedJob
       --master spark://spark-master:7077
       --deploy-mode client
-      --conf spark.driver.memory=512m
-      --conf spark.executor.memory=512m
+      --conf spark.driver.memory=2g
+      --conf spark.executor.memory=2g
       --conf spark.executor.cores=1
       --conf spark.dynamicAllocation.enabled=true
       --conf spark.dynamicAllocation.shuffleTracking.enabled=true
-      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.minExecutors=1
       --conf spark.dynamicAllocation.maxExecutors=2
       --conf spark.dynamicAllocation.initialExecutors=1
       --conf spark.dynamicAllocation.executorIdleTimeout=60s
@@ -847,12 +847,12 @@ services:
       --class csx55.sta.gold.GoldLayerApp
       --master spark://spark-master:7077
       --deploy-mode client
-      --conf spark.driver.memory=512m
-      --conf spark.executor.memory=512m
+      --conf spark.driver.memory=2g
+      --conf spark.executor.memory=2g
       --conf spark.executor.cores=1
       --conf spark.dynamicAllocation.enabled=true
       --conf spark.dynamicAllocation.shuffleTracking.enabled=true
-      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.minExecutors=1
       --conf spark.dynamicAllocation.maxExecutors=2
       --conf spark.dynamicAllocation.initialExecutors=1
       --conf spark.dynamicAllocation.executorIdleTimeout=60s
@@ -898,10 +898,6 @@ services:
       start_period: 60s
     stop_grace_period: 120s
     restart: unless-stopped
-
-  # =========================================================================
-  # MONITORING
-  # =========================================================================  
 
 
 volumes:
