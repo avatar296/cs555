@@ -1,5 +1,6 @@
 plugins {
     java
+    scala
     application
 }
 
@@ -10,11 +11,19 @@ val logbackVersion: String by rootProject.extra
 val sparkVersion = "3.5.0"
 val icebergVersion = "1.6.1"
 val hadoopVersion = "3.3.4"
+val scalaVersion = "2.12.18"
+val typesafeConfigVersion = "1.4.3"
 
 dependencies {
+    // Scala
+    implementation("org.scala-lang:scala-library:$scalaVersion")
+
     // Shared modules
     implementation(rootProject.project(":schemas"))
     implementation(project(":lakehouse:streaming"))
+
+    // Configuration management (needed for Scala compilation)
+    implementation("com.typesafe:config:$typesafeConfigVersion")
 
     // Apache Spark
     implementation("org.apache.spark:spark-sql_2.12:$sparkVersion")
@@ -47,6 +56,9 @@ tasks.jar {
     manifest {
         attributes["Main-Class"] = "csx55.sta.gold.GoldLayerApp"
     }
+
+    // Declare dependency on streaming jar
+    dependsOn(":lakehouse:streaming:jar")
 
     // Include dependencies (fat jar)
     from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) }) {

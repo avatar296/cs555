@@ -138,6 +138,15 @@ public class StreamConfig {
         );
     }
 
+    // Gold Layer Configuration
+    public GoldStreamConfig getGoldTripMetricsLiveConfig() {
+        return new GoldStreamConfig(
+            config.getString("gold.trip_metrics_live.source"),
+            config.getString("gold.trip_metrics_live.table"),
+            config.getString("gold.trip_metrics_live.checkpoint")
+        );
+    }
+
     /** Bronze layer stream configuration. */
     public static class BronzeStreamConfig {
         public final String topic;
@@ -172,6 +181,25 @@ public class StreamConfig {
         @Override
         public String toString() {
             return String.format("SilverStreamConfig{source='%s', target='%s', checkpoint='%s'}",
+                    sourceTable, targetTable, checkpointPath);
+        }
+    }
+
+    /** Gold layer stream configuration. */
+    public static class GoldStreamConfig {
+        public final String sourceTable;
+        public final String targetTable;
+        public final String checkpointPath;
+
+        public GoldStreamConfig(String sourceTable, String targetTable, String checkpointPath) {
+            this.sourceTable = sourceTable;
+            this.targetTable = targetTable;
+            this.checkpointPath = checkpointPath;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("GoldStreamConfig{source='%s', target='%s', checkpoint='%s'}",
                     sourceTable, targetTable, checkpointPath);
         }
     }
