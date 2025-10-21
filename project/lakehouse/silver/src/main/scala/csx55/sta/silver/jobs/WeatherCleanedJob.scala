@@ -22,7 +22,7 @@ class WeatherCleanedJob(config: StreamConfig)
       .hasMin("precipitation", _ >= 0.0)
       .hasMax("precipitation", _ <= 10.0)
       .hasMin("wind_speed", _ >= 0.0)
-      .hasMax("wind_speed", _ >= 100.0)
+      .hasMax("wind_speed", _ <= 100.0)
   }
 
   override protected def getBusinessRuleReplacements(): Map[String, Any] = {

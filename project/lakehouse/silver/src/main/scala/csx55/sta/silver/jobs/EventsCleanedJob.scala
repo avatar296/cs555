@@ -34,6 +34,12 @@ class EventsCleanedJob(config: StreamConfig)
       "EVENT_MEDIUM_MAX" -> BusinessRules.EVENT_MEDIUM_MAX,
       "EVENT_LARGE_MAX" -> BusinessRules.EVENT_LARGE_MAX,
 
+      // Rush hour time windows for overlap detection
+      "MORNING_RUSH_START" -> BusinessRules.MORNING_RUSH_START,
+      "MORNING_RUSH_END" -> BusinessRules.MORNING_RUSH_END,
+      "EVENING_RUSH_START" -> BusinessRules.EVENING_RUSH_START,
+      "EVENING_RUSH_END" -> BusinessRules.EVENING_RUSH_END,
+
       // Event duration categorization (brief, moderate, extended, multi-day)
       "DURATION_BRIEF_MAX" -> BusinessRules.DURATION_BRIEF_MAX,
       "DURATION_MODERATE_MAX" -> BusinessRules.DURATION_MODERATE_MAX,
