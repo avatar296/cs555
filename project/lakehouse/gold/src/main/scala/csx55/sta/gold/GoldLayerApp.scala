@@ -1,7 +1,7 @@
 package csx55.sta.gold
 
 import csx55.sta.gold.dimensions.{LocationDimensionLoader, TimeDimensionLoader}
-import csx55.sta.gold.jobs.TripMetricsLiveJob
+import csx55.sta.gold.jobs.{PipelineLatencyJob, TripMetricsLiveJob}
 import csx55.sta.streaming.config.StreamConfig
 import org.slf4j.LoggerFactory
 
@@ -25,6 +25,10 @@ object GoldLayerApp {
         case "trip-metrics-live" =>
           logger.info("Starting Trip Metrics Live streaming job")
           runTripMetricsLive()
+
+        case "pipeline-latency" =>
+          logger.info("Starting Pipeline Latency Metrics streaming job")
+          runPipelineLatency()
 
         case "load-time-dim" =>
           logger.info("Loading time dimension")
@@ -53,6 +57,12 @@ object GoldLayerApp {
     job.run()
   }
 
+  private def runPipelineLatency(): Unit = {
+    val config = new StreamConfig()
+    val job = new PipelineLatencyJob(config)
+    job.run()
+  }
+
   private def runTimeDimLoader(): Unit = {
     TimeDimensionLoader.main(Array.empty)
   }
@@ -66,11 +76,13 @@ object GoldLayerApp {
     logger.info("")
     logger.info("Available job types:")
     logger.info("  trip-metrics-live    - Streaming aggregation job (continuously updates trip metrics)")
+    logger.info("  pipeline-latency     - Streaming metrics job (tracks end-to-end latency and throughput)")
     logger.info("  load-time-dim        - Load time dimension table (one-time batch job)")
     logger.info("  load-location-dim    - Load location dimension table (one-time batch job)")
     logger.info("")
     logger.info("Examples:")
     logger.info("  GoldLayerApp trip-metrics-live")
+    logger.info("  GoldLayerApp pipeline-latency")
     logger.info("  GoldLayerApp load-time-dim")
   }
 }

@@ -32,9 +32,9 @@ abstract class AbstractGoldJob(
     logger.debug("Loaded SQL transformation from: {}", getSqlFilePath())
 
     // Add watermark for windowed aggregations in append mode
-    // Windows are considered complete 10 minutes after the latest event timestamp
-    val watermarkedInput = input.withWatermark("timestamp", "10 minutes")
-    logger.debug("Added watermark: 10 minutes on timestamp column")
+    // Windows are considered complete 5 minutes after the latest event timestamp
+    val watermarkedInput = input.withWatermark("timestamp", "5 minutes")
+    logger.debug("Added watermark: 5 minutes on timestamp column")
 
     // Create temp view from watermarked stream
     val tempViewName = getTempViewName()

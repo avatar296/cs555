@@ -147,6 +147,14 @@ public class StreamConfig {
         );
     }
 
+    public GoldStreamConfig getGoldPipelineLatencyConfig() {
+        return new GoldStreamConfig(
+            config.getString("gold.pipeline_latency.source"),
+            config.getString("gold.pipeline_latency.table"),
+            config.getString("gold.pipeline_latency.checkpoint")
+        );
+    }
+
     /** Bronze layer stream configuration. */
     public static class BronzeStreamConfig {
         public final String topic;
