@@ -114,7 +114,7 @@ abstract class AbstractSilverJob(
 
     val dedupColumns = getDeduplicationColumns()
     val silverData = transformedData
-      .withWatermark("ingestion_timestamp", "10 minutes")
+      .withWatermark("ingestion_timestamp", "5 minutes")
       .dropDuplicates(dedupColumns.toSeq)
 
     logger.info("Configured watermarking and deduplication on columns: {}", getDeduplicationColumns().mkString(", "))
