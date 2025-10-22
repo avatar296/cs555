@@ -1,25 +1,20 @@
--- Silver Layer: trips_cleaned Table
-
 CREATE TABLE IF NOT EXISTS lakehouse.silver.trips_cleaned (
-  -- Core fields
-  timestamp TIMESTAMP NOT NULL COMMENT 'Trip timestamp',
-  pickup_location_id BIGINT NOT NULL COMMENT 'TLC Taxi Zone where trip started',
-  dropoff_location_id BIGINT NOT NULL COMMENT 'TLC Taxi Zone where trip ended',
-  trip_distance DOUBLE NOT NULL COMMENT 'Trip distance in miles',
-  fare_amount DOUBLE NOT NULL COMMENT 'Fare amount in USD',
-  passenger_count INT NOT NULL COMMENT 'Number of passengers',
-  ingestion_timestamp TIMESTAMP NOT NULL COMMENT 'Bronze layer ingestion timestamp',
-  bronze_offset BIGINT NOT NULL COMMENT 'Kafka offset for traceability',
-  bronze_partition INT NOT NULL COMMENT 'Kafka partition for traceability',
-
-  -- Derived features
-  is_rush_hour BOOLEAN NOT NULL COMMENT 'Trip during rush hour (7-9am, 4-7pm)',
-  is_weekend BOOLEAN NOT NULL COMMENT 'Trip on Saturday or Sunday',
-  hour_of_day INT NOT NULL COMMENT 'Hour of day (0-23)',
-  day_of_week STRING NOT NULL COMMENT 'Day name',
-  fare_per_mile DOUBLE COMMENT 'Fare amount divided by trip distance',
-  distance_category STRING NOT NULL COMMENT 'Distance category: short, medium, long, very_long',
-  fare_category STRING NOT NULL COMMENT 'Fare category: economy, standard, premium, luxury'
+  timestamp TIMESTAMP NOT NULL,
+  pickup_location_id BIGINT NOT NULL,
+  dropoff_location_id BIGINT NOT NULL,
+  trip_distance DOUBLE NOT NULL,
+  fare_amount DOUBLE NOT NULL,
+  passenger_count INT NOT NULL,
+  ingestion_timestamp TIMESTAMP NOT NULL,
+  bronze_offset BIGINT NOT NULL,
+  bronze_partition INT NOT NULL,
+  is_rush_hour BOOLEAN NOT NULL,
+  is_weekend BOOLEAN NOT NULL,
+  hour_of_day INT NOT NULL,
+  day_of_week STRING NOT NULL,
+  fare_per_mile DOUBLE,
+  distance_category STRING NOT NULL,
+  fare_category STRING NOT NULL
 )
 USING iceberg
 PARTITIONED BY (days(timestamp))
@@ -28,5 +23,4 @@ TBLPROPERTIES (
   'write.metadata.compression-codec' = 'gzip',
   'write.parquet.compression-codec' = 'zstd',
   'write.distribution-mode' = 'hash'
-)
-COMMENT 'Silver layer: Cleaned and enriched NYC taxi trips';
+);

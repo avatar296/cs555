@@ -2,7 +2,7 @@
   "namespace": "csx55.sta.schema",
   "type": "record",
   "name": "SpecialEvent",
-  "doc": "Special events (concerts, sports, conferences) affecting demand",
+  "doc": "Special events",
   "fields": [
     {
       "name": "timestamp",
@@ -19,7 +19,14 @@
       "type": {
         "type": "enum",
         "name": "EventType",
-        "symbols": ["CONCERT", "SPORTS", "CONFERENCE", "FESTIVAL", "THEATER", "OTHER"]
+        "symbols": [
+          "CONCERT",
+          "SPORTS",
+          "CONFERENCE",
+          "FESTIVAL",
+          "THEATER",
+          "OTHER"
+        ]
       },
       "doc": "Type of special event"
     },

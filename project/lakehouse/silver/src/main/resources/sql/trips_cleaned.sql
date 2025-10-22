@@ -1,8 +1,4 @@
--- Silver Layer: Trips Transformation
--- Note: Deduplication is handled by Spark streaming dropDuplicates, not in SQL
-
 SELECT
-  -- Core fields
   TIMESTAMP_MILLIS(timestamp) AS timestamp,
   pickupLocationId AS pickup_location_id,
   dropoffLocationId AS dropoff_location_id,
@@ -13,7 +9,6 @@ SELECT
   offset AS bronze_offset,
   partition AS bronze_partition,
 
-  -- Derived features
   CASE
     WHEN HOUR(TIMESTAMP_MILLIS(timestamp)) BETWEEN ${MORNING_RUSH_START} AND ${MORNING_RUSH_END} THEN true
     WHEN HOUR(TIMESTAMP_MILLIS(timestamp)) BETWEEN ${EVENING_RUSH_START} AND ${EVENING_RUSH_END} THEN true

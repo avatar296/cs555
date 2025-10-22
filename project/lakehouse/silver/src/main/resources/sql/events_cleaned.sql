@@ -1,8 +1,4 @@
--- Silver Layer: Events Transformation
--- Note: Deduplication is handled by Spark streaming dropDuplicates, not in SQL
-
 SELECT
-  -- Core fields
   TIMESTAMP_MILLIS(timestamp) AS timestamp,
   locationId AS location_id,
   eventType AS event_type,
@@ -14,7 +10,6 @@ SELECT
   offset AS bronze_offset,
   partition AS bronze_partition,
 
-  -- Derived features
   CASE
     WHEN attendanceEstimate > ${MAJOR_EVENT_ATTENDANCE_THRESHOLD} THEN true
     WHEN eventType IN ('SPORTS', 'CONCERT') AND attendanceEstimate > ${MAJOR_SPORTS_CONCERT_THRESHOLD} THEN true

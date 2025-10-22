@@ -9,10 +9,6 @@ object GoldLayerApp {
   private val logger = LoggerFactory.getLogger(this.getClass)
 
   def main(args: Array[String]): Unit = {
-    logger.info("========================================")
-    logger.info("Gold Layer Application")
-    logger.info("========================================")
-
     if (args.isEmpty) {
       printUsage()
       System.exit(1)
@@ -23,19 +19,15 @@ object GoldLayerApp {
     try {
       jobType match {
         case "trip-metrics-live" =>
-          logger.info("Starting Trip Metrics Live streaming job")
           runTripMetricsLive()
 
         case "pipeline-latency" =>
-          logger.info("Starting Pipeline Latency Metrics streaming job")
           runPipelineLatency()
 
         case "load-time-dim" =>
-          logger.info("Loading time dimension")
           runTimeDimLoader()
 
         case "load-location-dim" =>
-          logger.info("Loading location dimension")
           runLocationDimLoader()
 
         case _ =>
@@ -72,17 +64,17 @@ object GoldLayerApp {
   }
 
   private def printUsage(): Unit = {
-    logger.info("Usage: GoldLayerApp <job-type>")
-    logger.info("")
-    logger.info("Available job types:")
-    logger.info("  trip-metrics-live    - Streaming aggregation job (continuously updates trip metrics)")
-    logger.info("  pipeline-latency     - Streaming metrics job (tracks end-to-end latency and throughput)")
-    logger.info("  load-time-dim        - Load time dimension table (one-time batch job)")
-    logger.info("  load-location-dim    - Load location dimension table (one-time batch job)")
-    logger.info("")
-    logger.info("Examples:")
-    logger.info("  GoldLayerApp trip-metrics-live")
-    logger.info("  GoldLayerApp pipeline-latency")
-    logger.info("  GoldLayerApp load-time-dim")
+    println("Usage: GoldLayerApp <job-type>")
+    println()
+    println("Available job types:")
+    println("  trip-metrics-live    - Streaming aggregation job (continuously updates trip metrics)")
+    println("  pipeline-latency     - Streaming metrics job (tracks end-to-end latency and throughput)")
+    println("  load-time-dim        - Load time dimension table (one-time batch job)")
+    println("  load-location-dim    - Load location dimension table (one-time batch job)")
+    println()
+    println("Examples:")
+    println("  GoldLayerApp trip-metrics-live")
+    println("  GoldLayerApp pipeline-latency")
+    println("  GoldLayerApp load-time-dim")
   }
 }

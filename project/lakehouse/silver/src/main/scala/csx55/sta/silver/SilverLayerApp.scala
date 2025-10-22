@@ -16,22 +16,14 @@ object SilverLayerApp {
     val jobName = args(0)
     val config = new StreamConfig()
 
-    logger.info("========================================")
-    logger.info("Silver Layer Application")
-    logger.info("Job: {}", jobName)
-    logger.info("========================================")
-
     jobName.toLowerCase match {
       case "trips-cleaned" =>
-        logger.info("Starting Trips Cleaned Job")
         new TripsCleanedJob(config).run()
 
       case "weather-cleaned" =>
-        logger.info("Starting Weather Cleaned Job")
         new WeatherCleanedJob(config).run()
 
       case "events-cleaned" =>
-        logger.info("Starting Events Cleaned Job")
         new EventsCleanedJob(config).run()
 
       case _ =>

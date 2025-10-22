@@ -72,7 +72,6 @@ abstract class AbstractSilverJob(
   private def verifySourceTableExists(): Unit = {
     try {
       spark.table(streamConfig.sourceTable)
-      logger.debug("Verified source table: {}", streamConfig.sourceTable)
     } catch {
       case e: Exception =>
         throw new RuntimeException(
@@ -85,22 +84,17 @@ abstract class AbstractSilverJob(
   private def ensureMonitoringTableExists(): Unit = {
     try {
       spark.table(MONITORING_TABLE)
-      logger.debug("Monitoring table exists: {}", MONITORING_TABLE)
     } catch {
       case _: Exception =>
-        logger.warn("Monitoring table not found. It will be created by MonitoringSetup job.")
     }
   }
 
   override def run(): Unit = {
-    logger.info("Starting streaming {}: {} → {}", getClass.getSimpleName, streamConfig.sourceTable, streamConfig.targetTable)
-
     this.spark = createSparkSession()
     initialize()
 
     val sqlTemplate = loadSqlFromResources(getSqlFilePath())
     val sql = injectBusinessRules(sqlTemplate)
-    logger.debug("Loaded SQL transformation from: {}", getSqlFilePath())
 
     val bronzeStream = spark.readStream
       .format("iceberg")
@@ -108,7 +102,6 @@ abstract class AbstractSilverJob(
 
     val tempViewName = getTempViewName()
     bronzeStream.createOrReplaceTempView(tempViewName)
-    logger.debug("Created temp view: {}", tempViewName)
 
     val transformedData = spark.sql(sql)
 
@@ -116,8 +109,6 @@ abstract class AbstractSilverJob(
     val silverData = transformedData
       .withWatermark("ingestion_timestamp", "5 minutes")
       .dropDuplicates(dedupColumns.toSeq)
-
-    logger.info("Configured watermarking and deduplication on columns: {}", getDeduplicationColumns().mkString(", "))
 
     val query = silverData
       .writeStream
@@ -128,7 +119,6 @@ abstract class AbstractSilverJob(
       .option("checkpointLocation", streamConfig.checkpointPath)
       .start()
 
-    logger.info("Streaming query started: {}", query.id)
     query.awaitTermination()
   }
 
@@ -142,8 +132,6 @@ abstract class AbstractSilverJob(
 
   protected def loadSqlFromResources(resourcePath: String): String = {
     try {
-      logger.debug("Loading SQL from: {}", resourcePath)
-
       val inputStream = getClass.getClassLoader.getResourceAsStream(resourcePath)
 
       if (inputStream == null) {

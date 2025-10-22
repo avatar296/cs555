@@ -20,8 +20,6 @@ abstract class AbstractGoldJob(
   }
 
   override protected def readStream(): Dataset[Row] = {
-    logger.info("Reading stream from: {}", streamConfig.sourceTable)
-
     spark.readStream
       .format("iceberg")
       .table(streamConfig.sourceTable)
@@ -29,28 +27,19 @@ abstract class AbstractGoldJob(
 
   override protected def transform(input: Dataset[Row]): Dataset[Row] = {
     val sqlTemplate = loadSqlFromResources(getSqlFilePath())
-    logger.debug("Loaded SQL transformation from: {}", getSqlFilePath())
 
-    // Add watermark for windowed aggregations in append mode
-    // Windows are considered complete 5 minutes after the latest event timestamp
     val watermarkedInput = input.withWatermark("timestamp", "5 minutes")
-    logger.debug("Added watermark: 5 minutes on timestamp column")
 
-    // Create temp view from watermarked stream
     val tempViewName = getTempViewName()
     watermarkedInput.createOrReplaceTempView(tempViewName)
-    logger.debug("Created temp view: {}", tempViewName)
 
-    // Execute aggregation SQL and return
     spark.sql(sqlTemplate)
   }
 
   override protected def writeStream(output: Dataset[Row]): StreamingQuery = {
-    logger.info("Writing stream to: {}", streamConfig.targetTable)
-
     output.writeStream
       .format("iceberg")
-      .outputMode("append")  // Append mode - each closed window produces a new row
+      .outputMode("append")
       .option("checkpointLocation", streamConfig.checkpointPath)
       .trigger(Trigger.ProcessingTime("30 seconds"))
       .toTable(streamConfig.targetTable)
@@ -69,7 +58,6 @@ abstract class AbstractGoldJob(
   private def verifySourceTableExists(): Unit = {
     try {
       spark.table(streamConfig.sourceTable)
-      logger.debug("Verified source table: {}", streamConfig.sourceTable)
     } catch {
       case e: Exception =>
         throw new RuntimeException(
@@ -82,7 +70,6 @@ abstract class AbstractGoldJob(
   private def verifyTargetTableExists(): Unit = {
     try {
       spark.table(streamConfig.targetTable)
-      logger.debug("Verified target table: {}", streamConfig.targetTable)
     } catch {
       case e: Exception =>
         throw new RuntimeException(
@@ -98,8 +85,6 @@ abstract class AbstractGoldJob(
 
   protected def loadSqlFromResources(resourcePath: String): String = {
     try {
-      logger.debug("Loading SQL from: {}", resourcePath)
-
       val inputStream = getClass.getClassLoader.getResourceAsStream(resourcePath)
 
       if (inputStream == null) {

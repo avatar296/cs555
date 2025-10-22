@@ -17,8 +17,6 @@ class QuarantineHandler(spark: SparkSession) {
   ): Unit = {
     val quarantineTable = getQuarantineTableName(targetTable)
 
-    logger.debug("Quarantining batch {} to: {}", batchId, quarantineTable)
-
     try {
       val quarantinedBatch = enrichWithQuarantineMetadata(
         batch,
@@ -32,8 +30,6 @@ class QuarantineHandler(spark: SparkSession) {
         .mode(SaveMode.Append)
         .option("mergeSchema", "true")
         .saveAsTable(quarantineTable)
-
-      logger.debug("Batch {} quarantined: {} records", batchId, batch.count())
 
     } catch {
       case e: Exception =>

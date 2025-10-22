@@ -101,7 +101,7 @@ logs/
 *.log
 *.log.*
 
-# Kafka/Zookeeper local data (if running docker-compose with local volumes)
+# Kafka/Zookeeper
 kafka-data/
 zookeeper-data/
 schema-registry-data/

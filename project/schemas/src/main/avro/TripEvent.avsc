@@ -2,7 +2,7 @@
   "namespace": "csx55.sta.schema",
   "type": "record",
   "name": "TripEvent",
-  "doc": "NYC Taxi Trip Event",
+  "doc": "Taxi Trip",
   "fields": [
     {
       "name": "timestamp",

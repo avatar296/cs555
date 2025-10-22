@@ -1,8 +1,4 @@
--- Silver Layer: Weather Transformation
--- Note: Deduplication is handled by Spark streaming dropDuplicates, not in SQL
-
 SELECT
-  -- Core fields
   TIMESTAMP_MILLIS(timestamp) AS timestamp,
   locationId AS location_id,
   temperature,
@@ -13,7 +9,6 @@ SELECT
   offset AS bronze_offset,
   partition AS bronze_partition,
 
-  -- Derived features
   CASE
     WHEN condition IN ('SNOW', 'STORM') THEN true
     WHEN precipitation > ${SEVERE_PRECIPITATION_THRESHOLD} THEN true

@@ -15,10 +15,6 @@ object PipelineLatencyJob {
   private val logger = LoggerFactory.getLogger(this.getClass)
 
   def main(args: Array[String]): Unit = {
-    logger.info("========================================")
-    logger.info("Monitoring: Pipeline Latency Metrics Job")
-    logger.info("========================================")
-
     try {
       val config = new StreamConfig()
       val job = new PipelineLatencyJob(config)

@@ -18,7 +18,6 @@ class BatchProcessor(
 
   def process(batch: Dataset[Row], batchId: Long): Unit = {
     if (batch.isEmpty) {
-      logger.debug("Batch {} is empty, skipping", batchId)
       return
     }
 
@@ -29,7 +28,6 @@ class BatchProcessor(
 
       if (result.passed) {
         handleSuccessfulBatch(batch, batchId, result)
-        logger.info("Batch {}: {} records validated and written", batchId, recordCount)
       } else {
         handleFailedBatch(batch, batchId, result)
         logger.error("Batch {}: {} records failed validation and quarantined", batchId, recordCount)

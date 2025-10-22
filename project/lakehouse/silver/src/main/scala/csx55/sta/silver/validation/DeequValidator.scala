@@ -10,8 +10,6 @@ class DeequValidator(check: Check) extends DataQualityValidator {
   private val logger = LoggerFactory.getLogger(getClass)
 
   override def validate(data: Dataset[Row]): ValidationResult = {
-    logger.debug("Starting Deequ validation on {} records", data.count())
-
     val verificationResult = new VerificationSuite()
       .onData(data)
       .addCheck(check)
@@ -24,10 +22,8 @@ class DeequValidator(check: Check) extends DataQualityValidator {
     val passed = deequResult.status == CheckStatus.Success
 
     if (passed) {
-      // All checks passed
       ValidationResult.success(passedChecks = countPassedChecks(deequResult))
     } else {
-      // Some checks failed
       val failureDetails = extractFailureReason(deequResult)
       ValidationResult.failure(
         passedChecks = countPassedChecks(deequResult),

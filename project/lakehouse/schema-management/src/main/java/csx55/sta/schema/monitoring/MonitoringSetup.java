@@ -7,30 +7,30 @@ import org.slf4j.LoggerFactory;
 
 public class MonitoringSetup extends AbstractTableSetup {
 
-    private static final Logger logger = LoggerFactory.getLogger(MonitoringSetup.class);
+  private static final Logger logger = LoggerFactory.getLogger(MonitoringSetup.class);
 
-    public MonitoringSetup(StreamConfig config) {
-        super(config);
-    }
+  public MonitoringSetup(StreamConfig config) {
+    super(config);
+  }
 
-    @Override
-    protected String getLayerName() {
-        return "Monitoring Infrastructure";
-    }
+  @Override
+  protected String getLayerName() {
+    return "Monitoring Infrastructure";
+  }
 
-    @Override
-    protected String getDDLResourcePath() {
-        return "ddl/monitoring";
-    }
+  @Override
+  protected String getDDLResourcePath() {
+    return "ddl/monitoring";
+  }
 
-    @Override
-    protected void createNamespaces() {
-        ensureNamespaceExists("lakehouse.monitoring");
-        ensureNamespaceExists("lakehouse.quarantine");
-    }
+  @Override
+  protected void createNamespaces() {
+    ensureNamespaceExists("lakehouse.monitoring");
+    ensureNamespaceExists("lakehouse.quarantine");
+  }
 
-    @Override
-    protected void performAdditionalSetup() {
-        logger.info("Quarantine namespace prepared for on-demand table creation");
-    }
+  @Override
+  protected void performAdditionalSetup() {
+    logger.info("Quarantine namespace prepared for on-demand table creation");
+  }
 }

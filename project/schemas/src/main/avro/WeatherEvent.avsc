@@ -2,7 +2,7 @@
   "namespace": "csx55.sta.schema",
   "type": "record",
   "name": "WeatherEvent",
-  "doc": "Weather conditions affecting a location",
+  "doc": "Weather condition",
   "fields": [
     {
       "name": "timestamp",

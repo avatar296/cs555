@@ -7,34 +7,33 @@ import csx55.sta.schema.SpecialEvent;
 
 public class SpecialEventStreamProducer extends EventStreamProducer<SpecialEvent> {
 
-    private final SyntheticSpecialEventGenerator generator;
+  private final SyntheticSpecialEventGenerator generator;
 
-    public SpecialEventStreamProducer(SyntheticProducerConfig.StreamConfig config,
-                                      SyntheticProducerConfig globalConfig) {
-        super("Event", config, globalConfig);
-        this.generator = new SyntheticSpecialEventGenerator(
-                globalConfig.useRealtime,
-                globalConfig.timeProgressionSeconds
-        );
-    }
+  public SpecialEventStreamProducer(
+      SyntheticProducerConfig.StreamConfig config, SyntheticProducerConfig globalConfig) {
+    super("Event", config, globalConfig);
+    this.generator =
+        new SyntheticSpecialEventGenerator(
+            globalConfig.useRealtime, globalConfig.timeProgressionSeconds);
+  }
 
-    @Override
-    protected SpecialEvent generateEvent() {
-        return generator.generateEvent();
-    }
+  @Override
+  protected SpecialEvent generateEvent() {
+    return generator.generateEvent();
+  }
 
-    @Override
-    protected SpecialEvent injectError(SpecialEvent event) {
-        return errorInjector.maybeInjectError(event);
-    }
+  @Override
+  protected SpecialEvent injectError(SpecialEvent event) {
+    return errorInjector.maybeInjectError(event);
+  }
 
-    @Override
-    protected boolean isInvalid(SpecialEvent event) {
-        return ErrorInjector.isInvalidEvent(event);
-    }
+  @Override
+  protected boolean isInvalid(SpecialEvent event) {
+    return ErrorInjector.isInvalidEvent(event);
+  }
 
-    @Override
-    protected String getPartitionKey(SpecialEvent event) {
-        return String.valueOf(event.getLocationId());
-    }
+  @Override
+  protected String getPartitionKey(SpecialEvent event) {
+    return String.valueOf(event.getLocationId());
+  }
 }

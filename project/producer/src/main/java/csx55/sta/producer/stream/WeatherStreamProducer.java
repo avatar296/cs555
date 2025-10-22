@@ -7,34 +7,33 @@ import csx55.sta.schema.WeatherEvent;
 
 public class WeatherStreamProducer extends EventStreamProducer<WeatherEvent> {
 
-    private final SyntheticWeatherGenerator generator;
+  private final SyntheticWeatherGenerator generator;
 
-    public WeatherStreamProducer(SyntheticProducerConfig.StreamConfig config,
-                                 SyntheticProducerConfig globalConfig) {
-        super("Weather", config, globalConfig);
-        this.generator = new SyntheticWeatherGenerator(
-                globalConfig.useRealtime,
-                globalConfig.timeProgressionSeconds
-        );
-    }
+  public WeatherStreamProducer(
+      SyntheticProducerConfig.StreamConfig config, SyntheticProducerConfig globalConfig) {
+    super("Weather", config, globalConfig);
+    this.generator =
+        new SyntheticWeatherGenerator(
+            globalConfig.useRealtime, globalConfig.timeProgressionSeconds);
+  }
 
-    @Override
-    protected WeatherEvent generateEvent() {
-        return generator.generateEvent();
-    }
+  @Override
+  protected WeatherEvent generateEvent() {
+    return generator.generateEvent();
+  }
 
-    @Override
-    protected WeatherEvent injectError(WeatherEvent event) {
-        return errorInjector.maybeInjectError(event);
-    }
+  @Override
+  protected WeatherEvent injectError(WeatherEvent event) {
+    return errorInjector.maybeInjectError(event);
+  }
 
-    @Override
-    protected boolean isInvalid(WeatherEvent event) {
-        return ErrorInjector.isInvalidEvent(event);
-    }
+  @Override
+  protected boolean isInvalid(WeatherEvent event) {
+    return ErrorInjector.isInvalidEvent(event);
+  }
 
-    @Override
-    protected String getPartitionKey(WeatherEvent event) {
-        return String.valueOf(event.getLocationId());
-    }
+  @Override
+  protected String getPartitionKey(WeatherEvent event) {
+    return String.valueOf(event.getLocationId());
+  }
 }

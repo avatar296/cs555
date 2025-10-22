@@ -22,25 +22,23 @@ class QualityMetricsRecorder(
     quarantined: Boolean
   ): Unit = {
     try {
-      logger.debug("Recording quality metrics for batch {} (table: {})", batchId, tableName)
-
       val now = new Timestamp(System.currentTimeMillis())
 
       import scala.jdk.CollectionConverters._
       val metricsRow = spark.createDataFrame(
         Seq(
           org.apache.spark.sql.Row(
-            now,                          // timestamp: when validation ran
-            tableName,                    // table_name: which table was validated
-            jobName,                      // job_name: which job produced this batch
-            batchId,                      // batch_id: streaming batch identifier
-            recordCount,                  // record_count: number of records
-            result.status,                // status: Success, Error, Warning
-            result.passed,                // all_checks_passed: boolean
-            result.passedChecks,          // passed_checks: count
-            result.failedChecks,          // failed_checks: count
-            result.failures.orNull,       // constraint_failures: failure details (nullable)
-            quarantined                   // batch_quarantined: was it quarantined?
+            now,
+            tableName,
+            jobName,
+            batchId,
+            recordCount,
+            result.status,
+            result.passed,
+            result.passedChecks,
+            result.failedChecks,
+            result.failures.orNull,
+            quarantined
           )
         ).asJava,
         getMonitoringTableSchema()
@@ -51,11 +49,8 @@ class QualityMetricsRecorder(
         .mode(SaveMode.Append)
         .save(monitoringTable)
 
-      logger.debug("Stored quality metrics for batch {}", batchId)
-
     } catch {
       case e: Exception =>
-        // Don't fail the pipeline if metrics storage fails
         logger.warn("Failed to store quality metrics for batch {}: {}", batchId, e.getMessage)
     }
   }

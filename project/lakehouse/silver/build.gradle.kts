@@ -1,13 +1,12 @@
 plugins {
-    java
-    scala
-    application
+  java
+  scala
+  application
 }
 
 val slf4jVersion: String by rootProject.extra
 val logbackVersion: String by rootProject.extra
 
-// Spark and Iceberg versions
 val sparkVersion = "3.5.0"
 val icebergVersion = "1.6.1"
 val hadoopVersion = "3.3.4"
@@ -15,59 +14,40 @@ val deequVersion = "2.0.12-spark-3.5"
 val typesafeConfigVersion = "1.4.3"
 
 dependencies {
-    // Scala runtime (matches Spark 3.5.0 - Scala 2.12)
-    implementation("org.scala-lang:scala-library:2.12.18")
-
-    // Shared modules
-    implementation(rootProject.project(":schemas"))
-    implementation(project(":lakehouse:streaming"))
-
-    // Configuration management (needed for StreamConfig)
-    implementation("com.typesafe:config:$typesafeConfigVersion")
-
-    // Apache Spark
-    implementation("org.apache.spark:spark-sql_2.12:$sparkVersion")
-    implementation("org.apache.spark:spark-streaming_2.12:$sparkVersion")
-    implementation("org.apache.spark:spark-avro_2.12:$sparkVersion")
-
-    // Apache Iceberg
-    implementation("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:$icebergVersion")
-
-    // AWS Deequ for data quality validation
-    implementation("com.amazon.deequ:deequ:$deequVersion")
-
-    // Hadoop AWS for MinIO S3 support
-    implementation("org.apache.hadoop:hadoop-aws:$hadoopVersion")
-    implementation("com.amazonaws:aws-java-sdk-bundle:1.12.262")
-
-    // Logging
-    implementation("org.slf4j:slf4j-api:$slf4jVersion")
-    implementation("ch.qos.logback:logback-classic:$logbackVersion")
+  implementation("org.scala-lang:scala-library:2.12.18")
+  implementation(rootProject.project(":schemas"))
+  implementation(project(":lakehouse:streaming"))
+  implementation("com.typesafe:config:$typesafeConfigVersion")
+  implementation("org.apache.spark:spark-sql_2.12:$sparkVersion")
+  implementation("org.apache.spark:spark-streaming_2.12:$sparkVersion")
+  implementation("org.apache.spark:spark-avro_2.12:$sparkVersion")
+  implementation("org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:$icebergVersion")
+  implementation("com.amazon.deequ:deequ:$deequVersion")
+  implementation("org.apache.hadoop:hadoop-aws:$hadoopVersion")
+  implementation("com.amazonaws:aws-java-sdk-bundle:1.12.262")
+  implementation("org.slf4j:slf4j-api:$slf4jVersion")
+  implementation("ch.qos.logback:logback-classic:$logbackVersion")
 }
 
 application {
-    mainClass.set("csx55.sta.silver.SilverLayerApp")
+  mainClass.set("csx55.sta.silver.SilverLayerApp")
 }
 
-// Create fat JAR for Spark submission
 tasks.jar {
-    dependsOn(":lakehouse:streaming:jar")
-    archiveBaseName.set("silver")
-    archiveVersion.set("")
+  dependsOn(":lakehouse:streaming:jar")
+  archiveBaseName.set("silver")
+  archiveVersion.set("")
+  isZip64 = true
 
-    // Enable zip64 for large JARs
-    isZip64 = true
+  manifest {
+    attributes["Main-Class"] = "csx55.sta.silver.SilverLayerApp"
+  }
 
-    manifest {
-        attributes["Main-Class"] = "csx55.sta.silver.SilverLayerApp"
-    }
+  from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) }) {
+    exclude("META-INF/*.SF")
+    exclude("META-INF/*.DSA")
+    exclude("META-INF/*.RSA")
+  }
 
-    // Include dependencies (fat jar)
-    from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) }) {
-        exclude("META-INF/*.SF")
-        exclude("META-INF/*.DSA")
-        exclude("META-INF/*.RSA")
-    }
-
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

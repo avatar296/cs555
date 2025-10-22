@@ -6,6 +6,7 @@
 plugins {
     java
     id("com.github.davidmc24.gradle.plugin.avro") version "1.9.1" apply false
+    id("com.diffplug.spotless") version "6.25.0" apply false
 }
 
 allprojects {
@@ -20,6 +21,7 @@ allprojects {
 
 subprojects {
     apply(plugin = "java")
+    apply(plugin = "com.diffplug.spotless")
 
     java {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -28,6 +30,50 @@ subprojects {
 
     tasks.withType<JavaCompile> {
         options.encoding = "UTF-8"
+    }
+
+    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+        java {
+            target("src/*/java/**/*.java")
+            googleJavaFormat("1.17.0")
+            removeUnusedImports()
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+
+        if (plugins.hasPlugin("scala")) {
+            scala {
+                target("src/*/scala/**/*.scala")
+                scalafmt("3.7.17").configFile("${rootProject.projectDir}/.scalafmt.conf")
+                trimTrailingWhitespace()
+                endWithNewline()
+            }
+        }
+
+        format("misc") {
+            target("**/*.gradle.kts", "**/*.md", "**/.gitignore")
+            trimTrailingWhitespace()
+            indentWithSpaces(2)
+            endWithNewline()
+        }
+
+        format("sql") {
+            target("**/*.sql")
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+
+        format("xml") {
+            target("**/*.xml")
+            trimTrailingWhitespace()
+            indentWithSpaces(2)
+            endWithNewline()
+        }
+
+        kotlinGradle {
+            target("*.gradle.kts")
+            ktlint("1.0.1")
+        }
     }
 }
 
