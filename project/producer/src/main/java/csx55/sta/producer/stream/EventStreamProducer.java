@@ -163,7 +163,6 @@ public abstract class EventStreamProducer<T> implements Runnable {
         invalidEventsGenerated.get());
   }
 
-  // Abstract methods to be implemented by subclasses
   protected abstract T generateEvent();
 
   protected abstract T injectError(T event);
