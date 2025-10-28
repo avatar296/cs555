@@ -82,11 +82,12 @@ public class Controller {
                     break;
 
                 case REQUEST_FILE_INFO:
-                    // TODO: Implement file info request
+                    processFileInfoRequest((FileInfoRequest) message, connection);
                     break;
 
                 case REQUEST_CHUNK_SERVER_FOR_READ:
-                    // TODO: Implement chunk server for read request
+                    processChunkServerForReadRequest(
+                            (ChunkServerForReadRequest) message, connection);
                     break;
 
                 default:
@@ -203,9 +204,41 @@ public class Controller {
 
     /** Get a random chunk server that holds the specified chunk */
     public String getChunkServerForRead(String filename, int chunkNumber) {
-        // TODO: Implement chunk server selection for read
+        String key = filename + ":" + chunkNumber;
+        List<String> servers = chunkLocations.get(key);
+        if (servers == null || servers.isEmpty()) {
+            return null;
+        }
         // Return random server from available replicas
-        return null;
+        Random random = new Random();
+        return servers.get(random.nextInt(servers.size()));
+    }
+
+    /** Process file info request from client */
+    private void processFileInfoRequest(FileInfoRequest request, TCPConnection connection)
+            throws IOException {
+        String filename = request.getFilename();
+
+        // Count chunks for this file
+        int maxChunk = 0;
+        for (String key : chunkLocations.keySet()) {
+            if (key.startsWith(filename + ":")) {
+                String[] parts = key.split(":");
+                int chunkNum = Integer.parseInt(parts[1]);
+                maxChunk = Math.max(maxChunk, chunkNum);
+            }
+        }
+
+        FileInfoResponse response = new FileInfoResponse(maxChunk);
+        connection.sendMessage(response);
+    }
+
+    /** Process chunk server for read request from client */
+    private void processChunkServerForReadRequest(
+            ChunkServerForReadRequest request, TCPConnection connection) throws IOException {
+        String server = getChunkServerForRead(request.getFilename(), request.getChunkNumber());
+        ChunkServerForReadResponse response = new ChunkServerForReadResponse(server);
+        connection.sendMessage(response);
     }
 
     /** Detect failed chunk servers and initiate recovery */

@@ -264,26 +264,53 @@ public class Client {
      * Get chunk server for reading a chunk (from controller) Controller returns a random server
      * from available replicas
      */
-    private String getChunkServerForRead(String filename, int chunkNumber) throws IOException {
-        // TODO: Implement protocol to request chunk server from controller
-        return null;
+    private String getChunkServerForRead(String filename, int chunkNumber)
+            throws IOException, ClassNotFoundException {
+        try (Socket socket = new Socket(controllerHost, controllerPort);
+                TCPConnection connection = new TCPConnection(socket)) {
+
+            ChunkServerForReadRequest request =
+                    new ChunkServerForReadRequest(filename, chunkNumber);
+            connection.sendMessage(request);
+
+            Message response = connection.receiveMessage();
+            return ((ChunkServerForReadResponse) response).getChunkServer();
+        }
     }
 
     /** Read chunk from a specific chunk server */
     private byte[] readChunkFromServer(String chunkServer, String filename, int chunkNumber)
-            throws IOException {
-        // TODO: Implement chunk read from server
-        // - Parse chunkServer "ip:port"
-        // - Connect to chunk server
-        // - Request chunk
-        // - Receive and return data
-        return new byte[0];
+            throws Exception {
+        TCPConnection.Address addr = TCPConnection.Address.parse(chunkServer);
+
+        try (Socket socket = new Socket(addr.host, addr.port);
+                TCPConnection connection = new TCPConnection(socket)) {
+
+            ReadChunkRequest request = new ReadChunkRequest(filename, chunkNumber);
+            connection.sendMessage(request);
+
+            Message response = connection.receiveMessage();
+            ChunkDataResponse dataResponse = (ChunkDataResponse) response;
+
+            if (!dataResponse.isSuccess()) {
+                throw new IOException(dataResponse.getErrorMessage());
+            }
+
+            return dataResponse.getData();
+        }
     }
 
     /** Get the number of chunks for a file (from controller) */
-    private int getFileChunkCount(String filename) throws IOException {
-        // TODO: Implement protocol to get file metadata from controller
-        return 0;
+    private int getFileChunkCount(String filename) throws IOException, ClassNotFoundException {
+        try (Socket socket = new Socket(controllerHost, controllerPort);
+                TCPConnection connection = new TCPConnection(socket)) {
+
+            FileInfoRequest request = new FileInfoRequest(filename);
+            connection.sendMessage(request);
+
+            Message response = connection.receiveMessage();
+            return ((FileInfoResponse) response).getNumChunks();
+        }
     }
 
     /** Normalize destination path (remove leading ./) */
