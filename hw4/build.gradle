@@ -1,0 +1,142 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.diffplug.spotless' version '6.23.3'
+}
+
+group = 'csx55.dfs'
+version = '1.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Reed-Solomon erasure coding library
+    implementation files('reed-solomon-erasure-coding.jar')
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java']
+        }
+    }
+}
+
+// Define tasks for running different components
+task runReplicationController(type: JavaExec) {
+    group = 'application'
+    description = 'Run the Replication Controller'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.dfs.replication.Controller'
+    standardInput = System.in
+    if (project.hasProperty('appArgs')) {
+        args(project.property('appArgs').split('\\s+'))
+    }
+}
+
+task runReplicationChunkServer(type: JavaExec) {
+    group = 'application'
+    description = 'Run the Replication Chunk Server'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.dfs.replication.ChunkServer'
+    standardInput = System.in
+    if (project.hasProperty('appArgs')) {
+        args(project.property('appArgs').split('\\s+'))
+    }
+}
+
+task runReplicationClient(type: JavaExec) {
+    group = 'application'
+    description = 'Run the Replication Client'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.dfs.replication.Client'
+    standardInput = System.in
+    if (project.hasProperty('appArgs')) {
+        args(project.property('appArgs').split('\\s+'))
+    }
+}
+
+task runErasureController(type: JavaExec) {
+    group = 'application'
+    description = 'Run the Erasure Controller'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.dfs.erasure.Controller'
+    standardInput = System.in
+    if (project.hasProperty('appArgs')) {
+        args(project.property('appArgs').split('\\s+'))
+    }
+}
+
+task runErasureChunkServer(type: JavaExec) {
+    group = 'application'
+    description = 'Run the Erasure Chunk Server'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.dfs.erasure.ChunkServer'
+    standardInput = System.in
+    if (project.hasProperty('appArgs')) {
+        args(project.property('appArgs').split('\\s+'))
+    }
+}
+
+task runErasureClient(type: JavaExec) {
+    group = 'application'
+    description = 'Run the Erasure Client'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'csx55.dfs.erasure.Client'
+    standardInput = System.in
+    if (project.hasProperty('appArgs')) {
+        args(project.property('appArgs').split('\\s+'))
+    }
+}
+
+// Jar configuration to create executable jars
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'csx55.dfs.replication.Controller'
+        )
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+}
+
+// Spotless configuration for code formatting
+spotless {
+    java {
+        target 'src/**/*.java'
+
+        // Use Google Java Format
+        googleJavaFormat('1.17.0').aosp().reflowLongStrings()
+
+        // Remove unused imports
+        removeUnusedImports()
+
+        // Format imports
+        importOrder('java', 'javax', 'org', 'com', 'csx55', '')
+
+        // Trim trailing whitespace
+        trimTrailingWhitespace()
+
+        // End files with newline
+        endWithNewline()
+
+        // Custom rules
+        indentWithSpaces(4)
+
+        // License header (optional)
+        licenseHeader '/* CS555 Distributed Systems - HW4 */'
+    }
+}
