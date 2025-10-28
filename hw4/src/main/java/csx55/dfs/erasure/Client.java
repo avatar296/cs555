@@ -1,3 +1,4 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.erasure;
 
 import java.io.*;
@@ -8,17 +9,14 @@ import java.util.*;
 /**
  * Client for the Erasure Coding-based Distributed File System
  *
- * Key differences from replication:
- * - Each 64KB chunk is erasure coded into 9 fragments
- * - Fragments distributed to 9 different chunk servers
- * - Only need 6 out of 9 fragments to reconstruct chunk
- * - More storage efficient than 3x replication
+ * <p>Key differences from replication: - Each 64KB chunk is erasure coded into 9 fragments -
+ * Fragments distributed to 9 different chunk servers - Only need 6 out of 9 fragments to
+ * reconstruct chunk - More storage efficient than 3x replication
  *
- * Usage: java csx55.dfs.erasure.Client <controller-ip> <controller-port>
+ * <p>Usage: java csx55.dfs.erasure.Client <controller-ip> <controller-port>
  *
- * Commands are same as replication:
- *   upload <source> <destination>
- *   download <source> <destination>
+ * <p>Commands are same as replication: upload <source> <destination> download <source>
+ * <destination>
  */
 public class Client {
 
@@ -37,12 +35,13 @@ public class Client {
         this.controllerPort = controllerPort;
     }
 
-    /**
-     * Start the interactive client shell
-     */
+    /** Start the interactive client shell */
     public void start() {
-        System.out.println("Erasure Coding Client connected to Controller: " +
-                controllerHost + ":" + controllerPort);
+        System.out.println(
+                "Erasure Coding Client connected to Controller: "
+                        + controllerHost
+                        + ":"
+                        + controllerPort);
         System.out.println("Commands:");
         System.out.println("  upload <source> <destination>");
         System.out.println("  download <source> <destination>");
@@ -97,12 +96,9 @@ public class Client {
     /**
      * Upload a file using erasure coding
      *
-     * Process:
-     * 1. Split file into 64KB chunks
-     * 2. For each chunk:
-     *    a. Erasure code into 9 fragments (6 data + 3 parity)
-     *    b. Get 9 chunk servers from controller
-     *    c. Send each fragment to different server
+     * <p>Process: 1. Split file into 64KB chunks 2. For each chunk: a. Erasure code into 9
+     * fragments (6 data + 3 parity) b. Get 9 chunk servers from controller c. Send each fragment to
+     * different server
      */
     public void uploadFile(String sourcePath, String destPath) throws Exception {
         File sourceFile = new File(sourcePath);
@@ -135,7 +131,8 @@ public class Client {
             List<String> fragmentServers = getChunkServersForWrite(destPath, chunkNumber);
 
             if (fragmentServers.size() != TOTAL_SHARDS) {
-                throw new IOException("Controller did not return " + TOTAL_SHARDS + " chunk servers");
+                throw new IOException(
+                        "Controller did not return " + TOTAL_SHARDS + " chunk servers");
             }
 
             // Send each fragment to its assigned server
@@ -157,17 +154,15 @@ public class Client {
     /**
      * Download a file using erasure coding
      *
-     * Process:
-     * 1. For each chunk:
-     *    a. Get available fragment locations from controller
-     *    b. Retrieve at least 6 fragments (any 6 out of 9)
-     *    c. Use Reed-Solomon to reconstruct chunk
-     * 2. Assemble chunks into file
+     * <p>Process: 1. For each chunk: a. Get available fragment locations from controller b.
+     * Retrieve at least 6 fragments (any 6 out of 9) c. Use Reed-Solomon to reconstruct chunk 2.
+     * Assemble chunks into file
      */
     public void downloadFile(String sourcePath, String destPath) throws Exception {
         sourcePath = normalizeSourcePath(sourcePath);
 
-        System.out.println("Downloading file with erasure coding: " + sourcePath + " -> " + destPath);
+        System.out.println(
+                "Downloading file with erasure coding: " + sourcePath + " -> " + destPath);
 
         int numChunks = getFileChunkCount(sourcePath);
 
@@ -188,7 +183,8 @@ public class Client {
             List<String> fragmentLocations = getFragmentLocationsForRead(sourcePath, chunkNumber);
 
             if (fragmentLocations.size() < DATA_SHARDS) {
-                throw new IOException("Not enough fragments available to reconstruct chunk " + chunkNumber);
+                throw new IOException(
+                        "Not enough fragments available to reconstruct chunk " + chunkNumber);
             }
 
             // Retrieve fragments and reconstruct chunk
@@ -228,59 +224,49 @@ public class Client {
         System.out.println("Download completed successfully");
     }
 
-    /**
-     * Encode a chunk using Reed-Solomon
-     */
+    /** Encode a chunk using Reed-Solomon */
     private byte[][] encodeChunk(byte[] chunkData) throws Exception {
         // TODO: Implement Reed-Solomon encoding
         // Use code from assignment PDF pages 6-7
         return new byte[TOTAL_SHARDS][];
     }
 
-    /**
-     * Decode fragments using Reed-Solomon to reconstruct chunk
-     */
-    private byte[] decodeFragments(byte[][] fragments, boolean[] fragmentsPresent) throws Exception {
+    /** Decode fragments using Reed-Solomon to reconstruct chunk */
+    private byte[] decodeFragments(byte[][] fragments, boolean[] fragmentsPresent)
+            throws Exception {
         // TODO: Implement Reed-Solomon decoding
         // Use code from assignment PDF page 8
         return new byte[0];
     }
 
-    /**
-     * Get chunk servers for storing fragments (from controller)
-     */
-    private List<String> getChunkServersForWrite(String filename, int chunkNumber) throws IOException {
+    /** Get chunk servers for storing fragments (from controller) */
+    private List<String> getChunkServersForWrite(String filename, int chunkNumber)
+            throws IOException {
         // TODO: Implement protocol to request 9 chunk servers from controller
         return new ArrayList<>();
     }
 
-    /**
-     * Get fragment locations for reading (from controller)
-     */
-    private List<String> getFragmentLocationsForRead(String filename, int chunkNumber) throws IOException {
+    /** Get fragment locations for reading (from controller) */
+    private List<String> getFragmentLocationsForRead(String filename, int chunkNumber)
+            throws IOException {
         // TODO: Implement protocol to get fragment locations
         return new ArrayList<>();
     }
 
-    /**
-     * Send a fragment to a chunk server
-     */
-    private void sendFragment(String filename, int chunkNumber, int fragmentNumber,
-                             byte[] data, String server) throws IOException {
+    /** Send a fragment to a chunk server */
+    private void sendFragment(
+            String filename, int chunkNumber, int fragmentNumber, byte[] data, String server)
+            throws IOException {
         // TODO: Implement fragment sending
     }
 
-    /**
-     * Get file chunk count from controller
-     */
+    /** Get file chunk count from controller */
     private int getFileChunkCount(String filename) throws IOException {
         // TODO: Implement
         return 0;
     }
 
-    /**
-     * Normalize paths
-     */
+    /** Normalize paths */
     private String normalizeDestPath(String path) {
         if (path.startsWith("./")) {
             path = path.substring(2);
@@ -303,7 +289,8 @@ public class Client {
 
     public static void main(String[] args) {
         if (args.length != 2) {
-            System.err.println("Usage: java csx55.dfs.erasure.Client <controller-ip> <controller-port>");
+            System.err.println(
+                    "Usage: java csx55.dfs.erasure.Client <controller-ip> <controller-port>");
             System.exit(1);
         }
 

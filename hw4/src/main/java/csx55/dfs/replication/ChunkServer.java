@@ -1,3 +1,4 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.replication;
 
 import java.io.*;
@@ -8,18 +9,18 @@ import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import csx55.dfs.protocol.*;
+import csx55.dfs.transport.TCPConnection;
+
 /**
  * Chunk Server for the Replication-based Distributed File System
  *
- * Responsibilities:
- * - Store 64KB file chunks on local disk (/tmp/chunk-server/)
- * - Maintain SHA-1 checksums for 8KB slices within each chunk
- * - Send heartbeats to controller (major: 60s, minor: 15s)
- * - Forward chunks to other chunk servers during write pipeline
- * - Detect and report data corruption
- * - Participate in error correction and recovery
+ * <p>Responsibilities: - Store 64KB file chunks on local disk (/tmp/chunk-server/) - Maintain SHA-1
+ * checksums for 8KB slices within each chunk - Send heartbeats to controller (major: 60s, minor:
+ * 15s) - Forward chunks to other chunk servers during write pipeline - Detect and report data
+ * corruption - Participate in error correction and recovery
  *
- * Usage: java csx55.dfs.replication.ChunkServer <controller-ip> <controller-port>
+ * <p>Usage: java csx55.dfs.replication.ChunkServer <controller-ip> <controller-port>
  */
 public class ChunkServer {
 
@@ -50,9 +51,7 @@ public class ChunkServer {
         this.newChunks = Collections.synchronizedSet(new HashSet<>());
     }
 
-    /**
-     * Start the chunk server
-     */
+    /** Start the chunk server */
     public void start() throws IOException {
         // Create storage directory
         Files.createDirectories(Paths.get(storageRoot));
@@ -84,15 +83,95 @@ public class ChunkServer {
         }
     }
 
-    /**
-     * Handle incoming connections
-     */
+    /** Handle incoming connections */
     private void handleConnection(Socket socket) {
-        // TODO: Implement connection handling
-        // - Receive chunk write requests
-        // - Forward chunks to next server in pipeline
-        // - Handle chunk read requests
-        // - Handle replication requests from controller
+        try (TCPConnection connection = new TCPConnection(socket)) {
+            Message message = connection.receiveMessage();
+
+            switch (message.getType()) {
+                case STORE_CHUNK_REQUEST:
+                    handleStoreChunkRequest((StoreChunkRequest) message, connection);
+                    break;
+
+                case READ_CHUNK_REQUEST:
+                    handleReadChunkRequest((ReadChunkRequest) message, connection);
+                    break;
+
+                default:
+                    System.err.println("Unknown message type: " + message.getType());
+                    break;
+            }
+        } catch (Exception e) {
+            System.err.println("Error handling connection: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /** Handle chunk write request with pipeline forwarding */
+    private void handleStoreChunkRequest(StoreChunkRequest request, TCPConnection connection)
+            throws Exception {
+        String filename = request.getFilename();
+        int chunkNumber = request.getChunkNumber();
+        byte[] data = request.getData();
+        List<String> nextServers = request.getNextServers();
+
+        // Store chunk locally
+        storeChunk(filename, chunkNumber, data);
+
+        // Forward to next server in pipeline if any
+        if (nextServers != null && !nextServers.isEmpty()) {
+            forwardChunkToNextServer(filename, chunkNumber, data, nextServers);
+        }
+
+        // Send acknowledgment back
+        StoreChunkResponse response = new StoreChunkResponse();
+        connection.sendMessage(response);
+    }
+
+    /** Forward chunk to next server in pipeline */
+    private void forwardChunkToNextServer(
+            String filename, int chunkNumber, byte[] data, List<String> nextServers)
+            throws Exception {
+        // Parse first server address
+        String nextServerAddr = nextServers.get(0);
+        TCPConnection.Address addr = TCPConnection.Address.parse(nextServerAddr);
+
+        // Create request for next server with remaining servers
+        List<String> remainingServers = new ArrayList<>(nextServers.subList(1, nextServers.size()));
+        StoreChunkRequest forwardRequest =
+                new StoreChunkRequest(filename, chunkNumber, data, remainingServers);
+
+        // Connect and forward
+        try (Socket socket = new Socket(addr.host, addr.port);
+                TCPConnection connection = new TCPConnection(socket)) {
+
+            connection.sendMessage(forwardRequest);
+
+            // Wait for ack
+            Message response = connection.receiveMessage();
+            if (response.getType() != MessageType.STORE_CHUNK_RESPONSE) {
+                System.err.println("Unexpected response from next server: " + response.getType());
+            }
+        }
+
+        System.out.println("Forwarded chunk " + chunkNumber + " to " + nextServerAddr);
+    }
+
+    /** Handle chunk read request */
+    private void handleReadChunkRequest(ReadChunkRequest request, TCPConnection connection)
+            throws Exception {
+        String filename = request.getFilename();
+        int chunkNumber = request.getChunkNumber();
+
+        try {
+            byte[] data = readChunk(filename, chunkNumber);
+            ChunkDataResponse response = new ChunkDataResponse(filename, chunkNumber, data);
+            connection.sendMessage(response);
+        } catch (Exception e) {
+            ChunkDataResponse response =
+                    new ChunkDataResponse(filename, chunkNumber, e.getMessage());
+            connection.sendMessage(response);
+        }
     }
 
     /**
@@ -140,7 +219,8 @@ public class ChunkServer {
         Path chunkPath = getChunkPath(filename, chunkNumber);
 
         if (!Files.exists(chunkPath)) {
-            throw new FileNotFoundException("Chunk not found: " + filename + "_chunk" + chunkNumber);
+            throw new FileNotFoundException(
+                    "Chunk not found: " + filename + "_chunk" + chunkNumber);
         }
 
         try (FileInputStream fis = new FileInputStream(chunkPath.toFile())) {
@@ -160,9 +240,7 @@ public class ChunkServer {
         }
     }
 
-    /**
-     * Compute SHA-1 checksums for each 8KB slice
-     */
+    /** Compute SHA-1 checksums for each 8KB slice */
     private byte[][] computeSliceChecksums(byte[] data) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-1");
         byte[][] checksums = new byte[SLICES_PER_CHUNK][];
@@ -183,82 +261,146 @@ public class ChunkServer {
         return checksums;
     }
 
-    /**
-     * Verify chunk integrity by comparing checksums
-     */
-    private void verifyChunkIntegrity(byte[] data, byte[][] storedChecksums,
-                                     String filename, int chunkNumber) throws Exception {
+    /** Verify chunk integrity by comparing checksums */
+    private void verifyChunkIntegrity(
+            byte[] data, byte[][] storedChecksums, String filename, int chunkNumber)
+            throws Exception {
         byte[][] computedChecksums = computeSliceChecksums(data);
 
         for (int i = 0; i < SLICES_PER_CHUNK; i++) {
             if (!Arrays.equals(storedChecksums[i], computedChecksums[i])) {
                 int sliceNumber = i + 1; // 1-indexed for output
-                System.err.println(serverId + " " + chunkNumber + " " + sliceNumber + " is corrupted");
-                throw new IOException("Chunk corruption detected: " + filename +
-                                    "_chunk" + chunkNumber + " slice " + sliceNumber);
+                System.err.println(
+                        serverId + " " + chunkNumber + " " + sliceNumber + " is corrupted");
+                throw new IOException(
+                        "Chunk corruption detected: "
+                                + filename
+                                + "_chunk"
+                                + chunkNumber
+                                + " slice "
+                                + sliceNumber);
             }
         }
     }
 
-    /**
-     * Start heartbeat threads (major and minor)
-     */
+    /** Start heartbeat threads (major and minor) */
     private void startHeartbeatThreads() {
         // Minor heartbeat every 15 seconds
-        Thread minorHeartbeat = new Thread(() -> {
-            while (running) {
-                try {
-                    Thread.sleep(15000);
-                    sendMinorHeartbeat();
-                } catch (InterruptedException e) {
-                    break;
-                } catch (Exception e) {
-                    System.err.println("Error sending minor heartbeat: " + e.getMessage());
-                }
-            }
-        });
+        Thread minorHeartbeat =
+                new Thread(
+                        () -> {
+                            while (running) {
+                                try {
+                                    Thread.sleep(15000);
+                                    sendMinorHeartbeat();
+                                } catch (InterruptedException e) {
+                                    break;
+                                } catch (Exception e) {
+                                    System.err.println(
+                                            "Error sending minor heartbeat: " + e.getMessage());
+                                }
+                            }
+                        });
         minorHeartbeat.setDaemon(true);
         minorHeartbeat.start();
 
         // Major heartbeat every 60 seconds
-        Thread majorHeartbeat = new Thread(() -> {
-            while (running) {
-                try {
-                    Thread.sleep(60000);
-                    sendMajorHeartbeat();
-                } catch (InterruptedException e) {
-                    break;
-                } catch (Exception e) {
-                    System.err.println("Error sending major heartbeat: " + e.getMessage());
-                }
-            }
-        });
+        Thread majorHeartbeat =
+                new Thread(
+                        () -> {
+                            while (running) {
+                                try {
+                                    Thread.sleep(60000);
+                                    sendMajorHeartbeat();
+                                } catch (InterruptedException e) {
+                                    break;
+                                } catch (Exception e) {
+                                    System.err.println(
+                                            "Error sending major heartbeat: " + e.getMessage());
+                                }
+                            }
+                        });
         majorHeartbeat.setDaemon(true);
         majorHeartbeat.start();
     }
 
-    /**
-     * Send major heartbeat to controller (all chunks metadata)
-     */
-    private void sendMajorHeartbeat() throws IOException {
-        // TODO: Implement major heartbeat
-        // - Send all chunk metadata
-        // - Send total chunks and free space
-        // - Clear newChunks set after sending
+    /** Send major heartbeat to controller (all chunks metadata) */
+    private void sendMajorHeartbeat() throws IOException, ClassNotFoundException {
+        // Collect all chunk metadata
+        List<HeartbeatMessage.ChunkInfo> chunkList = new ArrayList<>();
+        for (ChunkMetadata metadata : chunks.values()) {
+            chunkList.add(
+                    new HeartbeatMessage.ChunkInfo(
+                            metadata.filename,
+                            metadata.chunkNumber,
+                            metadata.version,
+                            metadata.sequenceNumber,
+                            metadata.timestamp,
+                            metadata.dataSize));
+        }
+
+        // Create and send major heartbeat
+        HeartbeatMessage heartbeat =
+                new HeartbeatMessage(
+                        MessageType.MAJOR_HEARTBEAT,
+                        serverId,
+                        chunks.size(),
+                        getFreeSpace(),
+                        chunkList);
+
+        sendHeartbeatToController(heartbeat);
+
+        // Clear new chunks set after major heartbeat
+        newChunks.clear();
     }
 
-    /**
-     * Send minor heartbeat to controller (only new chunks)
-     */
-    private void sendMinorHeartbeat() throws IOException {
-        // TODO: Implement minor heartbeat
-        // - Send only newly added chunks
-        // - Send total chunks and free space
+    /** Send minor heartbeat to controller (only new chunks) */
+    private void sendMinorHeartbeat() throws IOException, ClassNotFoundException {
+        // Collect only new chunk metadata
+        List<HeartbeatMessage.ChunkInfo> chunkList = new ArrayList<>();
+        for (String chunkKey : newChunks) {
+            ChunkMetadata metadata = chunks.get(chunkKey);
+            if (metadata != null) {
+                chunkList.add(
+                        new HeartbeatMessage.ChunkInfo(
+                                metadata.filename,
+                                metadata.chunkNumber,
+                                metadata.version,
+                                metadata.sequenceNumber,
+                                metadata.timestamp,
+                                metadata.dataSize));
+            }
+        }
+
+        // Create and send minor heartbeat
+        HeartbeatMessage heartbeat =
+                new HeartbeatMessage(
+                        MessageType.MINOR_HEARTBEAT,
+                        serverId,
+                        chunks.size(),
+                        getFreeSpace(),
+                        chunkList);
+
+        sendHeartbeatToController(heartbeat);
     }
 
-    /**
-     * Get the file path for a chunk
-     */
+    /** Send heartbeat message to controller */
+    private void sendHeartbeatToController(HeartbeatMessage heartbeat)
+            throws IOException, ClassNotFoundException {
+        try (Socket socket = new Socket(controllerHost, controllerPort);
+                TCPConnection connection = new TCPConnection(socket)) {
+
+            connection.sendMessage(heartbeat);
+
+            // Wait for acknowledgment
+            Message response = connection.receiveMessage();
+            if (response.getType() != MessageType.HEARTBEAT_RESPONSE) {
+                System.err.println("Unexpected response to heartbeat: " + response.getType());
+            }
+        }
+    }
+
+    /** Get the file path for a chunk */
     private Path getChunkPath(String filename, int chunkNumber) {
         // If filename starts with /, remove it
         if (filename.startsWith("/")) {
@@ -267,27 +409,26 @@ public class ChunkServer {
         return Paths.get(storageRoot, filename + "_chunk" + chunkNumber);
     }
 
-    /**
-     * Get the unique key for a chunk
-     */
+    /** Get the unique key for a chunk */
     private String getChunkKey(String filename, int chunkNumber) {
         return filename + ":" + chunkNumber;
     }
 
-    /**
-     * Calculate free space (1GB - space used)
-     */
+    /** Calculate free space (1GB - space used) */
     private long getFreeSpace() throws IOException {
-        // TODO: Calculate actual space used by chunks
         long totalSpace = 1024L * 1024L * 1024L; // 1GB
         long usedSpace = 0;
-        // Calculate used space...
+
+        // Calculate space used by all chunks
+        for (ChunkMetadata metadata : chunks.values()) {
+            // Each chunk uses: data size + checksums (160 bytes)
+            usedSpace += metadata.dataSize + (SLICES_PER_CHUNK * 20);
+        }
+
         return totalSpace - usedSpace;
     }
 
-    /**
-     * Inner class to track chunk metadata
-     */
+    /** Inner class to track chunk metadata */
     private static class ChunkMetadata {
         String filename;
         int chunkNumber;
@@ -308,7 +449,9 @@ public class ChunkServer {
 
     public static void main(String[] args) {
         if (args.length != 2) {
-            System.err.println("Usage: java csx55.dfs.replication.ChunkServer <controller-ip> <controller-port>");
+            System.err.println(
+                    "Usage: java csx55.dfs.replication.ChunkServer <controller-ip>"
+                            + " <controller-port>");
             System.exit(1);
         }
 

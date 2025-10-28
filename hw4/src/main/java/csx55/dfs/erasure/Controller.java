@@ -1,3 +1,4 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.erasure;
 
 import java.io.IOException;
@@ -9,15 +10,13 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Controller Node for the Erasure Coding-based Distributed File System
  *
- * Similar to replication Controller but manages erasure-coded fragments
- * instead of replicas.
+ * <p>Similar to replication Controller but manages erasure-coded fragments instead of replicas.
  *
- * Key differences from replication:
- * - Each chunk is split into k=6 data shards + m=3 parity shards = 9 fragments
- * - Need to track 9 fragment locations per chunk instead of 3 replicas
- * - Recovery requires at least k=6 fragments (any 6 out of 9)
+ * <p>Key differences from replication: - Each chunk is split into k=6 data shards + m=3 parity
+ * shards = 9 fragments - Need to track 9 fragment locations per chunk instead of 3 replicas -
+ * Recovery requires at least k=6 fragments (any 6 out of 9)
  *
- * Usage: java csx55.dfs.erasure.Controller <port>
+ * <p>Usage: java csx55.dfs.erasure.Controller <port>
  */
 public class Controller {
 
@@ -32,7 +31,8 @@ public class Controller {
     // Track all registered chunk servers
     private final Map<String, ChunkServerInfo> chunkServers;
 
-    // Track fragment locations: key = "filename:chunkNumber:fragmentNumber", value = server location
+    // Track fragment locations: key = "filename:chunkNumber:fragmentNumber", value = server
+    // location
     private final Map<String, List<String>> fragmentLocations;
 
     // Track last heartbeat time for failure detection
@@ -47,9 +47,7 @@ public class Controller {
         this.lastHeartbeat = new ConcurrentHashMap<>();
     }
 
-    /**
-     * Start the controller and listen for connections
-     */
+    /** Start the controller and listen for connections */
     public void start() throws IOException {
         serverSocket = new ServerSocket(port);
         System.out.println("Erasure Coding Controller started on port " + port);
@@ -70,16 +68,14 @@ public class Controller {
         }
     }
 
-    /**
-     * Handle incoming connections from chunk servers and clients
-     */
+    /** Handle incoming connections from chunk servers and clients */
     private void handleConnection(Socket socket) {
         // TODO: Implement connection handling for erasure coding mode
     }
 
     /**
-     * Select 9 chunk servers for storing erasure-coded fragments
-     * Each fragment must go to a different server
+     * Select 9 chunk servers for storing erasure-coded fragments Each fragment must go to a
+     * different server
      *
      * @return List of 9 chunk servers in format ["ip:port", ...]
      */
@@ -90,8 +86,8 @@ public class Controller {
     }
 
     /**
-     * Get chunk servers that hold fragments for a specific chunk
-     * Need at least DATA_SHARDS (6) fragments to reconstruct
+     * Get chunk servers that hold fragments for a specific chunk Need at least DATA_SHARDS (6)
+     * fragments to reconstruct
      *
      * @return List of available fragment locations
      */
@@ -100,36 +96,32 @@ public class Controller {
         return new ArrayList<>();
     }
 
-    /**
-     * Detect failed chunk servers and initiate recovery
-     */
+    /** Detect failed chunk servers and initiate recovery */
     private void startFailureDetectionThread() {
-        Thread failureDetector = new Thread(() -> {
-            while (running) {
-                try {
-                    Thread.sleep(10000);
-                    detectFailures();
-                } catch (InterruptedException e) {
-                    break;
-                }
-            }
-        });
+        Thread failureDetector =
+                new Thread(
+                        () -> {
+                            while (running) {
+                                try {
+                                    Thread.sleep(10000);
+                                    detectFailures();
+                                } catch (InterruptedException e) {
+                                    break;
+                                }
+                            }
+                        });
         failureDetector.setDaemon(true);
         failureDetector.start();
     }
 
-    /**
-     * Detect failed chunk servers
-     */
+    /** Detect failed chunk servers */
     private void detectFailures() {
         // TODO: Implement failure detection for erasure coding
         // Need to check if enough fragments are still available
         // Minimum k=6 fragments needed per chunk
     }
 
-    /**
-     * Initiate recovery for lost fragments
-     */
+    /** Initiate recovery for lost fragments */
     private void initiateRecovery(String failedServerId) {
         // TODO: Implement recovery for erasure coding
         // - Find lost fragments
@@ -137,9 +129,7 @@ public class Controller {
         // - Instruct servers to reconstruct missing fragments
     }
 
-    /**
-     * Inner class to track chunk server information
-     */
+    /** Inner class to track chunk server information */
     private static class ChunkServerInfo {
         String serverId;
         long totalSpace;

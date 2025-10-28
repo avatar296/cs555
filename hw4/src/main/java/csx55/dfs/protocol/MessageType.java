@@ -1,8 +1,7 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.protocol;
 
-/**
- * Enumeration of all message types in the distributed file system protocol
- */
+/** Enumeration of all message types in the distributed file system protocol */
 public enum MessageType {
 
     // Heartbeat messages (ChunkServer → Controller)

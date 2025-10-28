@@ -1,3 +1,4 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.util;
 
 import java.security.MessageDigest;
@@ -5,8 +6,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
 /**
- * Utility class for computing and verifying SHA-1 checksums
- * Used for ensuring data integrity in chunks
+ * Utility class for computing and verifying SHA-1 checksums Used for ensuring data integrity in
+ * chunks
  */
 public class ChecksumUtil {
 
@@ -30,9 +31,7 @@ public class ChecksumUtil {
         }
     }
 
-    /**
-     * Compute SHA-1 checksum for entire data
-     */
+    /** Compute SHA-1 checksum for entire data */
     public static byte[] computeChecksum(byte[] data) {
         return computeChecksum(data, 0, data.length);
     }
@@ -79,9 +78,7 @@ public class ChecksumUtil {
         return -1; // All slices valid
     }
 
-    /**
-     * Convert checksum bytes to hex string (for debugging)
-     */
+    /** Convert checksum bytes to hex string (for debugging) */
     public static String toHexString(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {

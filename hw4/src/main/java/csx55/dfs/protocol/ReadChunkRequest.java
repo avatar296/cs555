@@ -1,8 +1,7 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.protocol;
 
-/**
- * Request to read a chunk from a chunk server
- */
+/** Request to read a chunk from a chunk server */
 public class ReadChunkRequest extends Message {
 
     private static final long serialVersionUID = 1L;

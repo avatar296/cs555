@@ -1,3 +1,4 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.transport;
 
 import java.io.IOException;
@@ -6,9 +7,7 @@ import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * TCP Server that accepts connections and handles them with a connection handler
- */
+/** TCP Server that accepts connections and handles them with a connection handler */
 public class TCPServerThread extends Thread {
 
     private final ServerSocket serverSocket;
@@ -28,14 +27,15 @@ public class TCPServerThread extends Thread {
         while (running) {
             try {
                 Socket clientSocket = serverSocket.accept();
-                threadPool.submit(() -> {
-                    try {
-                        handler.handleConnection(new TCPConnection(clientSocket));
-                    } catch (Exception e) {
-                        System.err.println("Error handling connection: " + e.getMessage());
-                        e.printStackTrace();
-                    }
-                });
+                threadPool.submit(
+                        () -> {
+                            try {
+                                handler.handleConnection(new TCPConnection(clientSocket));
+                            } catch (Exception e) {
+                                System.err.println("Error handling connection: " + e.getMessage());
+                                e.printStackTrace();
+                            }
+                        });
             } catch (IOException e) {
                 if (running) {
                     System.err.println("Error accepting connection: " + e.getMessage());
@@ -56,9 +56,7 @@ public class TCPServerThread extends Thread {
         }
     }
 
-    /**
-     * Interface for handling connections
-     */
+    /** Interface for handling connections */
     public interface ConnectionHandler {
         void handleConnection(TCPConnection connection) throws Exception;
     }

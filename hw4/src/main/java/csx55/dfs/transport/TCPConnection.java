@@ -1,14 +1,12 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.transport;
-
-import csx55.dfs.protocol.Message;
 
 import java.io.*;
 import java.net.Socket;
 
-/**
- * Wrapper for TCP socket connections
- * Handles message sending/receiving over TCP
- */
+import csx55.dfs.protocol.Message;
+
+/** Wrapper for TCP socket connections Handles message sending/receiving over TCP */
 public class TCPConnection implements AutoCloseable {
 
     private final Socket socket;
@@ -25,23 +23,17 @@ public class TCPConnection implements AutoCloseable {
         this(new Socket(host, port));
     }
 
-    /**
-     * Send a message over this connection
-     */
+    /** Send a message over this connection */
     public void sendMessage(Message message) throws IOException {
         message.sendTo(outputStream);
     }
 
-    /**
-     * Receive a message from this connection
-     */
+    /** Receive a message from this connection */
     public Message receiveMessage() throws IOException, ClassNotFoundException {
         return Message.receiveFrom(inputStream);
     }
 
-    /**
-     * Send raw bytes
-     */
+    /** Send raw bytes */
     public void sendBytes(byte[] data) throws IOException {
         DataOutputStream dos = new DataOutputStream(outputStream);
         dos.writeInt(data.length);
@@ -49,9 +41,7 @@ public class TCPConnection implements AutoCloseable {
         dos.flush();
     }
 
-    /**
-     * Receive raw bytes
-     */
+    /** Receive raw bytes */
     public byte[] receiveBytes() throws IOException {
         DataInputStream dis = new DataInputStream(inputStream);
         int length = dis.readInt();
@@ -60,16 +50,12 @@ public class TCPConnection implements AutoCloseable {
         return data;
     }
 
-    /**
-     * Get the remote address as "ip:port"
-     */
+    /** Get the remote address as "ip:port" */
     public String getRemoteAddress() {
         return socket.getInetAddress().getHostName() + ":" + socket.getPort();
     }
 
-    /**
-     * Check if connection is still open
-     */
+    /** Check if connection is still open */
     public boolean isConnected() {
         return socket != null && socket.isConnected() && !socket.isClosed();
     }
@@ -81,9 +67,7 @@ public class TCPConnection implements AutoCloseable {
         }
     }
 
-    /**
-     * Parse "ip:port" string into host and port
-     */
+    /** Parse "ip:port" string into host and port */
     public static class Address {
         public final String host;
         public final int port;

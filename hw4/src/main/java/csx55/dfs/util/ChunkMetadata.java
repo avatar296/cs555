@@ -1,3 +1,4 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.util;
 
 import java.io.Serializable;
@@ -5,11 +6,8 @@ import java.io.Serializable;
 /**
  * Metadata associated with a chunk
  *
- * Includes:
- * - Versioning information (incremented on writes)
- * - Sequence number
- * - Timestamp
- * - File information
+ * <p>Includes: - Versioning information (incremented on writes) - Sequence number - Timestamp -
+ * File information
  */
 public class ChunkMetadata implements Serializable {
 
@@ -31,8 +29,13 @@ public class ChunkMetadata implements Serializable {
         this.dataSize = dataSize;
     }
 
-    public ChunkMetadata(String filename, int chunkNumber, int version, int sequenceNumber,
-                        long timestamp, int dataSize) {
+    public ChunkMetadata(
+            String filename,
+            int chunkNumber,
+            int version,
+            int sequenceNumber,
+            long timestamp,
+            int dataSize) {
         this.filename = filename;
         this.chunkNumber = chunkNumber;
         this.version = version;
@@ -76,16 +79,15 @@ public class ChunkMetadata implements Serializable {
         this.timestamp = System.currentTimeMillis();
     }
 
-    /**
-     * Get unique key for this chunk
-     */
+    /** Get unique key for this chunk */
     public String getKey() {
         return filename + ":" + chunkNumber;
     }
 
     @Override
     public String toString() {
-        return String.format("ChunkMetadata{file=%s, chunk=%d, version=%d, seq=%d, size=%d, time=%d}",
+        return String.format(
+                "ChunkMetadata{file=%s, chunk=%d, version=%d, seq=%d, size=%d, time=%d}",
                 filename, chunkNumber, version, sequenceNumber, dataSize, timestamp);
     }
 }

@@ -1,3 +1,4 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.replication;
 
 import java.io.*;
@@ -6,21 +7,20 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
+import csx55.dfs.protocol.*;
+import csx55.dfs.transport.TCPConnection;
+
 /**
  * Client for the Replication-based Distributed File System
  *
- * Responsibilities:
- * - Split files into 64KB chunks for upload
- * - Coordinate with controller to get chunk server locations
- * - Write chunks to chunk servers using pipeline (A → B → C)
- * - Retrieve and assemble chunks during download
- * - Handle corruption detection and recovery during reads
+ * <p>Responsibilities: - Split files into 64KB chunks for upload - Coordinate with controller to
+ * get chunk server locations - Write chunks to chunk servers using pipeline (A → B → C) - Retrieve
+ * and assemble chunks during download - Handle corruption detection and recovery during reads
  *
- * Usage: java csx55.dfs.replication.Client <controller-ip> <controller-port>
+ * <p>Usage: java csx55.dfs.replication.Client <controller-ip> <controller-port>
  *
- * Commands:
- *   upload <source> <destination>   - Upload file to DFS
- *   download <source> <destination> - Download file from DFS
+ * <p>Commands: upload <source> <destination> - Upload file to DFS download <source> <destination> -
+ * Download file from DFS
  */
 public class Client {
 
@@ -34,9 +34,7 @@ public class Client {
         this.controllerPort = controllerPort;
     }
 
-    /**
-     * Start the interactive client shell
-     */
+    /** Start the interactive client shell */
     public void start() {
         System.out.println("Connected to Controller: " + controllerHost + ":" + controllerPort);
         System.out.println("Commands:");
@@ -227,36 +225,51 @@ public class Client {
      *
      * @return List of 3 chunk servers in format ["ip:port", "ip:port", "ip:port"]
      */
-    private List<String> getChunkServersForWrite(String filename, int chunkNumber) throws IOException {
-        // TODO: Implement protocol to request chunk servers from controller
-        // For now, return empty list
-        return new ArrayList<>();
+    private List<String> getChunkServersForWrite(String filename, int chunkNumber)
+            throws IOException, ClassNotFoundException {
+        try (Socket socket = new Socket(controllerHost, controllerPort);
+                TCPConnection connection = new TCPConnection(socket)) {
+
+            ChunkServersRequest request = new ChunkServersRequest(filename, chunkNumber, 3);
+            connection.sendMessage(request);
+
+            Message response = connection.receiveMessage();
+            return ((ChunkServersResponse) response).getChunkServers();
+        }
     }
 
     /**
-     * Write chunk using pipeline: Client → A → B → C
-     * Client only writes to first server, which forwards to next, etc.
+     * Write chunk using pipeline: Client → A → B → C Client only writes to first server, which
+     * forwards to next, etc.
      */
-    private void writeChunkPipeline(String filename, int chunkNumber, byte[] data,
-                                   List<String> chunkServers) throws IOException {
-        // TODO: Implement pipeline write
-        // - Connect to first chunk server
-        // - Send chunk data and list of next servers
-        // - First server forwards to second, second to third
+    private void writeChunkPipeline(
+            String filename, int chunkNumber, byte[] data, List<String> chunkServers)
+            throws Exception {
+        TCPConnection.Address addr = TCPConnection.Address.parse(chunkServers.get(0));
+
+        try (Socket socket = new Socket(addr.host, addr.port);
+                TCPConnection connection = new TCPConnection(socket)) {
+
+            List<String> nextServers =
+                    new ArrayList<>(chunkServers.subList(1, chunkServers.size()));
+            StoreChunkRequest request =
+                    new StoreChunkRequest(filename, chunkNumber, data, nextServers);
+
+            connection.sendMessage(request);
+            connection.receiveMessage(); // Wait for ack
+        }
     }
 
     /**
-     * Get chunk server for reading a chunk (from controller)
-     * Controller returns a random server from available replicas
+     * Get chunk server for reading a chunk (from controller) Controller returns a random server
+     * from available replicas
      */
     private String getChunkServerForRead(String filename, int chunkNumber) throws IOException {
         // TODO: Implement protocol to request chunk server from controller
         return null;
     }
 
-    /**
-     * Read chunk from a specific chunk server
-     */
+    /** Read chunk from a specific chunk server */
     private byte[] readChunkFromServer(String chunkServer, String filename, int chunkNumber)
             throws IOException {
         // TODO: Implement chunk read from server
@@ -267,17 +280,13 @@ public class Client {
         return new byte[0];
     }
 
-    /**
-     * Get the number of chunks for a file (from controller)
-     */
+    /** Get the number of chunks for a file (from controller) */
     private int getFileChunkCount(String filename) throws IOException {
         // TODO: Implement protocol to get file metadata from controller
         return 0;
     }
 
-    /**
-     * Normalize destination path (remove leading ./)
-     */
+    /** Normalize destination path (remove leading ./) */
     private String normalizeDestPath(String path) {
         if (path.startsWith("./")) {
             path = path.substring(2);
@@ -288,9 +297,7 @@ public class Client {
         return path;
     }
 
-    /**
-     * Normalize source path (remove leading ./)
-     */
+    /** Normalize source path (remove leading ./) */
     private String normalizeSourcePath(String path) {
         if (path.startsWith("./")) {
             path = path.substring(2);
@@ -303,7 +310,8 @@ public class Client {
 
     public static void main(String[] args) {
         if (args.length != 2) {
-            System.err.println("Usage: java csx55.dfs.replication.Client <controller-ip> <controller-port>");
+            System.err.println(
+                    "Usage: java csx55.dfs.replication.Client <controller-ip> <controller-port>");
             System.exit(1);
         }
 

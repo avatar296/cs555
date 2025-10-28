@@ -1,67 +1,23 @@
 #!/bin/bash
 #
-# Cleanup script for the Distributed File System project
-# Removes build artifacts, test data, and chunk server storage
+# Cleanup script for DFS testing
+# Kills all DFS processes and removes test data
 #
 
-echo "=========================================="
-echo "Cleaning Distributed File System Project"
-echo "=========================================="
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Navigate to project root (parent of scripts directory)
+cd "$SCRIPT_DIR/.."
 
-# Clean Gradle build artifacts
-echo "Cleaning Gradle build artifacts..."
-./gradlew clean
+echo "Cleaning up DFS..."
 
-# Remove chunk server storage directory
-if [ -d "/tmp/chunk-server" ]; then
-    echo "Removing chunk server storage (/tmp/chunk-server)..."
-    rm -rf /tmp/chunk-server
-    echo "  ✓ Removed /tmp/chunk-server"
-else
-    echo "  ✓ No chunk server storage found"
-fi
+# Kill all Java processes for this project
+pkill -f "csx55.dfs" 2>/dev/null || true
 
-# Remove any test data directories
-if [ -d "test-data" ]; then
-    echo "Removing test data..."
-    rm -rf test-data
-    echo "  ✓ Removed test-data/"
-else
-    echo "  ✓ No test data found"
-fi
+# Remove chunk server storage
+rm -rf /tmp/chunk-server
 
-# Remove log files
-if ls *.log 1> /dev/null 2>&1; then
-    echo "Removing log files..."
-    rm -f *.log
-    echo "  ✓ Removed log files"
-else
-    echo "  ✓ No log files found"
-fi
+# Remove test files
+rm -f /tmp/test*.txt
 
-# Remove temporary files
-if ls *.tmp 1> /dev/null 2>&1; then
-    echo "Removing temporary files..."
-    rm -f *.tmp
-    echo "  ✓ Removed temporary files"
-else
-    echo "  ✓ No temporary files found"
-fi
-
-# Clean IDE files (optional)
-read -p "Remove IDE files (.idea, *.iml, etc.)? [y/N] " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "Removing IDE files..."
-    rm -rf .idea
-    rm -f *.iml
-    rm -rf .vscode
-    rm -rf .settings
-    rm -f .classpath .project
-    echo "  ✓ Removed IDE files"
-fi
-
-echo ""
-echo "=========================================="
-echo "Cleanup complete!"
-echo "=========================================="
+echo "✓ Cleanup complete"

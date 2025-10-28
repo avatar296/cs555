@@ -1,11 +1,9 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.util;
 
 import java.io.Serializable;
 
-/**
- * Metadata for erasure-coded fragments
- * Similar to ChunkMetadata but includes fragment number
- */
+/** Metadata for erasure-coded fragments Similar to ChunkMetadata but includes fragment number */
 public class FragmentMetadata implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -28,8 +26,14 @@ public class FragmentMetadata implements Serializable {
         this.dataSize = dataSize;
     }
 
-    public FragmentMetadata(String filename, int chunkNumber, int fragmentNumber, int version,
-                           int sequenceNumber, long timestamp, int dataSize) {
+    public FragmentMetadata(
+            String filename,
+            int chunkNumber,
+            int fragmentNumber,
+            int version,
+            int sequenceNumber,
+            long timestamp,
+            int dataSize) {
         this.filename = filename;
         this.chunkNumber = chunkNumber;
         this.fragmentNumber = fragmentNumber;
@@ -78,16 +82,22 @@ public class FragmentMetadata implements Serializable {
         this.timestamp = System.currentTimeMillis();
     }
 
-    /**
-     * Get unique key for this fragment
-     */
+    /** Get unique key for this fragment */
     public String getKey() {
         return filename + ":" + chunkNumber + ":" + fragmentNumber;
     }
 
     @Override
     public String toString() {
-        return String.format("FragmentMetadata{file=%s, chunk=%d, fragment=%d, version=%d, seq=%d, size=%d, time=%d}",
-                filename, chunkNumber, fragmentNumber, version, sequenceNumber, dataSize, timestamp);
+        return String.format(
+                "FragmentMetadata{file=%s, chunk=%d, fragment=%d, version=%d, seq=%d, size=%d,"
+                        + " time=%d}",
+                filename,
+                chunkNumber,
+                fragmentNumber,
+                version,
+                sequenceNumber,
+                dataSize,
+                timestamp);
     }
 }

@@ -1,3 +1,4 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.protocol;
 
 import java.util.*;
@@ -5,9 +6,8 @@ import java.util.*;
 /**
  * Heartbeat message sent from ChunkServer to Controller
  *
- * Two types:
- * - Major (every 60s): Contains ALL chunk metadata
- * - Minor (every 15s): Contains only newly added chunks
+ * <p>Two types: - Major (every 60s): Contains ALL chunk metadata - Minor (every 15s): Contains only
+ * newly added chunks
  */
 public class HeartbeatMessage extends Message {
 
@@ -19,8 +19,12 @@ public class HeartbeatMessage extends Message {
     private final long freeSpace; // bytes
     private final List<ChunkInfo> chunks; // Chunk metadata
 
-    public HeartbeatMessage(MessageType type, String chunkServerId, int totalChunks,
-                           long freeSpace, List<ChunkInfo> chunks) {
+    public HeartbeatMessage(
+            MessageType type,
+            String chunkServerId,
+            int totalChunks,
+            long freeSpace,
+            List<ChunkInfo> chunks) {
         this.type = type;
         this.chunkServerId = chunkServerId;
         this.totalChunks = totalChunks;
@@ -49,9 +53,7 @@ public class HeartbeatMessage extends Message {
         return chunks;
     }
 
-    /**
-     * Information about a chunk or fragment
-     */
+    /** Information about a chunk or fragment */
     public static class ChunkInfo implements java.io.Serializable {
         private static final long serialVersionUID = 1L;
 
@@ -65,8 +67,13 @@ public class HeartbeatMessage extends Message {
         // For erasure coding mode
         public Integer fragmentNumber; // null for replication mode
 
-        public ChunkInfo(String filename, int chunkNumber, int version, int sequenceNumber,
-                        long timestamp, int dataSize) {
+        public ChunkInfo(
+                String filename,
+                int chunkNumber,
+                int version,
+                int sequenceNumber,
+                long timestamp,
+                int dataSize) {
             this.filename = filename;
             this.chunkNumber = chunkNumber;
             this.version = version;
@@ -76,8 +83,14 @@ public class HeartbeatMessage extends Message {
             this.fragmentNumber = null;
         }
 
-        public ChunkInfo(String filename, int chunkNumber, int fragmentNumber, int version,
-                        int sequenceNumber, long timestamp, int dataSize) {
+        public ChunkInfo(
+                String filename,
+                int chunkNumber,
+                int fragmentNumber,
+                int version,
+                int sequenceNumber,
+                long timestamp,
+                int dataSize) {
             this.filename = filename;
             this.chunkNumber = chunkNumber;
             this.version = version;

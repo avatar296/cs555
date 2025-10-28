@@ -1,96 +1,93 @@
-# Helper Scripts
+# Testing Scripts for CS555 HW4
 
-This directory contains helper scripts for managing the distributed file system.
+Simple scripts to test the distributed file system.
 
-## Startup Scripts
+## Scripts
 
-### Replication Mode
-
-```bash
-# Start controller on port 8000 (default)
-./scripts/start-replication-controller.sh
-
-# Start controller on custom port
-./scripts/start-replication-controller.sh 9000
-
-# Start chunk server
-./scripts/start-replication-chunkserver.sh localhost 8000
-
-# Start client
-./scripts/start-replication-client.sh localhost 8000
-```
-
-### Erasure Coding Mode
+### `cleanup.sh`
+Clean up all test data and kill running processes.
 
 ```bash
-# Start controller on port 8000 (default)
-./scripts/start-erasure-controller.sh
-
-# Start controller on custom port
-./scripts/start-erasure-controller.sh 9000
-
-# Start chunk server
-./scripts/start-erasure-chunkserver.sh localhost 8000
-
-# Start client
-./scripts/start-erasure-client.sh localhost 8000
-```
-
-## Utility Scripts
-
-### Format Code
-
-```bash
-# Check and apply code formatting with Spotless
-./scripts/format-code.sh
-```
-
-### Cleanup
-
-```bash
-# Remove build artifacts, chunk server storage, and test data
 ./scripts/cleanup.sh
 ```
 
-### Test System
+### `controller.sh`
+Start the Controller node.
 
 ```bash
-# Get instructions for testing the system
-./scripts/test-system.sh replication
-./scripts/test-system.sh erasure
+./scripts/controller.sh [port]
+
+# Examples:
+./scripts/controller.sh          # Start on port 8000 (default)
+./scripts/controller.sh 9000     # Start on port 9000
 ```
 
-## Quick Start
+### `chunkserver.sh`
+Start a ChunkServer.
 
-1. **Start a local test cluster (replication mode):**
-   ```bash
-   # Terminal 1: Controller
-   ./scripts/start-replication-controller.sh 8000
+```bash
+./scripts/chunkserver.sh [controller-host] [controller-port]
 
-   # Terminal 2, 3, 4: Chunk Servers
-   ./scripts/start-replication-chunkserver.sh localhost 8000
-   ./scripts/start-replication-chunkserver.sh localhost 8000
-   ./scripts/start-replication-chunkserver.sh localhost 8000
+# Examples:
+./scripts/chunkserver.sh                    # Connect to localhost:8000
+./scripts/chunkserver.sh localhost 9000     # Connect to localhost:9000
+```
 
-   # Terminal 5: Client
-   ./scripts/start-replication-client.sh localhost 8000
-   ```
+## Testing Workflow
 
-2. **Test upload/download:**
-   ```
-   > upload ./test-file.txt /test/file.txt
-   > download /test/file.txt ./downloaded.txt
-   > exit
-   ```
+### Quick Test (Upload a file)
 
-3. **Cleanup after testing:**
-   ```bash
-   ./scripts/cleanup.sh
-   ```
+**Terminal 1 - Start Controller:**
+```bash
+./scripts/controller.sh 8000
+```
+
+**Terminal 2 - Start ChunkServer 1:**
+```bash
+./scripts/chunkserver.sh localhost 8000
+```
+
+**Terminal 3 - Start ChunkServer 2:**
+```bash
+./scripts/chunkserver.sh localhost 8000
+```
+
+**Terminal 4 - Start ChunkServer 3:**
+```bash
+./scripts/chunkserver.sh localhost 8000
+```
+
+**Terminal 5 - Create test file and run client:**
+```bash
+# Create test file
+echo "This is a test file for CS555 HW4" > /tmp/test.txt
+
+# Start client
+./gradlew runReplicationClient -PappArgs="localhost 8000" --console=plain
+
+# In client prompt:
+> upload /tmp/test.txt /test/myfile.txt
+```
+
+**Expected output:**
+- File size and number of chunks
+- 3 lines of `<ip>:<port>` (the 3 replicas)
+- "Upload completed successfully"
+
+**Verify storage:**
+```bash
+find /tmp/chunk-server -name "*myfile.txt*"
+# Should show 3 copies of /test/myfile.txt_chunk1
+```
+
+### Cleanup
+```bash
+./scripts/cleanup.sh
+```
 
 ## Notes
 
-- All scripts automatically build the project before running
-- Controller defaults to port 8000
-- Chunk servers connect to localhost:8000 by default
-- Chunk server storage is in `/tmp/chunk-server/`
+- Scripts can be run from any directory (they auto-navigate to project root)
+- Controller must be started before ChunkServers
+- Wait a few seconds after starting ChunkServers for them to register
+- Use Ctrl+C to stop any component

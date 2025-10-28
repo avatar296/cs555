@@ -1,10 +1,9 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.protocol;
 
 import java.util.*;
 
-/**
- * Response from Controller to Client with list of chunk servers
- */
+/** Response from Controller to Client with list of chunk servers */
 public class ChunkServersResponse extends Message {
 
     private static final long serialVersionUID = 1L;

@@ -1,11 +1,9 @@
+/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.protocol;
 
 import java.util.*;
 
-/**
- * Request to store a chunk on a chunk server
- * Used in replication mode
- */
+/** Request to store a chunk on a chunk server Used in replication mode */
 public class StoreChunkRequest extends Message {
 
     private static final long serialVersionUID = 1L;
@@ -15,7 +13,8 @@ public class StoreChunkRequest extends Message {
     private final byte[] data;
     private final List<String> nextServers; // Servers to forward to (pipeline)
 
-    public StoreChunkRequest(String filename, int chunkNumber, byte[] data, List<String> nextServers) {
+    public StoreChunkRequest(
+            String filename, int chunkNumber, byte[] data, List<String> nextServers) {
         this.filename = filename;
         this.chunkNumber = chunkNumber;
         this.data = data;
