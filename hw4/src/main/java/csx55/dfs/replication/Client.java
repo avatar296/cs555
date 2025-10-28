@@ -184,14 +184,36 @@ public class Client {
                 fileOutput.write(chunkData);
                 chunkServersUsed.add(chunkServer);
 
-            } catch (IOException e) {
+            } catch (Exception e) {
                 // Check if it's corruption or failure
-                if (e.getMessage().contains("corrupted")) {
-                    corruptedChunks.add(chunkServer + " " + chunkNumber + " is corrupted");
+                if (e.getMessage() != null && e.getMessage().contains("corruption")) {
+                    // Extract slice number from error message
+                    // Format: "Chunk corruption detected: /test/file.txt_chunk1 slice 3"
+                    String errorMsg = e.getMessage();
+                    int sliceNumber = -1;
+
+                    if (errorMsg.contains(" slice ")) {
+                        try {
+                            String sliceStr = errorMsg.substring(errorMsg.indexOf(" slice ") + 7);
+                            sliceNumber = Integer.parseInt(sliceStr.trim());
+                        } catch (Exception parseEx) {
+                            // If parsing fails, use -1
+                        }
+                    }
+
+                    // Create formatted corruption message and embed in exception
+                    String formattedMsg =
+                            chunkServer
+                                    + " "
+                                    + chunkNumber
+                                    + " "
+                                    + sliceNumber
+                                    + " is corrupted\n"
+                                    + e.getMessage();
 
                     // Try to recover from another replica
                     // TODO: Implement recovery logic
-                    throw e;
+                    throw new IOException(formattedMsg);
                 } else {
                     failedServers.add(chunkServer + " has failed");
                     throw e;

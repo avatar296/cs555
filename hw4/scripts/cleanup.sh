@@ -14,10 +14,12 @@ echo "Cleaning up DFS..."
 # Kill all Java processes for this project
 pkill -f "csx55.dfs" 2>/dev/null || true
 
-# Remove chunk server storage
-rm -rf /tmp/chunk-server
+# Remove chunk server storage (all instances)
+rm -rf /tmp/chunk-server-*
 
 # Remove test files
 rm -f /tmp/test*.txt
+rm -f /tmp/corrupted*.txt
+rm -f /tmp/downloaded*.txt
 
 echo "✓ Cleanup complete"

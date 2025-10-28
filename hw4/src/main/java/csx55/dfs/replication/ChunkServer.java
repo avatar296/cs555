@@ -26,7 +26,7 @@ public class ChunkServer {
 
     private final String controllerHost;
     private final int controllerPort;
-    private final String storageRoot = "/tmp/chunk-server";
+    private String storageRoot; // Will be set to "/tmp/chunk-server-{port}"
 
     private ServerSocket serverSocket;
     private String serverId; // Will be "ip:port" of this server
@@ -53,18 +53,20 @@ public class ChunkServer {
 
     /** Start the chunk server */
     public void start() throws IOException {
-        // Create storage directory
-        Files.createDirectories(Paths.get(storageRoot));
-
         // Start server socket on random port
         serverSocket = new ServerSocket(0); // 0 = random available port
         int port = serverSocket.getLocalPort();
+
+        // Set storage directory based on port (unique per ChunkServer)
+        storageRoot = "/tmp/chunk-server-" + port;
+        Files.createDirectories(Paths.get(storageRoot));
 
         // Determine server ID
         String hostname = java.net.InetAddress.getLocalHost().getHostName();
         serverId = hostname + ":" + port;
 
         System.out.println("ChunkServer started: " + serverId);
+        System.out.println("Storage directory: " + storageRoot);
         System.out.println("Connected to Controller: " + controllerHost + ":" + controllerPort);
 
         // Start heartbeat threads
