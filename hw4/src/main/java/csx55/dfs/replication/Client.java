@@ -169,55 +169,71 @@ public class Client {
         // Download each chunk
         for (int i = 0; i < numChunks; i++) {
             int chunkNumber = i + 1; // 1-indexed
+            boolean chunkSucceeded = false;
+            byte[] chunkData = null;
 
-            // Get a chunk server for this chunk
-            String chunkServer = getChunkServerForRead(sourcePath, chunkNumber);
+            // Retry loop: try up to 3 replicas in case of corruption
+            for (int attempt = 0; attempt < 3; attempt++) {
+                // Get a chunk server for this chunk
+                String chunkServer = getChunkServerForRead(sourcePath, chunkNumber);
 
-            if (chunkServer == null) {
-                failedServers.add("Failed to locate chunk " + chunkNumber);
-                throw new IOException("Cannot locate chunk " + chunkNumber);
+                if (chunkServer == null) {
+                    failedServers.add("Failed to locate chunk " + chunkNumber);
+                    throw new IOException("Cannot locate chunk " + chunkNumber);
+                }
+
+                try {
+                    // Read chunk from server
+                    chunkData = readChunkFromServer(chunkServer, sourcePath, chunkNumber);
+                    chunkServersUsed.add(chunkServer);
+                    chunkSucceeded = true;
+                    break; // Success! Exit retry loop
+
+                } catch (Exception e) {
+                    // Check if it's corruption or failure
+                    if (e.getMessage() != null && e.getMessage().contains("corruption")) {
+                        // Extract slice number from error message
+                        // Format: "Chunk corruption detected: /test/file.txt_chunk1 slice 3"
+                        String errorMsg = e.getMessage();
+                        int sliceNumber = -1;
+
+                        if (errorMsg.contains(" slice ")) {
+                            try {
+                                String sliceStr =
+                                        errorMsg.substring(errorMsg.indexOf(" slice ") + 7);
+                                sliceNumber = Integer.parseInt(sliceStr.trim());
+                            } catch (Exception parseEx) {
+                                // If parsing fails, use -1
+                            }
+                        }
+
+                        // Create formatted corruption message
+                        String corruptionMsg =
+                                chunkServer
+                                        + " "
+                                        + chunkNumber
+                                        + " "
+                                        + sliceNumber
+                                        + " is corrupted";
+                        corruptedChunks.add(corruptionMsg);
+
+                        // If this was the last attempt, throw exception
+                        if (attempt == 2) {
+                            throw new IOException("All replicas failed for chunk " + chunkNumber);
+                        }
+                        // Otherwise, continue to next attempt (retry with different server)
+
+                    } else {
+                        // Non-corruption error (server failure, network issue, etc.)
+                        failedServers.add(chunkServer + " has failed");
+                        throw e; // Don't retry for non-corruption errors
+                    }
+                }
             }
 
-            try {
-                // Read chunk from server
-                byte[] chunkData = readChunkFromServer(chunkServer, sourcePath, chunkNumber);
+            // Write the successfully retrieved chunk
+            if (chunkSucceeded && chunkData != null) {
                 fileOutput.write(chunkData);
-                chunkServersUsed.add(chunkServer);
-
-            } catch (Exception e) {
-                // Check if it's corruption or failure
-                if (e.getMessage() != null && e.getMessage().contains("corruption")) {
-                    // Extract slice number from error message
-                    // Format: "Chunk corruption detected: /test/file.txt_chunk1 slice 3"
-                    String errorMsg = e.getMessage();
-                    int sliceNumber = -1;
-
-                    if (errorMsg.contains(" slice ")) {
-                        try {
-                            String sliceStr = errorMsg.substring(errorMsg.indexOf(" slice ") + 7);
-                            sliceNumber = Integer.parseInt(sliceStr.trim());
-                        } catch (Exception parseEx) {
-                            // If parsing fails, use -1
-                        }
-                    }
-
-                    // Create formatted corruption message and embed in exception
-                    String formattedMsg =
-                            chunkServer
-                                    + " "
-                                    + chunkNumber
-                                    + " "
-                                    + sliceNumber
-                                    + " is corrupted\n"
-                                    + e.getMessage();
-
-                    // Try to recover from another replica
-                    // TODO: Implement recovery logic
-                    throw new IOException(formattedMsg);
-                } else {
-                    failedServers.add(chunkServer + " has failed");
-                    throw e;
-                }
             }
         }
 
