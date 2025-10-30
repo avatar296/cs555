@@ -2,63 +2,48 @@
 package csx55.dfs.erasure;
 
 import java.io.*;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import csx55.dfs.base.BaseChunkServer;
+import csx55.dfs.protocol.*;
 import csx55.dfs.util.DFSConfig;
 import csx55.dfs.util.FragmentMetadata;
 
-public class ChunkServer {
-
-    private final String controllerHost;
-    private final int controllerPort;
-    private final String storageRoot = "/tmp/chunk-server";
-
-    private ServerSocket serverSocket;
-    private String serverId;
+public class ChunkServer extends BaseChunkServer {
 
     private final Map<String, FragmentMetadata> fragments;
     private final Set<String> newFragments;
 
-    private volatile boolean running = true;
-
     public ChunkServer(String controllerHost, int controllerPort) {
-        this.controllerHost = controllerHost;
-        this.controllerPort = controllerPort;
+        super(controllerHost, controllerPort);
         this.fragments = new ConcurrentHashMap<>();
         this.newFragments = Collections.synchronizedSet(new HashSet<>());
     }
 
-    public void start() throws IOException {
-        Files.createDirectories(Paths.get(storageRoot));
-
-        serverSocket = new ServerSocket(0);
-        int port = serverSocket.getLocalPort();
-
-        String hostname = java.net.InetAddress.getLocalHost().getHostName();
-        serverId = hostname + ":" + port;
-
-        System.out.println("Erasure Coding ChunkServer started: " + serverId);
-        System.out.println("Connected to Controller: " + controllerHost + ":" + controllerPort);
-
-        startHeartbeatThreads();
-
-        while (running) {
-            try {
-                Socket clientSocket = serverSocket.accept();
-                new Thread(() -> handleConnection(clientSocket)).start();
-            } catch (IOException e) {
-                if (running) {
-                    e.printStackTrace();
-                }
-            }
-        }
+    @Override
+    protected String getServerType() {
+        return "Erasure Coding ChunkServer";
     }
 
-    private void handleConnection(Socket socket) {
+    @Override
+    protected int getStoredCount() {
+        return fragments.size();
+    }
+
+    @Override
+    protected long calculateUsedSpace() {
+        long usedSpace = 0;
+        for (FragmentMetadata metadata : fragments.values()) {
+            usedSpace += metadata.getDataSize();
+        }
+        return usedSpace;
+    }
+
+    @Override
+    protected void handleConnection(Socket socket) {
         try (csx55.dfs.transport.TCPConnection connection =
                 new csx55.dfs.transport.TCPConnection(socket)) {
             csx55.dfs.protocol.Message message = connection.receiveMessage();
@@ -303,45 +288,8 @@ public class ChunkServer {
         return Files.readAllBytes(fragmentPath);
     }
 
-    private void startHeartbeatThreads() {
-        Thread minorHeartbeat =
-                new Thread(
-                        () -> {
-                            while (running) {
-                                try {
-                                    Thread.sleep(15000);
-                                    sendMinorHeartbeat();
-                                } catch (InterruptedException e) {
-                                    break;
-                                } catch (Exception e) {
-                                    System.err.println(
-                                            "Error sending minor heartbeat: " + e.getMessage());
-                                }
-                            }
-                        });
-        minorHeartbeat.setDaemon(true);
-        minorHeartbeat.start();
-
-        Thread majorHeartbeat =
-                new Thread(
-                        () -> {
-                            while (running) {
-                                try {
-                                    Thread.sleep(60000);
-                                    sendMajorHeartbeat();
-                                } catch (InterruptedException e) {
-                                    break;
-                                } catch (Exception e) {
-                                    System.err.println(
-                                            "Error sending major heartbeat: " + e.getMessage());
-                                }
-                            }
-                        });
-        majorHeartbeat.setDaemon(true);
-        majorHeartbeat.start();
-    }
-
-    private void sendMajorHeartbeat() throws IOException {
+    @Override
+    protected void sendMajorHeartbeat() throws IOException {
         List<csx55.dfs.protocol.HeartbeatMessage.ChunkInfo> fragmentList = new ArrayList<>();
         for (FragmentMetadata metadata : fragments.values()) {
             fragmentList.add(
@@ -368,7 +316,8 @@ public class ChunkServer {
         newFragments.clear();
     }
 
-    private void sendMinorHeartbeat() throws IOException {
+    @Override
+    protected void sendMinorHeartbeat() throws IOException {
         List<csx55.dfs.protocol.HeartbeatMessage.ChunkInfo> fragmentList = new ArrayList<>();
         for (String key : newFragments) {
             FragmentMetadata metadata = fragments.get(key);
@@ -397,33 +346,9 @@ public class ChunkServer {
         }
     }
 
-    private void sendHeartbeatToController(csx55.dfs.protocol.HeartbeatMessage heartbeat)
-            throws IOException {
-        try (Socket socket = new Socket(controllerHost, controllerPort);
-                csx55.dfs.transport.TCPConnection connection =
-                        new csx55.dfs.transport.TCPConnection(socket)) {
-            connection.sendMessage(heartbeat);
-            connection.receiveMessage(); // Wait for ack
-        } catch (Exception e) {
-            System.err.println("Error sending heartbeat: " + e.getMessage());
-        }
-    }
-
-    private long getFreeSpace() {
-        try {
-            Path path = Paths.get(storageRoot);
-            return Files.getFileStore(path).getUsableSpace();
-        } catch (IOException e) {
-            return 0;
-        }
-    }
-
     private Path getFragmentPath(String filename, int chunkNumber, int fragmentNumber) {
-        if (filename.startsWith("/")) {
-            filename = filename.substring(1);
-        }
-        return Paths.get(
-                storageRoot, filename + "_chunk" + chunkNumber + "_shard" + fragmentNumber);
+        filename = normalizeFilename(filename);
+        return getStoragePath(filename + "_chunk" + chunkNumber + "_shard" + fragmentNumber);
     }
 
     private String getFragmentKey(String filename, int chunkNumber, int fragmentNumber) {

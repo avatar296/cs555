@@ -2,160 +2,57 @@
 package csx55.dfs.erasure;
 
 import java.io.IOException;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import csx55.dfs.base.BaseController;
 import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
 import csx55.dfs.util.DFSConfig;
-import csx55.dfs.util.ServerInfo;
 
-public class Controller {
+public class Controller extends BaseController {
 
-    private final int port;
-    private ServerSocket serverSocket;
-
-    private final Map<String, ServerInfo> chunkServers;
     private final Map<String, Map<Integer, String>> fragmentLocations;
-    private final Map<String, Long> lastHeartbeat;
-
-    private volatile boolean running = true;
 
     public Controller(int port) {
-        this.port = port;
-        this.chunkServers = new ConcurrentHashMap<>();
+        super(port);
         this.fragmentLocations = new ConcurrentHashMap<>();
-        this.lastHeartbeat = new ConcurrentHashMap<>();
     }
 
-    public void start() throws IOException {
-        serverSocket = new ServerSocket(port);
-        System.out.println("Erasure Coding Controller started on port " + port);
-
-        startFailureDetectionThread();
-
-        while (running) {
-            try {
-                Socket clientSocket = serverSocket.accept();
-                new Thread(() -> handleConnection(clientSocket)).start();
-            } catch (IOException e) {
-                if (running) {
-                    e.printStackTrace();
-                }
-            }
-        }
+    @Override
+    protected String getControllerType() {
+        return "Erasure Coding Controller";
     }
 
-    private void handleConnection(Socket socket) {
-        try (TCPConnection connection = new TCPConnection(socket)) {
-            Message message = connection.receiveMessage();
-
-            switch (message.getType()) {
-                case MAJOR_HEARTBEAT:
-                case MINOR_HEARTBEAT:
-                    processHeartbeat((HeartbeatMessage) message, connection);
-                    break;
-
-                case REQUEST_CHUNK_SERVERS_FOR_WRITE:
-                    processChunkServersRequest((ChunkServersRequest) message, connection);
-                    break;
-
-                case REQUEST_FILE_INFO:
-                    processFileInfoRequest((FileInfoRequest) message, connection);
-                    break;
-
-                default:
-                    System.err.println("Unknown message type: " + message.getType());
-                    break;
-            }
-        } catch (Exception e) {
-            System.err.println("Error handling connection: " + e.getMessage());
-            e.printStackTrace();
-        }
+    @Override
+    protected int getReplicationFactor() {
+        return DFSConfig.TOTAL_SHARDS;
     }
 
-    private void processHeartbeat(HeartbeatMessage heartbeat, TCPConnection connection)
-            throws IOException {
-        String serverId = heartbeat.getChunkServerId();
-
-        ServerInfo serverInfo = chunkServers.get(serverId);
-        if (serverInfo == null) {
-            serverInfo = new ServerInfo(serverId);
-            chunkServers.put(serverId, serverInfo);
-            System.out.println("New chunk server registered: " + serverId);
-        }
-
-        serverInfo.freeSpace = heartbeat.getFreeSpace();
-        serverInfo.count = heartbeat.getTotalChunks();
-        lastHeartbeat.put(serverId, System.currentTimeMillis());
-
-        if (heartbeat.getChunks() != null) {
-            for (HeartbeatMessage.ChunkInfo chunk : heartbeat.getChunks()) {
+    @Override
+    protected void updateLocationsFromHeartbeat(
+            String serverId, List<HeartbeatMessage.ChunkInfo> chunks, MessageType type) {
+        if (chunks != null) {
+            for (HeartbeatMessage.ChunkInfo chunk : chunks) {
                 String key = chunk.filename + ":" + chunk.chunkNumber;
                 fragmentLocations
                         .computeIfAbsent(key, k -> new HashMap<>())
                         .put(chunk.fragmentNumber, serverId);
             }
         }
-
-        HeartbeatResponse response = new HeartbeatResponse();
-        connection.sendMessage(response);
     }
 
-    private void processChunkServersRequest(ChunkServersRequest request, TCPConnection connection)
-            throws IOException {
-        List<String> servers =
-                selectChunkServersForWrite(request.getFilename(), request.getChunkNumber());
-        ChunkServersResponse response = new ChunkServersResponse(servers);
-        connection.sendMessage(response);
+    @Override
+    protected Set<String> getLocationKeys() {
+        return fragmentLocations.keySet();
     }
 
-    private void processFileInfoRequest(FileInfoRequest request, TCPConnection connection)
-            throws IOException {
-        String filename = request.getFilename();
-        int maxChunk = 0;
-
-        for (String key : fragmentLocations.keySet()) {
-            if (key.startsWith(filename + ":")) {
-                String[] parts = key.split(":");
-                int chunkNum = Integer.parseInt(parts[1]);
-                maxChunk = Math.max(maxChunk, chunkNum);
-            }
-        }
-
-        FileInfoResponse response = new FileInfoResponse(maxChunk);
-        connection.sendMessage(response);
-    }
-
-    public List<String> selectChunkServersForWrite(String filename, int chunkNumber) {
-        List<ServerInfo> availableServers = new ArrayList<>(chunkServers.values());
-
-        if (availableServers.size() < DFSConfig.TOTAL_SHARDS) {
-            System.err.println(
-                    "Not enough chunk servers available. Need "
-                            + DFSConfig.TOTAL_SHARDS
-                            + ", have "
-                            + availableServers.size());
-            return new ArrayList<>();
-        }
-
-        availableServers.sort((a, b) -> Long.compare(b.freeSpace, a.freeSpace));
-
-        List<String> selected = new ArrayList<>();
-        for (int i = 0; i < DFSConfig.TOTAL_SHARDS && i < availableServers.size(); i++) {
-            selected.add(availableServers.get(i).serverId);
-        }
-
-        System.out.println(
-                "Selected chunk servers for "
-                        + filename
-                        + " chunk "
-                        + chunkNumber
-                        + ": "
-                        + selected);
-        return selected;
+    @Override
+    protected void handleAdditionalMessages(Message message, TCPConnection connection)
+            throws Exception {
+        // Erasure mode doesn't have additional message types
+        System.err.println("Unknown message type: " + message.getType());
     }
 
     public List<String> getFragmentLocationsForRead(String filename, int chunkNumber) {
@@ -179,48 +76,8 @@ public class Controller {
         return result;
     }
 
-    private void startFailureDetectionThread() {
-        Thread failureDetector =
-                new Thread(
-                        () -> {
-                            while (running) {
-                                try {
-                                    Thread.sleep(10000);
-                                    detectFailures();
-                                } catch (InterruptedException e) {
-                                    break;
-                                }
-                            }
-                        });
-        failureDetector.setDaemon(true);
-        failureDetector.start();
-    }
-
-    private void detectFailures() {
-        long currentTime = System.currentTimeMillis();
-        long failureThreshold = 180000;
-
-        List<String> failedServers = new ArrayList<>();
-
-        for (Map.Entry<String, Long> entry : lastHeartbeat.entrySet()) {
-            String serverId = entry.getKey();
-            long lastTime = entry.getValue();
-
-            if (currentTime - lastTime > failureThreshold) {
-                failedServers.add(serverId);
-            }
-        }
-
-        for (String failedServerId : failedServers) {
-            System.err.println("FAILURE DETECTED: " + failedServerId);
-            initiateRecovery(failedServerId);
-
-            chunkServers.remove(failedServerId);
-            lastHeartbeat.remove(failedServerId);
-        }
-    }
-
-    private void initiateRecovery(String failedServerId) {
+    @Override
+    protected void initiateRecovery(String failedServerId) {
         System.out.println("Initiating recovery for failed server: " + failedServerId);
 
         List<String> affectedChunks = new ArrayList<>();
@@ -290,7 +147,7 @@ public class Controller {
             }
 
             for (int missingFragmentNumber : missingFragments) {
-                String targetServer = selectNewServerForFragment(fragmentMap.values());
+                String targetServer = selectNewServerForRecovery(fragmentMap.values());
 
                 if (targetServer == null) {
                     System.err.println(
@@ -351,20 +208,6 @@ public class Controller {
                 }
             }
         }
-    }
-
-    private String selectNewServerForFragment(Collection<String> existingServers) {
-        List<ServerInfo> availableServers = new ArrayList<>(chunkServers.values());
-
-        availableServers.removeIf(server -> existingServers.contains(server.serverId));
-
-        if (availableServers.isEmpty()) {
-            return null;
-        }
-
-        availableServers.sort((a, b) -> Long.compare(b.freeSpace, a.freeSpace));
-
-        return availableServers.get(0).serverId;
     }
 
     public static void main(String[] args) {

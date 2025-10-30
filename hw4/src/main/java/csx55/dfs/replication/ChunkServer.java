@@ -2,73 +2,53 @@
 package csx55.dfs.replication;
 
 import java.io.*;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import csx55.dfs.base.BaseChunkServer;
 import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
 import csx55.dfs.util.ChunkMetadata;
 import csx55.dfs.util.DFSConfig;
 
-public class ChunkServer {
-
-    private final String controllerHost;
-    private final int controllerPort;
-    private String storageRoot;
-
-    private ServerSocket serverSocket;
-    private String serverId;
+public class ChunkServer extends BaseChunkServer {
 
     private final Map<String, ChunkMetadata> chunks;
-
     private final Set<String> newChunks;
-
-    private volatile boolean running = true;
 
     private static final int SLICE_SIZE = 8 * 1024; // 8KB
     private static final int SLICES_PER_CHUNK = DFSConfig.CHUNK_SIZE / SLICE_SIZE; // 8 slices
 
     public ChunkServer(String controllerHost, int controllerPort) {
-        this.controllerHost = controllerHost;
-        this.controllerPort = controllerPort;
+        super(controllerHost, controllerPort);
         this.chunks = new ConcurrentHashMap<>();
         this.newChunks = Collections.synchronizedSet(new HashSet<>());
     }
 
-    public void start() throws IOException {
-
-        serverSocket = new ServerSocket(0);
-        int port = serverSocket.getLocalPort();
-
-        storageRoot = "/tmp/chunk-server-" + port;
-        Files.createDirectories(Paths.get(storageRoot));
-
-        String hostname = java.net.InetAddress.getLocalHost().getHostName();
-        serverId = hostname + ":" + port;
-
-        System.out.println("ChunkServer started: " + serverId);
-        System.out.println("Storage directory: " + storageRoot);
-        System.out.println("Connected to Controller: " + controllerHost + ":" + controllerPort);
-
-        startHeartbeatThreads();
-
-        while (running) {
-            try {
-                Socket clientSocket = serverSocket.accept();
-                new Thread(() -> handleConnection(clientSocket)).start();
-            } catch (IOException e) {
-                if (running) {
-                    e.printStackTrace();
-                }
-            }
-        }
+    @Override
+    protected String getServerType() {
+        return "ChunkServer";
     }
 
-    private void handleConnection(Socket socket) {
+    @Override
+    protected int getStoredCount() {
+        return chunks.size();
+    }
+
+    @Override
+    protected long calculateUsedSpace() {
+        long usedSpace = 0;
+        for (ChunkMetadata metadata : chunks.values()) {
+            usedSpace += metadata.getDataSize() + (SLICES_PER_CHUNK * 20);
+        }
+        return usedSpace;
+    }
+
+    @Override
+    protected void handleConnection(Socket socket) {
         try (TCPConnection connection = new TCPConnection(socket)) {
             Message message = connection.receiveMessage();
 
@@ -273,45 +253,8 @@ public class ChunkServer {
         }
     }
 
-    private void startHeartbeatThreads() {
-        Thread minorHeartbeat =
-                new Thread(
-                        () -> {
-                            while (running) {
-                                try {
-                                    Thread.sleep(15000);
-                                    sendMinorHeartbeat();
-                                } catch (InterruptedException e) {
-                                    break;
-                                } catch (Exception e) {
-                                    System.err.println(
-                                            "Error sending minor heartbeat: " + e.getMessage());
-                                }
-                            }
-                        });
-        minorHeartbeat.setDaemon(true);
-        minorHeartbeat.start();
-
-        Thread majorHeartbeat =
-                new Thread(
-                        () -> {
-                            while (running) {
-                                try {
-                                    Thread.sleep(60000);
-                                    sendMajorHeartbeat();
-                                } catch (InterruptedException e) {
-                                    break;
-                                } catch (Exception e) {
-                                    System.err.println(
-                                            "Error sending major heartbeat: " + e.getMessage());
-                                }
-                            }
-                        });
-        majorHeartbeat.setDaemon(true);
-        majorHeartbeat.start();
-    }
-
-    private void sendMajorHeartbeat() throws IOException, ClassNotFoundException {
+    @Override
+    protected void sendMajorHeartbeat() throws IOException {
         List<HeartbeatMessage.ChunkInfo> chunkList = new ArrayList<>();
         for (ChunkMetadata metadata : chunks.values()) {
             chunkList.add(
@@ -337,7 +280,8 @@ public class ChunkServer {
         newChunks.clear();
     }
 
-    private void sendMinorHeartbeat() throws IOException, ClassNotFoundException {
+    @Override
+    protected void sendMinorHeartbeat() throws IOException {
         List<HeartbeatMessage.ChunkInfo> chunkList = new ArrayList<>();
         for (String chunkKey : newChunks) {
             ChunkMetadata metadata = chunks.get(chunkKey);
@@ -364,40 +308,13 @@ public class ChunkServer {
         sendHeartbeatToController(heartbeat);
     }
 
-    private void sendHeartbeatToController(HeartbeatMessage heartbeat)
-            throws IOException, ClassNotFoundException {
-        try (Socket socket = new Socket(controllerHost, controllerPort);
-                TCPConnection connection = new TCPConnection(socket)) {
-
-            connection.sendMessage(heartbeat);
-
-            Message response = connection.receiveMessage();
-            if (response.getType() != MessageType.HEARTBEAT_RESPONSE) {
-                System.err.println("Unexpected response to heartbeat: " + response.getType());
-            }
-        }
-    }
-
     private Path getChunkPath(String filename, int chunkNumber) {
-        if (filename.startsWith("/")) {
-            filename = filename.substring(1);
-        }
-        return Paths.get(storageRoot, filename + "_chunk" + chunkNumber);
+        filename = normalizeFilename(filename);
+        return getStoragePath(filename + "_chunk" + chunkNumber);
     }
 
     private String getChunkKey(String filename, int chunkNumber) {
         return filename + ":" + chunkNumber;
-    }
-
-    private long getFreeSpace() throws IOException {
-        long totalSpace = 1024L * 1024L * 1024L; // 1GB
-        long usedSpace = 0;
-
-        for (ChunkMetadata metadata : chunks.values()) {
-            usedSpace += metadata.getDataSize() + (SLICES_PER_CHUNK * 20);
-        }
-
-        return totalSpace - usedSpace;
     }
 
     public static void main(String[] args) {

@@ -7,84 +7,28 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
+import csx55.dfs.base.BaseClient;
+import csx55.dfs.protocol.*;
+import csx55.dfs.transport.TCPConnection;
 import csx55.dfs.util.DFSConfig;
-import csx55.dfs.util.PathUtil;
 
-public class Client {
-
-    private final String controllerHost;
-    private final int controllerPort;
+public class Client extends BaseClient {
 
     public Client(String controllerHost, int controllerPort) {
-        this.controllerHost = controllerHost;
-        this.controllerPort = controllerPort;
+        super(controllerHost, controllerPort);
     }
 
-    public void start() {
-        System.out.println(
-                "Erasure Coding Client connected to Controller: "
-                        + controllerHost
-                        + ":"
-                        + controllerPort);
-        System.out.println("Commands:");
-        System.out.println("  upload <source> <destination>");
-        System.out.println("  download <source> <destination>");
-        System.out.println("  exit");
-
-        Scanner scanner = new Scanner(System.in);
-        while (true) {
-            System.out.print("> ");
-            String line = scanner.nextLine().trim();
-
-            if (line.isEmpty()) {
-                continue;
-            }
-
-            String[] parts = line.split("\\s+");
-            String command = parts[0].toLowerCase();
-
-            try {
-                switch (command) {
-                    case "upload":
-                        if (parts.length != 3) {
-                            System.err.println("Usage: upload <source> <destination>");
-                        } else {
-                            uploadFile(parts[1], parts[2]);
-                        }
-                        break;
-
-                    case "download":
-                        if (parts.length != 3) {
-                            System.err.println("Usage: download <source> <destination>");
-                        } else {
-                            downloadFile(parts[1], parts[2]);
-                        }
-                        break;
-
-                    case "exit":
-                        System.out.println("Exiting...");
-                        scanner.close();
-                        return;
-
-                    default:
-                        System.err.println("Unknown command: " + command);
-                        break;
-                }
-            } catch (Exception e) {
-                System.err.println("Error: " + e.getMessage());
-                e.printStackTrace();
-            }
-        }
+    @Override
+    protected String getClientType() {
+        return "Erasure Coding Client";
     }
 
-    public void uploadFile(String sourcePath, String destPath) throws Exception {
+    @Override
+    protected void uploadFile(String sourcePath, String destPath) throws Exception {
+        validateSourceFile(sourcePath);
+        destPath = normalizePath(destPath);
+
         File sourceFile = new File(sourcePath);
-
-        if (!sourceFile.exists()) {
-            throw new FileNotFoundException("Source file not found: " + sourcePath);
-        }
-
-        destPath = PathUtil.normalize(destPath);
 
         byte[] fileData = Files.readAllBytes(sourceFile.toPath());
         int numChunks = (int) Math.ceil((double) fileData.length / DFSConfig.CHUNK_SIZE);
@@ -105,7 +49,8 @@ public class Client {
             byte[][] fragments = encodeChunk(chunkData);
 
             // Get 9 chunk servers from controller (one for each fragment)
-            List<String> fragmentServers = getChunkServersForWrite(destPath, chunkNumber);
+            List<String> fragmentServers =
+                    getChunkServersForWrite(destPath, chunkNumber, DFSConfig.TOTAL_SHARDS);
 
             if (fragmentServers.size() != DFSConfig.TOTAL_SHARDS) {
                 throw new IOException(
@@ -128,8 +73,9 @@ public class Client {
         System.out.println("Upload completed successfully");
     }
 
-    public void downloadFile(String sourcePath, String destPath) throws Exception {
-        sourcePath = PathUtil.normalize(sourcePath);
+    @Override
+    protected void downloadFile(String sourcePath, String destPath) throws Exception {
+        sourcePath = normalizePath(sourcePath);
 
         System.out.println(
                 "Downloading file with erasure coding: " + sourcePath + " -> " + destPath);
@@ -148,7 +94,8 @@ public class Client {
             int chunkNumber = i + 1;
 
             // Get available fragment locations (list of 9, index = fragment number)
-            List<String> fragmentLocations = getChunkServersForWrite(sourcePath, chunkNumber);
+            List<String> fragmentLocations =
+                    getChunkServersForWrite(sourcePath, chunkNumber, DFSConfig.TOTAL_SHARDS);
 
             // Count non-null fragments
             int availableFragments = 0;
@@ -274,35 +221,17 @@ public class Client {
         return reconstructed;
     }
 
-    private List<String> getChunkServersForWrite(String filename, int chunkNumber)
-            throws Exception {
-        try (Socket socket = new Socket(controllerHost, controllerPort);
-                csx55.dfs.transport.TCPConnection connection =
-                        new csx55.dfs.transport.TCPConnection(socket)) {
-
-            csx55.dfs.protocol.ChunkServersRequest request =
-                    new csx55.dfs.protocol.ChunkServersRequest(
-                            filename, chunkNumber, DFSConfig.TOTAL_SHARDS);
-            connection.sendMessage(request);
-
-            csx55.dfs.protocol.Message response = connection.receiveMessage();
-            return ((csx55.dfs.protocol.ChunkServersResponse) response).getChunkServers();
-        }
-    }
-
     private void sendFragment(
             String filename, int chunkNumber, int fragmentNumber, byte[] data, String server)
             throws Exception {
-        csx55.dfs.transport.TCPConnection.Address addr =
-                csx55.dfs.transport.TCPConnection.Address.parse(server);
+        TCPConnection.Address addr = TCPConnection.Address.parse(server);
 
         try (Socket socket = new Socket(addr.host, addr.port);
-                csx55.dfs.transport.TCPConnection connection =
-                        new csx55.dfs.transport.TCPConnection(socket)) {
+                TCPConnection connection = new TCPConnection(socket)) {
 
             String fragmentFilename = filename + "_chunk" + chunkNumber;
-            csx55.dfs.protocol.StoreChunkRequest request =
-                    new csx55.dfs.protocol.StoreChunkRequest(
+            StoreChunkRequest request =
+                    new StoreChunkRequest(
                             fragmentFilename, fragmentNumber, data, new ArrayList<>());
 
             connection.sendMessage(request);
@@ -310,37 +239,19 @@ public class Client {
         }
     }
 
-    private int getFileChunkCount(String filename) throws Exception {
-        try (Socket socket = new Socket(controllerHost, controllerPort);
-                csx55.dfs.transport.TCPConnection connection =
-                        new csx55.dfs.transport.TCPConnection(socket)) {
-
-            csx55.dfs.protocol.FileInfoRequest request =
-                    new csx55.dfs.protocol.FileInfoRequest(filename);
-            connection.sendMessage(request);
-
-            csx55.dfs.protocol.Message response = connection.receiveMessage();
-            return ((csx55.dfs.protocol.FileInfoResponse) response).getNumChunks();
-        }
-    }
-
     private byte[] readFragmentFromServer(
             String server, String filename, int chunkNumber, int fragmentNumber) throws Exception {
-        csx55.dfs.transport.TCPConnection.Address addr =
-                csx55.dfs.transport.TCPConnection.Address.parse(server);
+        TCPConnection.Address addr = TCPConnection.Address.parse(server);
 
         try (Socket socket = new Socket(addr.host, addr.port);
-                csx55.dfs.transport.TCPConnection connection =
-                        new csx55.dfs.transport.TCPConnection(socket)) {
+                TCPConnection connection = new TCPConnection(socket)) {
 
             String fragmentFilename = filename + "_chunk" + chunkNumber;
-            csx55.dfs.protocol.ReadChunkRequest request =
-                    new csx55.dfs.protocol.ReadChunkRequest(fragmentFilename, fragmentNumber);
+            ReadChunkRequest request = new ReadChunkRequest(fragmentFilename, fragmentNumber);
             connection.sendMessage(request);
 
-            csx55.dfs.protocol.Message response = connection.receiveMessage();
-            csx55.dfs.protocol.ChunkDataResponse dataResponse =
-                    (csx55.dfs.protocol.ChunkDataResponse) response;
+            Message response = connection.receiveMessage();
+            ChunkDataResponse dataResponse = (ChunkDataResponse) response;
 
             if (!dataResponse.isSuccess()) {
                 throw new IOException(dataResponse.getErrorMessage());

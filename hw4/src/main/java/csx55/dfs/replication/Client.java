@@ -7,83 +7,28 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
+import csx55.dfs.base.BaseClient;
 import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
 import csx55.dfs.util.DFSConfig;
-import csx55.dfs.util.PathUtil;
 
-public class Client {
-
-    private final String controllerHost;
-    private final int controllerPort;
+public class Client extends BaseClient {
 
     public Client(String controllerHost, int controllerPort) {
-        this.controllerHost = controllerHost;
-        this.controllerPort = controllerPort;
+        super(controllerHost, controllerPort);
     }
 
-    public void start() {
-        System.out.println("Connected to Controller: " + controllerHost + ":" + controllerPort);
-        System.out.println("Commands:");
-        System.out.println("  upload <source> <destination>");
-        System.out.println("  download <source> <destination>");
-        System.out.println("  exit");
-
-        Scanner scanner = new Scanner(System.in);
-        while (true) {
-            System.out.print("> ");
-            String line = scanner.nextLine().trim();
-
-            if (line.isEmpty()) {
-                continue;
-            }
-
-            String[] parts = line.split("\\s+");
-            String command = parts[0].toLowerCase();
-
-            try {
-                switch (command) {
-                    case "upload":
-                        if (parts.length != 3) {
-                            System.err.println("Usage: upload <source> <destination>");
-                        } else {
-                            uploadFile(parts[1], parts[2]);
-                        }
-                        break;
-
-                    case "download":
-                        if (parts.length != 3) {
-                            System.err.println("Usage: download <source> <destination>");
-                        } else {
-                            downloadFile(parts[1], parts[2]);
-                        }
-                        break;
-
-                    case "exit":
-                        System.out.println("Exiting...");
-                        scanner.close();
-                        return;
-
-                    default:
-                        System.err.println("Unknown command: " + command);
-                        break;
-                }
-            } catch (Exception e) {
-                System.err.println("Error: " + e.getMessage());
-                e.printStackTrace();
-            }
-        }
+    @Override
+    protected String getClientType() {
+        return "Client";
     }
 
-    public void uploadFile(String sourcePath, String destPath) throws Exception {
+    @Override
+    protected void uploadFile(String sourcePath, String destPath) throws Exception {
+        validateSourceFile(sourcePath);
+        destPath = normalizePath(destPath);
+
         File sourceFile = new File(sourcePath);
-
-        if (!sourceFile.exists()) {
-            throw new FileNotFoundException("Source file not found: " + sourcePath);
-        }
-
-        // Normalize destination path
-        destPath = PathUtil.normalize(destPath);
 
         // Read file and split into chunks
         byte[] fileData = Files.readAllBytes(sourceFile.toPath());
@@ -102,7 +47,7 @@ public class Client {
             byte[] chunkData = Arrays.copyOfRange(fileData, offset, offset + length);
 
             // Get 3 chunk servers from controller
-            List<String> chunkServers = getChunkServersForWrite(destPath, chunkNumber);
+            List<String> chunkServers = getChunkServersForWrite(destPath, chunkNumber, 3);
 
             if (chunkServers.size() != 3) {
                 throw new IOException("Controller did not return 3 chunk servers");
@@ -123,9 +68,9 @@ public class Client {
         System.out.println("Upload completed successfully");
     }
 
-    public void downloadFile(String sourcePath, String destPath) throws Exception {
-        // Normalize source path
-        sourcePath = PathUtil.normalize(sourcePath);
+    @Override
+    protected void downloadFile(String sourcePath, String destPath) throws Exception {
+        sourcePath = normalizePath(sourcePath);
 
         System.out.println("Downloading file: " + sourcePath + " -> " + destPath);
 
@@ -233,19 +178,6 @@ public class Client {
         System.out.println("Download completed successfully");
     }
 
-    private List<String> getChunkServersForWrite(String filename, int chunkNumber)
-            throws IOException, ClassNotFoundException {
-        try (Socket socket = new Socket(controllerHost, controllerPort);
-                TCPConnection connection = new TCPConnection(socket)) {
-
-            ChunkServersRequest request = new ChunkServersRequest(filename, chunkNumber, 3);
-            connection.sendMessage(request);
-
-            Message response = connection.receiveMessage();
-            return ((ChunkServersResponse) response).getChunkServers();
-        }
-    }
-
     private void writeChunkPipeline(
             String filename, int chunkNumber, byte[] data, List<String> chunkServers)
             throws Exception {
@@ -296,18 +228,6 @@ public class Client {
             }
 
             return dataResponse.getData();
-        }
-    }
-
-    private int getFileChunkCount(String filename) throws IOException, ClassNotFoundException {
-        try (Socket socket = new Socket(controllerHost, controllerPort);
-                TCPConnection connection = new TCPConnection(socket)) {
-
-            FileInfoRequest request = new FileInfoRequest(filename);
-            connection.sendMessage(request);
-
-            Message response = connection.receiveMessage();
-            return ((FileInfoResponse) response).getNumChunks();
         }
     }
 
