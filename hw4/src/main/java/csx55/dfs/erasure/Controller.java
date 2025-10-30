@@ -7,35 +7,18 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Controller Node for the Erasure Coding-based Distributed File System
- *
- * <p>Similar to replication Controller but manages erasure-coded fragments instead of replicas.
- *
- * <p>Key differences from replication: - Each chunk is split into k=6 data shards + m=3 parity
- * shards = 9 fragments - Need to track 9 fragment locations per chunk instead of 3 replicas -
- * Recovery requires at least k=6 fragments (any 6 out of 9)
- *
- * <p>Usage: java csx55.dfs.erasure.Controller <port>
- */
+import csx55.dfs.protocol.*;
+import csx55.dfs.transport.TCPConnection;
+import csx55.dfs.util.DFSConfig;
+import csx55.dfs.util.ServerInfo;
+
 public class Controller {
 
     private final int port;
     private ServerSocket serverSocket;
 
-    // Reed-Solomon parameters
-    private static final int DATA_SHARDS = 6;
-    private static final int PARITY_SHARDS = 3;
-    private static final int TOTAL_SHARDS = 9;
-
-    // Track all registered chunk servers
-    private final Map<String, ChunkServerInfo> chunkServers;
-
-    // Track fragment locations: key = "filename:chunkNumber:fragmentNumber", value = server
-    // location
-    private final Map<String, List<String>> fragmentLocations;
-
-    // Track last heartbeat time for failure detection
+    private final Map<String, ServerInfo> chunkServers;
+    private final Map<String, Map<Integer, String>> fragmentLocations;
     private final Map<String, Long> lastHeartbeat;
 
     private volatile boolean running = true;
@@ -47,15 +30,12 @@ public class Controller {
         this.lastHeartbeat = new ConcurrentHashMap<>();
     }
 
-    /** Start the controller and listen for connections */
     public void start() throws IOException {
         serverSocket = new ServerSocket(port);
         System.out.println("Erasure Coding Controller started on port " + port);
 
-        // Start failure detection thread
         startFailureDetectionThread();
 
-        // Accept connections
         while (running) {
             try {
                 Socket clientSocket = serverSocket.accept();
@@ -68,35 +48,137 @@ public class Controller {
         }
     }
 
-    /** Handle incoming connections from chunk servers and clients */
     private void handleConnection(Socket socket) {
-        // TODO: Implement connection handling for erasure coding mode
+        try (TCPConnection connection = new TCPConnection(socket)) {
+            Message message = connection.receiveMessage();
+
+            switch (message.getType()) {
+                case MAJOR_HEARTBEAT:
+                case MINOR_HEARTBEAT:
+                    processHeartbeat((HeartbeatMessage) message, connection);
+                    break;
+
+                case REQUEST_CHUNK_SERVERS_FOR_WRITE:
+                    processChunkServersRequest((ChunkServersRequest) message, connection);
+                    break;
+
+                case REQUEST_FILE_INFO:
+                    processFileInfoRequest((FileInfoRequest) message, connection);
+                    break;
+
+                default:
+                    System.err.println("Unknown message type: " + message.getType());
+                    break;
+            }
+        } catch (Exception e) {
+            System.err.println("Error handling connection: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
-    /**
-     * Select 9 chunk servers for storing erasure-coded fragments Each fragment must go to a
-     * different server
-     *
-     * @return List of 9 chunk servers in format ["ip:port", ...]
-     */
+    private void processHeartbeat(HeartbeatMessage heartbeat, TCPConnection connection)
+            throws IOException {
+        String serverId = heartbeat.getChunkServerId();
+
+        ServerInfo serverInfo = chunkServers.get(serverId);
+        if (serverInfo == null) {
+            serverInfo = new ServerInfo(serverId);
+            chunkServers.put(serverId, serverInfo);
+            System.out.println("New chunk server registered: " + serverId);
+        }
+
+        serverInfo.freeSpace = heartbeat.getFreeSpace();
+        serverInfo.count = heartbeat.getTotalChunks();
+        lastHeartbeat.put(serverId, System.currentTimeMillis());
+
+        if (heartbeat.getChunks() != null) {
+            for (HeartbeatMessage.ChunkInfo chunk : heartbeat.getChunks()) {
+                String key = chunk.filename + ":" + chunk.chunkNumber;
+                fragmentLocations
+                        .computeIfAbsent(key, k -> new HashMap<>())
+                        .put(chunk.fragmentNumber, serverId);
+            }
+        }
+
+        HeartbeatResponse response = new HeartbeatResponse();
+        connection.sendMessage(response);
+    }
+
+    private void processChunkServersRequest(ChunkServersRequest request, TCPConnection connection)
+            throws IOException {
+        List<String> servers =
+                selectChunkServersForWrite(request.getFilename(), request.getChunkNumber());
+        ChunkServersResponse response = new ChunkServersResponse(servers);
+        connection.sendMessage(response);
+    }
+
+    private void processFileInfoRequest(FileInfoRequest request, TCPConnection connection)
+            throws IOException {
+        String filename = request.getFilename();
+        int maxChunk = 0;
+
+        for (String key : fragmentLocations.keySet()) {
+            if (key.startsWith(filename + ":")) {
+                String[] parts = key.split(":");
+                int chunkNum = Integer.parseInt(parts[1]);
+                maxChunk = Math.max(maxChunk, chunkNum);
+            }
+        }
+
+        FileInfoResponse response = new FileInfoResponse(maxChunk);
+        connection.sendMessage(response);
+    }
+
     public List<String> selectChunkServersForWrite(String filename, int chunkNumber) {
-        // TODO: Implement chunk server selection for erasure coding
-        // Must return 9 different servers
-        return new ArrayList<>();
+        List<ServerInfo> availableServers = new ArrayList<>(chunkServers.values());
+
+        if (availableServers.size() < DFSConfig.TOTAL_SHARDS) {
+            System.err.println(
+                    "Not enough chunk servers available. Need "
+                            + DFSConfig.TOTAL_SHARDS
+                            + ", have "
+                            + availableServers.size());
+            return new ArrayList<>();
+        }
+
+        availableServers.sort((a, b) -> Long.compare(b.freeSpace, a.freeSpace));
+
+        List<String> selected = new ArrayList<>();
+        for (int i = 0; i < DFSConfig.TOTAL_SHARDS && i < availableServers.size(); i++) {
+            selected.add(availableServers.get(i).serverId);
+        }
+
+        System.out.println(
+                "Selected chunk servers for "
+                        + filename
+                        + " chunk "
+                        + chunkNumber
+                        + ": "
+                        + selected);
+        return selected;
     }
 
-    /**
-     * Get chunk servers that hold fragments for a specific chunk Need at least DATA_SHARDS (6)
-     * fragments to reconstruct
-     *
-     * @return List of available fragment locations
-     */
     public List<String> getFragmentLocationsForRead(String filename, int chunkNumber) {
-        // TODO: Implement fragment location retrieval
-        return new ArrayList<>();
+        String key = filename + ":" + chunkNumber;
+        Map<Integer, String> fragmentMap = fragmentLocations.get(key);
+
+        if (fragmentMap == null || fragmentMap.isEmpty()) {
+            System.err.println("No fragments found for " + filename + " chunk " + chunkNumber);
+            return new ArrayList<>();
+        }
+
+        List<String> result = new ArrayList<>(Collections.nCopies(DFSConfig.TOTAL_SHARDS, null));
+        for (Map.Entry<Integer, String> entry : fragmentMap.entrySet()) {
+            int fragmentNumber = entry.getKey();
+            String serverId = entry.getValue();
+            if (fragmentNumber >= 0 && fragmentNumber < DFSConfig.TOTAL_SHARDS) {
+                result.set(fragmentNumber, serverId);
+            }
+        }
+
+        return result;
     }
 
-    /** Detect failed chunk servers and initiate recovery */
     private void startFailureDetectionThread() {
         Thread failureDetector =
                 new Thread(
@@ -114,34 +196,175 @@ public class Controller {
         failureDetector.start();
     }
 
-    /** Detect failed chunk servers */
     private void detectFailures() {
-        // TODO: Implement failure detection for erasure coding
-        // Need to check if enough fragments are still available
-        // Minimum k=6 fragments needed per chunk
-    }
+        long currentTime = System.currentTimeMillis();
+        long failureThreshold = 180000;
 
-    /** Initiate recovery for lost fragments */
-    private void initiateRecovery(String failedServerId) {
-        // TODO: Implement recovery for erasure coding
-        // - Find lost fragments
-        // - Check if at least k=6 fragments still available
-        // - Instruct servers to reconstruct missing fragments
-    }
+        List<String> failedServers = new ArrayList<>();
 
-    /** Inner class to track chunk server information */
-    private static class ChunkServerInfo {
-        String serverId;
-        long totalSpace;
-        long freeSpace;
-        int fragmentCount;
+        for (Map.Entry<String, Long> entry : lastHeartbeat.entrySet()) {
+            String serverId = entry.getKey();
+            long lastTime = entry.getValue();
 
-        public ChunkServerInfo(String serverId) {
-            this.serverId = serverId;
-            this.totalSpace = 1024 * 1024 * 1024; // 1GB
-            this.freeSpace = totalSpace;
-            this.fragmentCount = 0;
+            if (currentTime - lastTime > failureThreshold) {
+                failedServers.add(serverId);
+            }
         }
+
+        for (String failedServerId : failedServers) {
+            System.err.println("FAILURE DETECTED: " + failedServerId);
+            initiateRecovery(failedServerId);
+
+            chunkServers.remove(failedServerId);
+            lastHeartbeat.remove(failedServerId);
+        }
+    }
+
+    private void initiateRecovery(String failedServerId) {
+        System.out.println("Initiating recovery for failed server: " + failedServerId);
+
+        List<String> affectedChunks = new ArrayList<>();
+
+        for (Map.Entry<String, Map<Integer, String>> entry : fragmentLocations.entrySet()) {
+            String chunkKey = entry.getKey();
+            Map<Integer, String> fragmentMap = entry.getValue();
+
+            for (String serverId : fragmentMap.values()) {
+                if (serverId.equals(failedServerId)) {
+                    affectedChunks.add(chunkKey);
+                    break;
+                }
+            }
+        }
+
+        System.out.println("Found " + affectedChunks.size() + " chunks affected by failure");
+
+        for (String chunkKey : affectedChunks) {
+            String[] parts = chunkKey.split(":");
+            String filename = parts[0];
+            int chunkNumber = Integer.parseInt(parts[1]);
+
+            Map<Integer, String> fragmentMap = fragmentLocations.get(chunkKey);
+
+            Set<Integer> missingFragments = new HashSet<>();
+            for (int i = 0; i < DFSConfig.TOTAL_SHARDS; i++) {
+                if (!fragmentMap.containsKey(i) || fragmentMap.get(i).equals(failedServerId)) {
+                    missingFragments.add(i);
+                }
+            }
+
+            for (int fragmentNumber : missingFragments) {
+                if (fragmentMap.containsKey(fragmentNumber)
+                        && fragmentMap.get(fragmentNumber).equals(failedServerId)) {
+                    fragmentMap.remove(fragmentNumber);
+                }
+            }
+
+            int availableFragments = DFSConfig.TOTAL_SHARDS - missingFragments.size();
+
+            if (availableFragments < DFSConfig.DATA_SHARDS) {
+                System.err.println(
+                        "ERROR: Not enough fragments to recover "
+                                + chunkKey
+                                + " (have "
+                                + availableFragments
+                                + ", need "
+                                + DFSConfig.DATA_SHARDS
+                                + ")");
+                continue;
+            }
+
+            System.out.println(
+                    "Recovering " + missingFragments.size() + " missing fragments for " + chunkKey);
+
+            Set<String> sourceServers = new HashSet<>();
+            for (Map.Entry<Integer, String> fragEntry : fragmentMap.entrySet()) {
+                sourceServers.add(fragEntry.getValue());
+            }
+
+            List<String> sourceServerList = new ArrayList<>(sourceServers);
+
+            if (sourceServerList.isEmpty()) {
+                System.err.println("ERROR: No source servers available for " + chunkKey);
+                continue;
+            }
+
+            for (int missingFragmentNumber : missingFragments) {
+                String targetServer = selectNewServerForFragment(fragmentMap.values());
+
+                if (targetServer == null) {
+                    System.err.println(
+                            "ERROR: Cannot find new server for fragment "
+                                    + missingFragmentNumber
+                                    + " of "
+                                    + chunkKey);
+                    continue;
+                }
+
+                String coordinatorServer = sourceServerList.get(0);
+
+                try {
+                    TCPConnection.Address addr = TCPConnection.Address.parse(coordinatorServer);
+                    try (Socket socket = new Socket(addr.host, addr.port);
+                            TCPConnection connection = new TCPConnection(socket)) {
+
+                        ReconstructFragmentRequest request =
+                                new ReconstructFragmentRequest(
+                                        filename,
+                                        chunkNumber,
+                                        missingFragmentNumber,
+                                        sourceServerList,
+                                        targetServer);
+                        connection.sendMessage(request);
+
+                        Message response = connection.receiveMessage();
+                        ReconstructFragmentResponse reconstructResponse =
+                                (ReconstructFragmentResponse) response;
+
+                        if (reconstructResponse.isSuccess()) {
+                            fragmentMap.put(missingFragmentNumber, targetServer);
+                            System.out.println(
+                                    "Successfully reconstructed fragment "
+                                            + missingFragmentNumber
+                                            + " of "
+                                            + chunkKey
+                                            + " to "
+                                            + targetServer);
+                        } else {
+                            System.err.println(
+                                    "Failed to reconstruct fragment "
+                                            + missingFragmentNumber
+                                            + " of "
+                                            + chunkKey
+                                            + ": "
+                                            + reconstructResponse.getErrorMessage());
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println(
+                            "Error reconstructing fragment "
+                                    + missingFragmentNumber
+                                    + " of "
+                                    + chunkKey
+                                    + ": "
+                                    + e.getMessage());
+                }
+            }
+        }
+    }
+
+    private String selectNewServerForFragment(Collection<String> existingServers) {
+        List<ServerInfo> availableServers = new ArrayList<>(chunkServers.values());
+
+        availableServers.removeIf(server -> existingServers.contains(server.serverId));
+
+        if (availableServers.isEmpty()) {
+            return null;
+        }
+
+        availableServers.sort((a, b) -> Long.compare(b.freeSpace, a.freeSpace));
+
+        return availableServers.get(0).serverId;
     }
 
     public static void main(String[] args) {

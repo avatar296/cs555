@@ -8,15 +8,9 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Chunk Server for the Erasure Coding-based Distributed File System
- *
- * <p>Key differences from replication: - Stores fragments (shards) instead of full chunk replicas -
- * Each 64KB chunk is split into 9 fragments - Uses Reed-Solomon encoding/decoding - Participates in
- * fragment reconstruction when needed
- *
- * <p>Usage: java csx55.dfs.erasure.ChunkServer <controller-ip> <controller-port>
- */
+import csx55.dfs.util.DFSConfig;
+import csx55.dfs.util.FragmentMetadata;
+
 public class ChunkServer {
 
     private final String controllerHost;
@@ -26,19 +20,10 @@ public class ChunkServer {
     private ServerSocket serverSocket;
     private String serverId;
 
-    // Track all fragments stored at this server
     private final Map<String, FragmentMetadata> fragments;
     private final Set<String> newFragments;
 
     private volatile boolean running = true;
-
-    // Reed-Solomon parameters
-    private static final int DATA_SHARDS = 6;
-    private static final int PARITY_SHARDS = 3;
-    private static final int TOTAL_SHARDS = 9;
-
-    // Chunk size
-    private static final int CHUNK_SIZE = 64 * 1024; // 64KB
 
     public ChunkServer(String controllerHost, int controllerPort) {
         this.controllerHost = controllerHost;
@@ -47,7 +32,6 @@ public class ChunkServer {
         this.newFragments = Collections.synchronizedSet(new HashSet<>());
     }
 
-    /** Start the chunk server */
     public void start() throws IOException {
         Files.createDirectories(Paths.get(storageRoot));
 
@@ -60,10 +44,8 @@ public class ChunkServer {
         System.out.println("Erasure Coding ChunkServer started: " + serverId);
         System.out.println("Connected to Controller: " + controllerHost + ":" + controllerPort);
 
-        // Start heartbeat threads
         startHeartbeatThreads();
 
-        // Accept connections
         while (running) {
             try {
                 Socket clientSocket = serverSocket.accept();
@@ -76,22 +58,213 @@ public class ChunkServer {
         }
     }
 
-    /** Handle incoming connections */
     private void handleConnection(Socket socket) {
-        // TODO: Implement connection handling for erasure coding
-        // - Receive fragment storage requests
-        // - Handle fragment read requests
-        // - Handle reconstruction requests
+        try (csx55.dfs.transport.TCPConnection connection =
+                new csx55.dfs.transport.TCPConnection(socket)) {
+            csx55.dfs.protocol.Message message = connection.receiveMessage();
+
+            switch (message.getType()) {
+                case STORE_CHUNK_REQUEST:
+                    handleStoreFragmentRequest(
+                            (csx55.dfs.protocol.StoreChunkRequest) message, connection);
+                    break;
+
+                case READ_CHUNK_REQUEST:
+                    handleReadFragmentRequest(
+                            (csx55.dfs.protocol.ReadChunkRequest) message, connection);
+                    break;
+
+                case RECONSTRUCT_FRAGMENT_REQUEST:
+                    handleReconstructFragmentRequest(
+                            (csx55.dfs.protocol.ReconstructFragmentRequest) message, connection);
+                    break;
+
+                default:
+                    System.err.println("Unknown message type: " + message.getType());
+                    break;
+            }
+        } catch (Exception e) {
+            System.err.println("Error handling connection: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
-    /**
-     * Store a fragment (shard) to disk
-     *
-     * @param filename Original file name
-     * @param chunkNumber Chunk number
-     * @param fragmentNumber Fragment number (0-8)
-     * @param data Fragment data
-     */
+    private void handleStoreFragmentRequest(
+            csx55.dfs.protocol.StoreChunkRequest request,
+            csx55.dfs.transport.TCPConnection connection)
+            throws Exception {
+        String filename = request.getFilename();
+        int fragmentNumber = request.getChunkNumber();
+        byte[] data = request.getData();
+
+        int chunkNumber = 1;
+        if (filename.contains("_chunk")) {
+            String[] parts = filename.split("_chunk");
+            if (parts.length > 1) {
+                chunkNumber = Integer.parseInt(parts[1].split("_")[0]);
+                filename = parts[0];
+            }
+        }
+
+        storeFragment(filename, chunkNumber, fragmentNumber, data);
+
+        csx55.dfs.protocol.StoreChunkResponse response =
+                new csx55.dfs.protocol.StoreChunkResponse();
+        connection.sendMessage(response);
+    }
+
+    private void handleReadFragmentRequest(
+            csx55.dfs.protocol.ReadChunkRequest request,
+            csx55.dfs.transport.TCPConnection connection)
+            throws Exception {
+        String filename = request.getFilename();
+        int fragmentNumber = request.getChunkNumber();
+
+        int chunkNumber = 1;
+        if (filename.contains("_chunk")) {
+            String[] parts = filename.split("_chunk");
+            if (parts.length > 1) {
+                chunkNumber = Integer.parseInt(parts[1].split("_")[0]);
+                filename = parts[0];
+            }
+        }
+
+        try {
+            byte[] data = readFragment(filename, chunkNumber, fragmentNumber);
+            csx55.dfs.protocol.ChunkDataResponse response =
+                    new csx55.dfs.protocol.ChunkDataResponse(filename, fragmentNumber, data);
+            connection.sendMessage(response);
+        } catch (Exception e) {
+            csx55.dfs.protocol.ChunkDataResponse response =
+                    new csx55.dfs.protocol.ChunkDataResponse(
+                            filename, fragmentNumber, e.getMessage());
+            connection.sendMessage(response);
+        }
+    }
+
+    private void handleReconstructFragmentRequest(
+            csx55.dfs.protocol.ReconstructFragmentRequest request,
+            csx55.dfs.transport.TCPConnection connection)
+            throws Exception {
+        String filename = request.getFilename();
+        int chunkNumber = request.getChunkNumber();
+        int fragmentNumber = request.getFragmentNumber();
+        List<String> sourceServers = request.getSourceServers();
+        String targetServer = request.getTargetServer();
+
+        try {
+            // Retrieve fragments from source servers
+            byte[][] fragments = new byte[DFSConfig.TOTAL_SHARDS][];
+            boolean[] fragmentsPresent = new boolean[DFSConfig.TOTAL_SHARDS];
+            int fragmentSize = 0;
+            int retrieved = 0;
+
+            // Try to retrieve fragments from source servers
+            for (int i = 0; i < sourceServers.size() && i < DFSConfig.TOTAL_SHARDS; i++) {
+                try {
+                    String server = sourceServers.get(i);
+                    csx55.dfs.transport.TCPConnection.Address addr =
+                            csx55.dfs.transport.TCPConnection.Address.parse(server);
+
+                    try (Socket socket = new Socket(addr.host, addr.port);
+                            csx55.dfs.transport.TCPConnection fragConnection =
+                                    new csx55.dfs.transport.TCPConnection(socket)) {
+
+                        // Request fragment from server
+                        String fragmentFilename = filename + "_chunk" + chunkNumber;
+                        csx55.dfs.protocol.ReadChunkRequest fragRequest =
+                                new csx55.dfs.protocol.ReadChunkRequest(fragmentFilename, i);
+                        fragConnection.sendMessage(fragRequest);
+
+                        csx55.dfs.protocol.Message fragResponse = fragConnection.receiveMessage();
+                        csx55.dfs.protocol.ChunkDataResponse dataResponse =
+                                (csx55.dfs.protocol.ChunkDataResponse) fragResponse;
+
+                        if (dataResponse.isSuccess()) {
+                            fragments[i] = dataResponse.getData();
+                            fragmentsPresent[i] = true;
+                            fragmentSize = fragments[i].length;
+                            retrieved++;
+                        }
+                    }
+                } catch (Exception e) {
+                    // Fragment not available from this server, continue
+                    fragmentsPresent[i] = false;
+                }
+            }
+
+            if (retrieved < DFSConfig.DATA_SHARDS) {
+                throw new Exception(
+                        "Not enough fragments retrieved: "
+                                + retrieved
+                                + "/"
+                                + DFSConfig.DATA_SHARDS);
+            }
+
+            // Create empty buffers for missing fragments
+            for (int i = 0; i < DFSConfig.TOTAL_SHARDS; i++) {
+                if (!fragmentsPresent[i]) {
+                    fragments[i] = new byte[fragmentSize];
+                }
+            }
+
+            // Use Reed-Solomon to reconstruct missing fragments
+            erasure.ReedSolomon reedSolomon =
+                    new erasure.ReedSolomon(DFSConfig.DATA_SHARDS, DFSConfig.PARITY_SHARDS);
+            reedSolomon.decodeMissing(fragments, fragmentsPresent, 0, fragmentSize);
+
+            // Send reconstructed fragment to target server
+            csx55.dfs.transport.TCPConnection.Address targetAddr =
+                    csx55.dfs.transport.TCPConnection.Address.parse(targetServer);
+            try (Socket targetSocket = new Socket(targetAddr.host, targetAddr.port);
+                    csx55.dfs.transport.TCPConnection targetConnection =
+                            new csx55.dfs.transport.TCPConnection(targetSocket)) {
+
+                // Send fragment using chunk protocol
+                String fragmentFilename = filename + "_chunk" + chunkNumber;
+                csx55.dfs.protocol.StoreChunkRequest storeRequest =
+                        new csx55.dfs.protocol.StoreChunkRequest(
+                                fragmentFilename,
+                                fragmentNumber,
+                                fragments[fragmentNumber],
+                                new ArrayList<>());
+
+                targetConnection.sendMessage(storeRequest);
+                targetConnection.receiveMessage(); // Wait for ack
+            }
+
+            // Send success response to Controller
+            csx55.dfs.protocol.ReconstructFragmentResponse response =
+                    new csx55.dfs.protocol.ReconstructFragmentResponse(true);
+            connection.sendMessage(response);
+
+            System.out.println(
+                    "Reconstructed "
+                            + filename
+                            + "_chunk"
+                            + chunkNumber
+                            + "_shard"
+                            + fragmentNumber
+                            + " to "
+                            + targetServer);
+
+        } catch (Exception e) {
+            // Send failure response to Controller
+            csx55.dfs.protocol.ReconstructFragmentResponse response =
+                    new csx55.dfs.protocol.ReconstructFragmentResponse(false, e.getMessage());
+            connection.sendMessage(response);
+            System.err.println(
+                    "Failed to reconstruct "
+                            + filename
+                            + "_chunk"
+                            + chunkNumber
+                            + "_shard"
+                            + fragmentNumber
+                            + ": "
+                            + e.getMessage());
+        }
+    }
+
     public void storeFragment(String filename, int chunkNumber, int fragmentNumber, byte[] data)
             throws IOException {
         Path fragmentPath = getFragmentPath(filename, chunkNumber, fragmentNumber);
@@ -99,7 +272,6 @@ public class ChunkServer {
 
         Files.write(fragmentPath, data);
 
-        // Update metadata
         FragmentMetadata metadata =
                 new FragmentMetadata(filename, chunkNumber, fragmentNumber, data.length);
         fragments.put(getFragmentKey(filename, chunkNumber, fragmentNumber), metadata);
@@ -114,7 +286,6 @@ public class ChunkServer {
                         + fragmentNumber);
     }
 
-    /** Read a fragment from disk */
     public byte[] readFragment(String filename, int chunkNumber, int fragmentNumber)
             throws IOException {
         Path fragmentPath = getFragmentPath(filename, chunkNumber, fragmentNumber);
@@ -132,51 +303,7 @@ public class ChunkServer {
         return Files.readAllBytes(fragmentPath);
     }
 
-    /**
-     * Encode a chunk using Reed-Solomon and return fragments This demonstrates how to use the
-     * Reed-Solomon library
-     *
-     * @param chunkData The 64KB chunk data
-     * @return Array of 9 fragments (6 data + 3 parity)
-     */
-    public byte[][] encodeChunk(byte[] chunkData) throws Exception {
-        // TODO: Implement Reed-Solomon encoding
-        // Use the provided reed-solomon-erasure-coding.jar
-        // See assignment PDF pages 6-7 for code examples
-
-        // Pseudocode:
-        // 1. Pad chunk data to make it divisible by DATA_SHARDS (6)
-        // 2. Split into DATA_SHARDS pieces
-        // 3. Use ReedSolomon.encodeParity() to generate parity shards
-        // 4. Return all 9 shards
-
-        return new byte[TOTAL_SHARDS][];
-    }
-
-    /**
-     * Decode fragments using Reed-Solomon to reconstruct chunk
-     *
-     * @param fragments Array of 9 fragments (some may be null/missing)
-     * @param fragmentsPresent Boolean array indicating which fragments are available
-     * @return Reconstructed chunk data
-     */
-    public byte[] decodeFragments(byte[][] fragments, boolean[] fragmentsPresent) throws Exception {
-        // TODO: Implement Reed-Solomon decoding
-        // Use the provided reed-solomon-erasure-coding.jar
-        // See assignment PDF page 8 for code examples
-
-        // Pseudocode:
-        // 1. Check if at least DATA_SHARDS (6) fragments available
-        // 2. Use ReedSolomon.decodeMissing() to reconstruct missing fragments
-        // 3. Combine data shards to reconstruct original chunk
-        // 4. Remove padding and return
-
-        return new byte[0];
-    }
-
-    /** Start heartbeat threads */
     private void startHeartbeatThreads() {
-        // Minor heartbeat every 15 seconds
         Thread minorHeartbeat =
                 new Thread(
                         () -> {
@@ -195,7 +322,6 @@ public class ChunkServer {
         minorHeartbeat.setDaemon(true);
         minorHeartbeat.start();
 
-        // Major heartbeat every 60 seconds
         Thread majorHeartbeat =
                 new Thread(
                         () -> {
@@ -215,17 +341,83 @@ public class ChunkServer {
         majorHeartbeat.start();
     }
 
-    /** Send major heartbeat to controller */
     private void sendMajorHeartbeat() throws IOException {
-        // TODO: Implement major heartbeat for erasure coding
+        List<csx55.dfs.protocol.HeartbeatMessage.ChunkInfo> fragmentList = new ArrayList<>();
+        for (FragmentMetadata metadata : fragments.values()) {
+            fragmentList.add(
+                    new csx55.dfs.protocol.HeartbeatMessage.ChunkInfo(
+                            metadata.getFilename(),
+                            metadata.getChunkNumber(),
+                            metadata.getFragmentNumber(),
+                            0,
+                            0,
+                            0,
+                            metadata.getDataSize()));
+        }
+
+        // Create and send major heartbeat
+        csx55.dfs.protocol.HeartbeatMessage heartbeat =
+                new csx55.dfs.protocol.HeartbeatMessage(
+                        csx55.dfs.protocol.MessageType.MAJOR_HEARTBEAT,
+                        serverId,
+                        fragments.size(),
+                        getFreeSpace(),
+                        fragmentList);
+
+        sendHeartbeatToController(heartbeat);
+        newFragments.clear();
     }
 
-    /** Send minor heartbeat to controller */
     private void sendMinorHeartbeat() throws IOException {
-        // TODO: Implement minor heartbeat for erasure coding
+        List<csx55.dfs.protocol.HeartbeatMessage.ChunkInfo> fragmentList = new ArrayList<>();
+        for (String key : newFragments) {
+            FragmentMetadata metadata = fragments.get(key);
+            if (metadata != null) {
+                fragmentList.add(
+                        new csx55.dfs.protocol.HeartbeatMessage.ChunkInfo(
+                                metadata.getFilename(),
+                                metadata.getChunkNumber(),
+                                metadata.getFragmentNumber(),
+                                0,
+                                0,
+                                0,
+                                metadata.getDataSize()));
+            }
+        }
+
+        if (!fragmentList.isEmpty()) {
+            csx55.dfs.protocol.HeartbeatMessage heartbeat =
+                    new csx55.dfs.protocol.HeartbeatMessage(
+                            csx55.dfs.protocol.MessageType.MINOR_HEARTBEAT,
+                            serverId,
+                            fragments.size(),
+                            getFreeSpace(),
+                            fragmentList);
+            sendHeartbeatToController(heartbeat);
+        }
     }
 
-    /** Get file path for a fragment */
+    private void sendHeartbeatToController(csx55.dfs.protocol.HeartbeatMessage heartbeat)
+            throws IOException {
+        try (Socket socket = new Socket(controllerHost, controllerPort);
+                csx55.dfs.transport.TCPConnection connection =
+                        new csx55.dfs.transport.TCPConnection(socket)) {
+            connection.sendMessage(heartbeat);
+            connection.receiveMessage(); // Wait for ack
+        } catch (Exception e) {
+            System.err.println("Error sending heartbeat: " + e.getMessage());
+        }
+    }
+
+    private long getFreeSpace() {
+        try {
+            Path path = Paths.get(storageRoot);
+            return Files.getFileStore(path).getUsableSpace();
+        } catch (IOException e) {
+            return 0;
+        }
+    }
+
     private Path getFragmentPath(String filename, int chunkNumber, int fragmentNumber) {
         if (filename.startsWith("/")) {
             filename = filename.substring(1);
@@ -234,29 +426,8 @@ public class ChunkServer {
                 storageRoot, filename + "_chunk" + chunkNumber + "_shard" + fragmentNumber);
     }
 
-    /** Get unique key for a fragment */
     private String getFragmentKey(String filename, int chunkNumber, int fragmentNumber) {
         return filename + ":" + chunkNumber + ":" + fragmentNumber;
-    }
-
-    /** Inner class to track fragment metadata */
-    private static class FragmentMetadata {
-        String filename;
-        int chunkNumber;
-        int fragmentNumber;
-        int version;
-        long timestamp;
-        int dataSize;
-
-        public FragmentMetadata(
-                String filename, int chunkNumber, int fragmentNumber, int dataSize) {
-            this.filename = filename;
-            this.chunkNumber = chunkNumber;
-            this.fragmentNumber = fragmentNumber;
-            this.version = 1;
-            this.timestamp = System.currentTimeMillis();
-            this.dataSize = dataSize;
-        }
     }
 
     public static void main(String[] args) {

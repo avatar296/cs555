@@ -3,12 +3,6 @@ package csx55.dfs.util;
 
 import java.io.Serializable;
 
-/**
- * Metadata associated with a chunk
- *
- * <p>Includes: - Versioning information (incremented on writes) - Sequence number - Timestamp -
- * File information
- */
 public class ChunkMetadata implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -24,23 +18,8 @@ public class ChunkMetadata implements Serializable {
         this.filename = filename;
         this.chunkNumber = chunkNumber;
         this.version = 1;
-        this.sequenceNumber = chunkNumber; // Sequence number matches chunk number
+        this.sequenceNumber = chunkNumber;
         this.timestamp = System.currentTimeMillis();
-        this.dataSize = dataSize;
-    }
-
-    public ChunkMetadata(
-            String filename,
-            int chunkNumber,
-            int version,
-            int sequenceNumber,
-            long timestamp,
-            int dataSize) {
-        this.filename = filename;
-        this.chunkNumber = chunkNumber;
-        this.version = version;
-        this.sequenceNumber = sequenceNumber;
-        this.timestamp = timestamp;
         this.dataSize = dataSize;
     }
 
@@ -67,21 +46,6 @@ public class ChunkMetadata implements Serializable {
 
     public int getDataSize() {
         return dataSize;
-    }
-
-    // Update operations
-    public void incrementVersion() {
-        this.version++;
-        this.timestamp = System.currentTimeMillis();
-    }
-
-    public void updateTimestamp() {
-        this.timestamp = System.currentTimeMillis();
-    }
-
-    /** Get unique key for this chunk */
-    public String getKey() {
-        return filename + ":" + chunkNumber;
     }
 
     @Override

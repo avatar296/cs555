@@ -1,7 +1,6 @@
 /* CS555 Distributed Systems - HW4 */
 package csx55.dfs.protocol;
 
-/** Response containing chunk data */
 public class ChunkDataResponse extends Message {
 
     private static final long serialVersionUID = 1L;

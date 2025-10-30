@@ -9,32 +9,19 @@ import java.util.*;
 
 import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
+import csx55.dfs.util.DFSConfig;
+import csx55.dfs.util.PathUtil;
 
-/**
- * Client for the Replication-based Distributed File System
- *
- * <p>Responsibilities: - Split files into 64KB chunks for upload - Coordinate with controller to
- * get chunk server locations - Write chunks to chunk servers using pipeline (A → B → C) - Retrieve
- * and assemble chunks during download - Handle corruption detection and recovery during reads
- *
- * <p>Usage: java csx55.dfs.replication.Client <controller-ip> <controller-port>
- *
- * <p>Commands: upload <source> <destination> - Upload file to DFS download <source> <destination> -
- * Download file from DFS
- */
 public class Client {
 
     private final String controllerHost;
     private final int controllerPort;
-
-    private static final int CHUNK_SIZE = 64 * 1024; // 64KB
 
     public Client(String controllerHost, int controllerPort) {
         this.controllerHost = controllerHost;
         this.controllerPort = controllerPort;
     }
 
-    /** Start the interactive client shell */
     public void start() {
         System.out.println("Connected to Controller: " + controllerHost + ":" + controllerPort);
         System.out.println("Commands:");
@@ -88,12 +75,6 @@ public class Client {
         }
     }
 
-    /**
-     * Upload a file to the distributed file system
-     *
-     * @param sourcePath Local file path
-     * @param destPath DFS file path
-     */
     public void uploadFile(String sourcePath, String destPath) throws Exception {
         File sourceFile = new File(sourcePath);
 
@@ -102,11 +83,11 @@ public class Client {
         }
 
         // Normalize destination path
-        destPath = normalizeDestPath(destPath);
+        destPath = PathUtil.normalize(destPath);
 
         // Read file and split into chunks
         byte[] fileData = Files.readAllBytes(sourceFile.toPath());
-        int numChunks = (int) Math.ceil((double) fileData.length / CHUNK_SIZE);
+        int numChunks = (int) Math.ceil((double) fileData.length / DFSConfig.CHUNK_SIZE);
 
         System.out.println("Uploading file: " + sourcePath + " -> " + destPath);
         System.out.println("File size: " + fileData.length + " bytes, Chunks: " + numChunks);
@@ -116,8 +97,8 @@ public class Client {
         // Upload each chunk
         for (int i = 0; i < numChunks; i++) {
             int chunkNumber = i + 1; // 1-indexed
-            int offset = i * CHUNK_SIZE;
-            int length = Math.min(CHUNK_SIZE, fileData.length - offset);
+            int offset = i * DFSConfig.CHUNK_SIZE;
+            int length = Math.min(DFSConfig.CHUNK_SIZE, fileData.length - offset);
             byte[] chunkData = Arrays.copyOfRange(fileData, offset, offset + length);
 
             // Get 3 chunk servers from controller
@@ -142,15 +123,9 @@ public class Client {
         System.out.println("Upload completed successfully");
     }
 
-    /**
-     * Download a file from the distributed file system
-     *
-     * @param sourcePath DFS file path
-     * @param destPath Local file path
-     */
     public void downloadFile(String sourcePath, String destPath) throws Exception {
         // Normalize source path
-        sourcePath = normalizeSourcePath(sourcePath);
+        sourcePath = PathUtil.normalize(sourcePath);
 
         System.out.println("Downloading file: " + sourcePath + " -> " + destPath);
 
@@ -258,11 +233,6 @@ public class Client {
         System.out.println("Download completed successfully");
     }
 
-    /**
-     * Get chunk servers for writing a chunk (from controller)
-     *
-     * @return List of 3 chunk servers in format ["ip:port", "ip:port", "ip:port"]
-     */
     private List<String> getChunkServersForWrite(String filename, int chunkNumber)
             throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(controllerHost, controllerPort);
@@ -276,10 +246,6 @@ public class Client {
         }
     }
 
-    /**
-     * Write chunk using pipeline: Client → A → B → C Client only writes to first server, which
-     * forwards to next, etc.
-     */
     private void writeChunkPipeline(
             String filename, int chunkNumber, byte[] data, List<String> chunkServers)
             throws Exception {
@@ -298,10 +264,6 @@ public class Client {
         }
     }
 
-    /**
-     * Get chunk server for reading a chunk (from controller) Controller returns a random server
-     * from available replicas
-     */
     private String getChunkServerForRead(String filename, int chunkNumber)
             throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(controllerHost, controllerPort);
@@ -316,7 +278,6 @@ public class Client {
         }
     }
 
-    /** Read chunk from a specific chunk server */
     private byte[] readChunkFromServer(String chunkServer, String filename, int chunkNumber)
             throws Exception {
         TCPConnection.Address addr = TCPConnection.Address.parse(chunkServer);
@@ -338,7 +299,6 @@ public class Client {
         }
     }
 
-    /** Get the number of chunks for a file (from controller) */
     private int getFileChunkCount(String filename) throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(controllerHost, controllerPort);
                 TCPConnection connection = new TCPConnection(socket)) {
@@ -349,28 +309,6 @@ public class Client {
             Message response = connection.receiveMessage();
             return ((FileInfoResponse) response).getNumChunks();
         }
-    }
-
-    /** Normalize destination path (remove leading ./) */
-    private String normalizeDestPath(String path) {
-        if (path.startsWith("./")) {
-            path = path.substring(2);
-        }
-        if (!path.startsWith("/")) {
-            path = "/" + path;
-        }
-        return path;
-    }
-
-    /** Normalize source path (remove leading ./) */
-    private String normalizeSourcePath(String path) {
-        if (path.startsWith("./")) {
-            path = path.substring(2);
-        }
-        if (!path.startsWith("/")) {
-            path = "/" + path;
-        }
-        return path;
     }
 
     public static void main(String[] args) {

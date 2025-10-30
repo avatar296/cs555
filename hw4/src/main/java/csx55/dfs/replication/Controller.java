@@ -9,28 +9,17 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
+import csx55.dfs.util.ServerInfo;
 
-/**
- * Controller Node for the Replication-based Distributed File System
- *
- * <p>Responsibilities: - Track all active chunk servers in the system - Receive and process
- * heartbeats (major every 60s, minor every 15s) - Maintain metadata about chunks and their
- * locations (in-memory only) - Detect chunk server failures - Coordinate replication and recovery
- *
- * <p>Usage: java csx55.dfs.replication.Controller <port>
- */
 public class Controller {
 
     private final int port;
     private ServerSocket serverSocket;
 
-    // Track all registered chunk servers: key = "ip:port", value = ChunkServerInfo
-    private final Map<String, ChunkServerInfo> chunkServers;
+    private final Map<String, ServerInfo> chunkServers;
 
-    // Track file chunks: key = "filename:chunkNumber", value = list of chunk server locations
     private final Map<String, List<String>> chunkLocations;
 
-    // Track last heartbeat time for failure detection
     private final Map<String, Long> lastHeartbeat;
 
     private volatile boolean running = true;
@@ -42,19 +31,15 @@ public class Controller {
         this.lastHeartbeat = new ConcurrentHashMap<>();
     }
 
-    /** Start the controller and listen for connections */
     public void start() throws IOException {
         serverSocket = new ServerSocket(port);
         System.out.println("Controller started on port " + port);
 
-        // Start failure detection thread
         startFailureDetectionThread();
 
-        // Accept connections from chunk servers and clients
         while (running) {
             try {
                 Socket clientSocket = serverSocket.accept();
-                // Handle connection in a new thread
                 new Thread(() -> handleConnection(clientSocket)).start();
             } catch (IOException e) {
                 if (running) {
@@ -64,13 +49,10 @@ public class Controller {
         }
     }
 
-    /** Handle incoming connections from chunk servers and clients */
     private void handleConnection(Socket socket) {
         try (TCPConnection connection = new TCPConnection(socket)) {
-            // Receive message
             Message message = connection.receiveMessage();
 
-            // Process based on message type
             switch (message.getType()) {
                 case MAJOR_HEARTBEAT:
                 case MINOR_HEARTBEAT:
@@ -100,56 +82,44 @@ public class Controller {
         }
     }
 
-    /** Process heartbeat (major or minor) from chunk server */
     private void processHeartbeat(HeartbeatMessage heartbeat, TCPConnection connection)
             throws IOException {
         String serverId = heartbeat.getChunkServerId();
 
-        // Register or update chunk server info
-        ChunkServerInfo serverInfo = chunkServers.get(serverId);
+        ServerInfo serverInfo = chunkServers.get(serverId);
         if (serverInfo == null) {
-            serverInfo = new ChunkServerInfo(serverId);
+            serverInfo = new ServerInfo(serverId);
             chunkServers.put(serverId, serverInfo);
             System.out.println("New chunk server registered: " + serverId);
         }
 
-        // Update server statistics
         serverInfo.freeSpace = heartbeat.getFreeSpace();
-        serverInfo.chunkCount = heartbeat.getTotalChunks();
+        serverInfo.count = heartbeat.getTotalChunks();
 
-        // Update last heartbeat time
         lastHeartbeat.put(serverId, System.currentTimeMillis());
 
-        // Update chunk location mappings
         if (heartbeat.getType() == MessageType.MAJOR_HEARTBEAT) {
-            // Major heartbeat: clear old mappings for this server and rebuild
             updateChunkLocationsFromMajorHeartbeat(serverId, heartbeat.getChunks());
         } else {
-            // Minor heartbeat: add new chunks only
             updateChunkLocationsFromMinorHeartbeat(serverId, heartbeat.getChunks());
         }
 
-        // Send acknowledgment
         HeartbeatResponse response = new HeartbeatResponse();
         connection.sendMessage(response);
     }
 
-    /** Update chunk locations from major heartbeat (all chunks) */
     private void updateChunkLocationsFromMajorHeartbeat(
             String serverId, List<HeartbeatMessage.ChunkInfo> chunks) {
-        // Remove this server from all current chunk locations
         for (Map.Entry<String, List<String>> entry : chunkLocations.entrySet()) {
             entry.getValue().remove(serverId);
         }
 
-        // Add all chunks from this heartbeat
         for (HeartbeatMessage.ChunkInfo chunk : chunks) {
             String key = chunk.filename + ":" + chunk.chunkNumber;
             chunkLocations.computeIfAbsent(key, k -> new ArrayList<>()).add(serverId);
         }
     }
 
-    /** Update chunk locations from minor heartbeat (new chunks only) */
     private void updateChunkLocationsFromMinorHeartbeat(
             String serverId, List<HeartbeatMessage.ChunkInfo> chunks) {
         for (HeartbeatMessage.ChunkInfo chunk : chunks) {
@@ -161,7 +131,6 @@ public class Controller {
         }
     }
 
-    /** Process chunk servers request from client */
     private void processChunkServersRequest(ChunkServersRequest request, TCPConnection connection)
             throws IOException {
         List<String> servers =
@@ -170,12 +139,8 @@ public class Controller {
         connection.sendMessage(response);
     }
 
-    /**
-     * Select 3 chunk servers for storing a new chunk Should consider: - Free space available -
-     * Cannot select same server multiple times - Load balancing
-     */
     public List<String> selectChunkServersForWrite(String filename, int chunkNumber) {
-        List<ChunkServerInfo> availableServers = new ArrayList<>(chunkServers.values());
+        List<ServerInfo> availableServers = new ArrayList<>(chunkServers.values());
 
         if (availableServers.size() < 3) {
             System.err.println(
@@ -183,10 +148,8 @@ public class Controller {
             return new ArrayList<>();
         }
 
-        // Sort by free space (descending) for load balancing
         availableServers.sort((a, b) -> Long.compare(b.freeSpace, a.freeSpace));
 
-        // Select top 3 servers with most free space
         List<String> selected = new ArrayList<>();
         for (int i = 0; i < 3 && i < availableServers.size(); i++) {
             selected.add(availableServers.get(i).serverId);
@@ -202,24 +165,20 @@ public class Controller {
         return selected;
     }
 
-    /** Get a random chunk server that holds the specified chunk */
     public String getChunkServerForRead(String filename, int chunkNumber) {
         String key = filename + ":" + chunkNumber;
         List<String> servers = chunkLocations.get(key);
         if (servers == null || servers.isEmpty()) {
             return null;
         }
-        // Return random server from available replicas
         Random random = new Random();
         return servers.get(random.nextInt(servers.size()));
     }
 
-    /** Process file info request from client */
     private void processFileInfoRequest(FileInfoRequest request, TCPConnection connection)
             throws IOException {
         String filename = request.getFilename();
 
-        // Count chunks for this file
         int maxChunk = 0;
         for (String key : chunkLocations.keySet()) {
             if (key.startsWith(filename + ":")) {
@@ -233,7 +192,6 @@ public class Controller {
         connection.sendMessage(response);
     }
 
-    /** Process chunk server for read request from client */
     private void processChunkServerForReadRequest(
             ChunkServerForReadRequest request, TCPConnection connection) throws IOException {
         String server = getChunkServerForRead(request.getFilename(), request.getChunkNumber());
@@ -241,7 +199,6 @@ public class Controller {
         connection.sendMessage(response);
     }
 
-    /** Detect failed chunk servers and initiate recovery */
     private void startFailureDetectionThread() {
         Thread failureDetector =
                 new Thread(
@@ -259,10 +216,6 @@ public class Controller {
         failureDetector.start();
     }
 
-    /**
-     * Detect failed chunk servers (no heartbeat received) Threshold: If no heartbeat for 3 major
-     * periods (180 seconds)
-     */
     private void detectFailures() {
         long currentTime = System.currentTimeMillis();
         long failureThreshold = 180000; // 3 minutes (180 seconds)
@@ -279,22 +232,18 @@ public class Controller {
             }
         }
 
-        // Initiate recovery for each failed server
         for (String failedServerId : failedServers) {
             System.err.println("FAILURE DETECTED: " + failedServerId);
             initiateRecovery(failedServerId);
 
-            // Remove failed server from tracking
             chunkServers.remove(failedServerId);
             lastHeartbeat.remove(failedServerId);
         }
     }
 
-    /** Initiate recovery for chunks that lost replicas due to server failure */
     private void initiateRecovery(String failedServerId) {
         System.out.println("Initiating recovery for failed server: " + failedServerId);
 
-        // Find all chunks that were on the failed server
         List<String> affectedChunks = new ArrayList<>();
 
         for (Map.Entry<String, List<String>> entry : chunkLocations.entrySet()) {
@@ -308,7 +257,6 @@ public class Controller {
 
         System.out.println("Found " + affectedChunks.size() + " chunks affected by failure");
 
-        // For each affected chunk, re-replicate it
         for (String chunkKey : affectedChunks) {
             String[] parts = chunkKey.split(":");
             String filename = parts[0];
@@ -322,7 +270,6 @@ public class Controller {
                 continue;
             }
 
-            // Select a new server for replication (not in remaining servers, not failed)
             String newServer = selectNewServerForReplication(remainingServers);
 
             if (newServer == null) {
@@ -330,10 +277,8 @@ public class Controller {
                 continue;
             }
 
-            // Pick one of the remaining servers as the source
             String sourceServer = remainingServers.get(0);
 
-            // Send replication request to source server
             try {
                 TCPConnection.Address addr = TCPConnection.Address.parse(sourceServer);
                 try (Socket socket = new Socket(addr.host, addr.port);
@@ -347,7 +292,6 @@ public class Controller {
                     ReplicateChunkResponse replicateResponse = (ReplicateChunkResponse) response;
 
                     if (replicateResponse.isSuccess()) {
-                        // Update chunk locations
                         remainingServers.add(newServer);
                         System.out.println(
                                 "Successfully replicated "
@@ -370,42 +314,18 @@ public class Controller {
         }
     }
 
-    /**
-     * Select a new server for replication that doesn't already have the chunk
-     *
-     * @param existingServers Servers that already have this chunk
-     * @return Server ID for new replica, or null if none available
-     */
     private String selectNewServerForReplication(List<String> existingServers) {
-        // Get all available servers sorted by free space
-        List<ChunkServerInfo> availableServers = new ArrayList<>(chunkServers.values());
+        List<ServerInfo> availableServers = new ArrayList<>(chunkServers.values());
 
-        // Remove servers that already have this chunk
         availableServers.removeIf(server -> existingServers.contains(server.serverId));
 
         if (availableServers.isEmpty()) {
             return null;
         }
 
-        // Sort by free space (descending)
         availableServers.sort((a, b) -> Long.compare(b.freeSpace, a.freeSpace));
 
         return availableServers.get(0).serverId;
-    }
-
-    /** Inner class to track chunk server information */
-    private static class ChunkServerInfo {
-        String serverId; // "ip:port"
-        long totalSpace;
-        long freeSpace;
-        int chunkCount;
-
-        public ChunkServerInfo(String serverId) {
-            this.serverId = serverId;
-            this.totalSpace = 1024 * 1024 * 1024; // 1GB
-            this.freeSpace = totalSpace;
-            this.chunkCount = 0;
-        }
     }
 
     public static void main(String[] args) {

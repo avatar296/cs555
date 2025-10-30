@@ -3,12 +3,6 @@ package csx55.dfs.protocol;
 
 import java.util.*;
 
-/**
- * Heartbeat message sent from ChunkServer to Controller
- *
- * <p>Two types: - Major (every 60s): Contains ALL chunk metadata - Minor (every 15s): Contains only
- * newly added chunks
- */
 public class HeartbeatMessage extends Message {
 
     private static final long serialVersionUID = 1L;
@@ -53,7 +47,6 @@ public class HeartbeatMessage extends Message {
         return chunks;
     }
 
-    /** Information about a chunk or fragment */
     public static class ChunkInfo implements java.io.Serializable {
         private static final long serialVersionUID = 1L;
 

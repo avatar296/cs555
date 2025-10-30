@@ -1,25 +1,25 @@
 /* CS555 Distributed Systems - HW4 */
 package csx55.dfs.protocol;
 
-public class ReplicateChunkResponse extends Message {
+public class ReconstructFragmentResponse extends Message {
 
     private static final long serialVersionUID = 1L;
 
     private final boolean success;
     private final String errorMessage;
 
-    public ReplicateChunkResponse(boolean success, String errorMessage) {
+    public ReconstructFragmentResponse(boolean success, String errorMessage) {
         this.success = success;
         this.errorMessage = errorMessage;
     }
 
-    public ReplicateChunkResponse(boolean success) {
+    public ReconstructFragmentResponse(boolean success) {
         this(success, null);
     }
 
     @Override
     public MessageType getType() {
-        return MessageType.REPLICATE_CHUNK_RESPONSE;
+        return MessageType.RECONSTRUCT_FRAGMENT_RESPONSE;
     }
 
     public boolean isSuccess() {

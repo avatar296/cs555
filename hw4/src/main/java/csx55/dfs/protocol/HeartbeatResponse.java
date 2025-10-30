@@ -1,7 +1,6 @@
 /* CS555 Distributed Systems - HW4 */
 package csx55.dfs.protocol;
 
-/** Response to heartbeat from Controller to ChunkServer */
 public class HeartbeatResponse extends Message {
 
     private static final long serialVersionUID = 1L;
