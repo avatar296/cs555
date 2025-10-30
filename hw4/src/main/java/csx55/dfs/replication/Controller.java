@@ -1,14 +1,13 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.replication;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import csx55.dfs.base.BaseController;
 import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
+import csx55.dfs.util.NetworkUtils;
 
 public class Controller extends BaseController {
 
@@ -95,9 +94,7 @@ public class Controller extends BaseController {
     }
 
     @Override
-    protected void initiateRecovery(String failedServerId) {
-        System.out.println("Initiating recovery for failed server: " + failedServerId);
-
+    protected List<String> findAffectedChunks(String failedServerId) {
         List<String> affectedChunks = new ArrayList<>();
 
         for (Map.Entry<String, List<String>> entry : chunkLocations.entrySet()) {
@@ -109,62 +106,57 @@ public class Controller extends BaseController {
             }
         }
 
-        System.out.println("Found " + affectedChunks.size() + " chunks affected by failure");
+        return affectedChunks;
+    }
 
-        for (String chunkKey : affectedChunks) {
-            String[] parts = chunkKey.split(":");
-            String filename = parts[0];
-            int chunkNumber = Integer.parseInt(parts[1]);
+    @Override
+    protected void recoverChunk(String chunkKey, String failedServerId) {
+        String[] parts = chunkKey.split(":");
+        String filename = parts[0];
+        int chunkNumber = Integer.parseInt(parts[1]);
 
-            List<String> remainingServers = chunkLocations.get(chunkKey);
-            remainingServers.remove(failedServerId); // Remove failed server
+        List<String> remainingServers = chunkLocations.get(chunkKey);
+        remainingServers.remove(failedServerId);
 
-            if (remainingServers.isEmpty()) {
-                System.err.println("ERROR: No remaining replicas for " + chunkKey);
-                continue;
+        if (remainingServers.isEmpty()) {
+            System.err.println("ERROR: No remaining replicas for " + chunkKey);
+            return;
+        }
+
+        String newServer = selectNewServerForRecovery(remainingServers);
+
+        if (newServer == null) {
+            System.err.println("ERROR: Cannot find new server for " + chunkKey);
+            return;
+        }
+
+        String sourceServer = remainingServers.get(0);
+
+        try {
+            ReplicateChunkRequest request =
+                    new ReplicateChunkRequest(filename, chunkNumber, newServer);
+
+            Message response = NetworkUtils.sendRequestToServer(sourceServer, request);
+            ReplicateChunkResponse replicateResponse = (ReplicateChunkResponse) response;
+
+            if (replicateResponse.isSuccess()) {
+                remainingServers.add(newServer);
+                System.out.println(
+                        "Successfully replicated "
+                                + chunkKey
+                                + " from "
+                                + sourceServer
+                                + " to "
+                                + newServer);
+            } else {
+                System.err.println(
+                        "Failed to replicate "
+                                + chunkKey
+                                + ": "
+                                + replicateResponse.getErrorMessage());
             }
-
-            String newServer = selectNewServerForRecovery(remainingServers);
-
-            if (newServer == null) {
-                System.err.println("ERROR: Cannot find new server for " + chunkKey);
-                continue;
-            }
-
-            String sourceServer = remainingServers.get(0);
-
-            try {
-                TCPConnection.Address addr = TCPConnection.Address.parse(sourceServer);
-                try (Socket socket = new Socket(addr.host, addr.port);
-                        TCPConnection connection = new TCPConnection(socket)) {
-
-                    ReplicateChunkRequest request =
-                            new ReplicateChunkRequest(filename, chunkNumber, newServer);
-                    connection.sendMessage(request);
-
-                    Message response = connection.receiveMessage();
-                    ReplicateChunkResponse replicateResponse = (ReplicateChunkResponse) response;
-
-                    if (replicateResponse.isSuccess()) {
-                        remainingServers.add(newServer);
-                        System.out.println(
-                                "Successfully replicated "
-                                        + chunkKey
-                                        + " from "
-                                        + sourceServer
-                                        + " to "
-                                        + newServer);
-                    } else {
-                        System.err.println(
-                                "Failed to replicate "
-                                        + chunkKey
-                                        + ": "
-                                        + replicateResponse.getErrorMessage());
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("Error replicating " + chunkKey + ": " + e.getMessage());
-            }
+        } catch (Exception e) {
+            System.err.println("Error replicating " + chunkKey + ": " + e.getMessage());
         }
     }
 

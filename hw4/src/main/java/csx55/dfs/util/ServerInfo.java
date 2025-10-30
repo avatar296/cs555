@@ -1,4 +1,3 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.util;
 
 public class ServerInfo {
@@ -8,7 +7,7 @@ public class ServerInfo {
 
     public ServerInfo(String serverId) {
         this.serverId = serverId;
-        this.freeSpace = 1024 * 1024 * 1024; // 1GB
+        this.freeSpace = 1024 * 1024 * 1024;
         this.count = 0;
     }
 }

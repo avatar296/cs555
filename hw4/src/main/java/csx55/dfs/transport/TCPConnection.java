@@ -1,4 +1,3 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.transport;
 
 import java.io.*;

@@ -1,8 +1,6 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.erasure;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -10,6 +8,7 @@ import csx55.dfs.base.BaseController;
 import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
 import csx55.dfs.util.DFSConfig;
+import csx55.dfs.util.NetworkUtils;
 
 public class Controller extends BaseController {
 
@@ -51,7 +50,7 @@ public class Controller extends BaseController {
     @Override
     protected void handleAdditionalMessages(Message message, TCPConnection connection)
             throws Exception {
-        // Erasure mode doesn't have additional message types
+
         System.err.println("Unknown message type: " + message.getType());
     }
 
@@ -77,9 +76,7 @@ public class Controller extends BaseController {
     }
 
     @Override
-    protected void initiateRecovery(String failedServerId) {
-        System.out.println("Initiating recovery for failed server: " + failedServerId);
-
+    protected List<String> findAffectedChunks(String failedServerId) {
         List<String> affectedChunks = new ArrayList<>();
 
         for (Map.Entry<String, Map<Integer, String>> entry : fragmentLocations.entrySet()) {
@@ -94,118 +91,113 @@ public class Controller extends BaseController {
             }
         }
 
-        System.out.println("Found " + affectedChunks.size() + " chunks affected by failure");
+        return affectedChunks;
+    }
 
-        for (String chunkKey : affectedChunks) {
-            String[] parts = chunkKey.split(":");
-            String filename = parts[0];
-            int chunkNumber = Integer.parseInt(parts[1]);
+    @Override
+    protected void recoverChunk(String chunkKey, String failedServerId) {
+        String[] parts = chunkKey.split(":");
+        String filename = parts[0];
+        int chunkNumber = Integer.parseInt(parts[1]);
 
-            Map<Integer, String> fragmentMap = fragmentLocations.get(chunkKey);
+        Map<Integer, String> fragmentMap = fragmentLocations.get(chunkKey);
 
-            Set<Integer> missingFragments = new HashSet<>();
-            for (int i = 0; i < DFSConfig.TOTAL_SHARDS; i++) {
-                if (!fragmentMap.containsKey(i) || fragmentMap.get(i).equals(failedServerId)) {
-                    missingFragments.add(i);
-                }
+        Set<Integer> missingFragments = new HashSet<>();
+        for (int i = 0; i < DFSConfig.TOTAL_SHARDS; i++) {
+            if (!fragmentMap.containsKey(i) || fragmentMap.get(i).equals(failedServerId)) {
+                missingFragments.add(i);
             }
+        }
 
-            for (int fragmentNumber : missingFragments) {
-                if (fragmentMap.containsKey(fragmentNumber)
-                        && fragmentMap.get(fragmentNumber).equals(failedServerId)) {
-                    fragmentMap.remove(fragmentNumber);
-                }
+        for (int fragmentNumber : missingFragments) {
+            if (fragmentMap.containsKey(fragmentNumber)
+                    && fragmentMap.get(fragmentNumber).equals(failedServerId)) {
+                fragmentMap.remove(fragmentNumber);
             }
+        }
 
-            int availableFragments = DFSConfig.TOTAL_SHARDS - missingFragments.size();
+        int availableFragments = DFSConfig.TOTAL_SHARDS - missingFragments.size();
 
-            if (availableFragments < DFSConfig.DATA_SHARDS) {
+        if (availableFragments < DFSConfig.DATA_SHARDS) {
+            System.err.println(
+                    "ERROR: Not enough fragments to recover "
+                            + chunkKey
+                            + " (have "
+                            + availableFragments
+                            + ", need "
+                            + DFSConfig.DATA_SHARDS
+                            + ")");
+            return;
+        }
+
+        System.out.println(
+                "Recovering " + missingFragments.size() + " missing fragments for " + chunkKey);
+
+        Set<String> sourceServers = new HashSet<>();
+        for (Map.Entry<Integer, String> fragEntry : fragmentMap.entrySet()) {
+            sourceServers.add(fragEntry.getValue());
+        }
+
+        List<String> sourceServerList = new ArrayList<>(sourceServers);
+
+        if (sourceServerList.isEmpty()) {
+            System.err.println("ERROR: No source servers available for " + chunkKey);
+            return;
+        }
+
+        for (int missingFragmentNumber : missingFragments) {
+            String targetServer = selectNewServerForRecovery(fragmentMap.values());
+
+            if (targetServer == null) {
                 System.err.println(
-                        "ERROR: Not enough fragments to recover "
-                                + chunkKey
-                                + " (have "
-                                + availableFragments
-                                + ", need "
-                                + DFSConfig.DATA_SHARDS
-                                + ")");
+                        "ERROR: Cannot find new server for fragment "
+                                + missingFragmentNumber
+                                + " of "
+                                + chunkKey);
                 continue;
             }
 
-            System.out.println(
-                    "Recovering " + missingFragments.size() + " missing fragments for " + chunkKey);
+            String coordinatorServer = sourceServerList.get(0);
 
-            Set<String> sourceServers = new HashSet<>();
-            for (Map.Entry<Integer, String> fragEntry : fragmentMap.entrySet()) {
-                sourceServers.add(fragEntry.getValue());
-            }
+            try {
+                ReconstructFragmentRequest request =
+                        new ReconstructFragmentRequest(
+                                filename,
+                                chunkNumber,
+                                missingFragmentNumber,
+                                sourceServerList,
+                                targetServer);
 
-            List<String> sourceServerList = new ArrayList<>(sourceServers);
+                Message response = NetworkUtils.sendRequestToServer(coordinatorServer, request);
+                ReconstructFragmentResponse reconstructResponse =
+                        (ReconstructFragmentResponse) response;
 
-            if (sourceServerList.isEmpty()) {
-                System.err.println("ERROR: No source servers available for " + chunkKey);
-                continue;
-            }
-
-            for (int missingFragmentNumber : missingFragments) {
-                String targetServer = selectNewServerForRecovery(fragmentMap.values());
-
-                if (targetServer == null) {
-                    System.err.println(
-                            "ERROR: Cannot find new server for fragment "
+                if (reconstructResponse.isSuccess()) {
+                    fragmentMap.put(missingFragmentNumber, targetServer);
+                    System.out.println(
+                            "Successfully reconstructed fragment "
                                     + missingFragmentNumber
                                     + " of "
-                                    + chunkKey);
-                    continue;
-                }
-
-                String coordinatorServer = sourceServerList.get(0);
-
-                try {
-                    TCPConnection.Address addr = TCPConnection.Address.parse(coordinatorServer);
-                    try (Socket socket = new Socket(addr.host, addr.port);
-                            TCPConnection connection = new TCPConnection(socket)) {
-
-                        ReconstructFragmentRequest request =
-                                new ReconstructFragmentRequest(
-                                        filename,
-                                        chunkNumber,
-                                        missingFragmentNumber,
-                                        sourceServerList,
-                                        targetServer);
-                        connection.sendMessage(request);
-
-                        Message response = connection.receiveMessage();
-                        ReconstructFragmentResponse reconstructResponse =
-                                (ReconstructFragmentResponse) response;
-
-                        if (reconstructResponse.isSuccess()) {
-                            fragmentMap.put(missingFragmentNumber, targetServer);
-                            System.out.println(
-                                    "Successfully reconstructed fragment "
-                                            + missingFragmentNumber
-                                            + " of "
-                                            + chunkKey
-                                            + " to "
-                                            + targetServer);
-                        } else {
-                            System.err.println(
-                                    "Failed to reconstruct fragment "
-                                            + missingFragmentNumber
-                                            + " of "
-                                            + chunkKey
-                                            + ": "
-                                            + reconstructResponse.getErrorMessage());
-                        }
-                    }
-                } catch (Exception e) {
+                                    + chunkKey
+                                    + " to "
+                                    + targetServer);
+                } else {
                     System.err.println(
-                            "Error reconstructing fragment "
+                            "Failed to reconstruct fragment "
                                     + missingFragmentNumber
                                     + " of "
                                     + chunkKey
                                     + ": "
-                                    + e.getMessage());
+                                    + reconstructResponse.getErrorMessage());
                 }
+            } catch (Exception e) {
+                System.err.println(
+                        "Error reconstructing fragment "
+                                + missingFragmentNumber
+                                + " of "
+                                + chunkKey
+                                + ": "
+                                + e.getMessage());
             }
         }
     }

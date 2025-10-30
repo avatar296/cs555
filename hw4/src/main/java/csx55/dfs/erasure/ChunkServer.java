@@ -1,4 +1,3 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.erasure;
 
 import java.io.*;
@@ -11,6 +10,8 @@ import csx55.dfs.base.BaseChunkServer;
 import csx55.dfs.protocol.*;
 import csx55.dfs.util.DFSConfig;
 import csx55.dfs.util.FragmentMetadata;
+import csx55.dfs.util.IOUtils;
+import csx55.dfs.util.NetworkUtils;
 
 public class ChunkServer extends BaseChunkServer {
 
@@ -138,13 +139,12 @@ public class ChunkServer extends BaseChunkServer {
         String targetServer = request.getTargetServer();
 
         try {
-            // Retrieve fragments from source servers
+
             byte[][] fragments = new byte[DFSConfig.TOTAL_SHARDS][];
             boolean[] fragmentsPresent = new boolean[DFSConfig.TOTAL_SHARDS];
             int fragmentSize = 0;
             int retrieved = 0;
 
-            // Try to retrieve fragments from source servers
             for (int i = 0; i < sourceServers.size() && i < DFSConfig.TOTAL_SHARDS; i++) {
                 try {
                     String server = sourceServers.get(i);
@@ -155,7 +155,6 @@ public class ChunkServer extends BaseChunkServer {
                             csx55.dfs.transport.TCPConnection fragConnection =
                                     new csx55.dfs.transport.TCPConnection(socket)) {
 
-                        // Request fragment from server
                         String fragmentFilename = filename + "_chunk" + chunkNumber;
                         csx55.dfs.protocol.ReadChunkRequest fragRequest =
                                 new csx55.dfs.protocol.ReadChunkRequest(fragmentFilename, i);
@@ -173,7 +172,7 @@ public class ChunkServer extends BaseChunkServer {
                         }
                     }
                 } catch (Exception e) {
-                    // Fragment not available from this server, continue
+
                     fragmentsPresent[i] = false;
                 }
             }
@@ -186,39 +185,26 @@ public class ChunkServer extends BaseChunkServer {
                                 + DFSConfig.DATA_SHARDS);
             }
 
-            // Create empty buffers for missing fragments
             for (int i = 0; i < DFSConfig.TOTAL_SHARDS; i++) {
                 if (!fragmentsPresent[i]) {
                     fragments[i] = new byte[fragmentSize];
                 }
             }
 
-            // Use Reed-Solomon to reconstruct missing fragments
             erasure.ReedSolomon reedSolomon =
                     new erasure.ReedSolomon(DFSConfig.DATA_SHARDS, DFSConfig.PARITY_SHARDS);
             reedSolomon.decodeMissing(fragments, fragmentsPresent, 0, fragmentSize);
 
-            // Send reconstructed fragment to target server
-            csx55.dfs.transport.TCPConnection.Address targetAddr =
-                    csx55.dfs.transport.TCPConnection.Address.parse(targetServer);
-            try (Socket targetSocket = new Socket(targetAddr.host, targetAddr.port);
-                    csx55.dfs.transport.TCPConnection targetConnection =
-                            new csx55.dfs.transport.TCPConnection(targetSocket)) {
+            String fragmentFilename = filename + "_chunk" + chunkNumber;
+            StoreChunkRequest storeRequest =
+                    new StoreChunkRequest(
+                            fragmentFilename,
+                            fragmentNumber,
+                            fragments[fragmentNumber],
+                            new ArrayList<>());
 
-                // Send fragment using chunk protocol
-                String fragmentFilename = filename + "_chunk" + chunkNumber;
-                csx55.dfs.protocol.StoreChunkRequest storeRequest =
-                        new csx55.dfs.protocol.StoreChunkRequest(
-                                fragmentFilename,
-                                fragmentNumber,
-                                fragments[fragmentNumber],
-                                new ArrayList<>());
+            NetworkUtils.sendRequestToServer(targetServer, storeRequest);
 
-                targetConnection.sendMessage(storeRequest);
-                targetConnection.receiveMessage(); // Wait for ack
-            }
-
-            // Send success response to Controller
             csx55.dfs.protocol.ReconstructFragmentResponse response =
                     new csx55.dfs.protocol.ReconstructFragmentResponse(true);
             connection.sendMessage(response);
@@ -234,7 +220,7 @@ public class ChunkServer extends BaseChunkServer {
                             + targetServer);
 
         } catch (Exception e) {
-            // Send failure response to Controller
+
             csx55.dfs.protocol.ReconstructFragmentResponse response =
                     new csx55.dfs.protocol.ReconstructFragmentResponse(false, e.getMessage());
             connection.sendMessage(response);
@@ -253,9 +239,8 @@ public class ChunkServer extends BaseChunkServer {
     public void storeFragment(String filename, int chunkNumber, int fragmentNumber, byte[] data)
             throws IOException {
         Path fragmentPath = getFragmentPath(filename, chunkNumber, fragmentNumber);
-        Files.createDirectories(fragmentPath.getParent());
 
-        Files.write(fragmentPath, data);
+        IOUtils.writeWithDirectoryCreation(fragmentPath, data);
 
         FragmentMetadata metadata =
                 new FragmentMetadata(filename, chunkNumber, fragmentNumber, data.length);
@@ -275,21 +260,18 @@ public class ChunkServer extends BaseChunkServer {
             throws IOException {
         Path fragmentPath = getFragmentPath(filename, chunkNumber, fragmentNumber);
 
-        if (!Files.exists(fragmentPath)) {
-            throw new FileNotFoundException(
-                    "Fragment not found: "
-                            + filename
-                            + "_chunk"
-                            + chunkNumber
-                            + "_shard"
-                            + fragmentNumber);
-        }
-
-        return Files.readAllBytes(fragmentPath);
+        return IOUtils.readWithExistenceCheck(
+                fragmentPath,
+                "Fragment not found: "
+                        + filename
+                        + "_chunk"
+                        + chunkNumber
+                        + "_shard"
+                        + fragmentNumber);
     }
 
     @Override
-    protected void sendMajorHeartbeat() throws IOException {
+    protected List<csx55.dfs.protocol.HeartbeatMessage.ChunkInfo> buildMajorHeartbeatChunks() {
         List<csx55.dfs.protocol.HeartbeatMessage.ChunkInfo> fragmentList = new ArrayList<>();
         for (FragmentMetadata metadata : fragments.values()) {
             fragmentList.add(
@@ -302,22 +284,12 @@ public class ChunkServer extends BaseChunkServer {
                             0,
                             metadata.getDataSize()));
         }
-
-        // Create and send major heartbeat
-        csx55.dfs.protocol.HeartbeatMessage heartbeat =
-                new csx55.dfs.protocol.HeartbeatMessage(
-                        csx55.dfs.protocol.MessageType.MAJOR_HEARTBEAT,
-                        serverId,
-                        fragments.size(),
-                        getFreeSpace(),
-                        fragmentList);
-
-        sendHeartbeatToController(heartbeat);
         newFragments.clear();
+        return fragmentList;
     }
 
     @Override
-    protected void sendMinorHeartbeat() throws IOException {
+    protected List<csx55.dfs.protocol.HeartbeatMessage.ChunkInfo> buildMinorHeartbeatChunks() {
         List<csx55.dfs.protocol.HeartbeatMessage.ChunkInfo> fragmentList = new ArrayList<>();
         for (String key : newFragments) {
             FragmentMetadata metadata = fragments.get(key);
@@ -333,17 +305,7 @@ public class ChunkServer extends BaseChunkServer {
                                 metadata.getDataSize()));
             }
         }
-
-        if (!fragmentList.isEmpty()) {
-            csx55.dfs.protocol.HeartbeatMessage heartbeat =
-                    new csx55.dfs.protocol.HeartbeatMessage(
-                            csx55.dfs.protocol.MessageType.MINOR_HEARTBEAT,
-                            serverId,
-                            fragments.size(),
-                            getFreeSpace(),
-                            fragmentList);
-            sendHeartbeatToController(heartbeat);
-        }
+        return fragmentList;
     }
 
     private Path getFragmentPath(String filename, int chunkNumber, int fragmentNumber) {

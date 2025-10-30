@@ -1,4 +1,3 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.base;
 
 import java.io.IOException;
@@ -10,10 +9,6 @@ import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
 import csx55.dfs.util.DFSConfig;
 
-/**
- * Abstract base class for ChunkServer implementations. Provides common functionality for both
- * erasure coding and replication modes.
- */
 public abstract class BaseChunkServer {
 
     protected final String controllerHost;
@@ -28,22 +23,46 @@ public abstract class BaseChunkServer {
         this.controllerPort = controllerPort;
     }
 
-    /** Returns the type of chunk server for logging purposes. */
     protected abstract String getServerType();
 
-    /** Handles incoming message connections. Subclasses implement message dispatching. */
     protected abstract void handleConnection(Socket socket);
 
-    /** Sends a major heartbeat with all chunk/fragment metadata. */
-    protected abstract void sendMajorHeartbeat() throws IOException;
-
-    /** Sends a minor heartbeat with only new chunk/fragment metadata. */
-    protected abstract void sendMinorHeartbeat() throws IOException;
-
-    /** Returns the number of chunks/fragments stored. */
     protected abstract int getStoredCount();
 
-    /** Starts the chunk server. */
+    protected abstract java.util.List<HeartbeatMessage.ChunkInfo> buildMajorHeartbeatChunks();
+
+    protected abstract java.util.List<HeartbeatMessage.ChunkInfo> buildMinorHeartbeatChunks();
+
+    protected void sendMajorHeartbeat() throws IOException {
+        java.util.List<HeartbeatMessage.ChunkInfo> chunkList = buildMajorHeartbeatChunks();
+
+        HeartbeatMessage heartbeat =
+                new HeartbeatMessage(
+                        MessageType.MAJOR_HEARTBEAT,
+                        serverId,
+                        getStoredCount(),
+                        getFreeSpace(),
+                        chunkList);
+
+        sendHeartbeatToController(heartbeat);
+    }
+
+    protected void sendMinorHeartbeat() throws IOException {
+        java.util.List<HeartbeatMessage.ChunkInfo> chunkList = buildMinorHeartbeatChunks();
+
+        if (!chunkList.isEmpty()) {
+            HeartbeatMessage heartbeat =
+                    new HeartbeatMessage(
+                            MessageType.MINOR_HEARTBEAT,
+                            serverId,
+                            getStoredCount(),
+                            getFreeSpace(),
+                            chunkList);
+
+            sendHeartbeatToController(heartbeat);
+        }
+    }
+
     public void start() throws IOException {
         serverSocket = new ServerSocket(0);
         int port = serverSocket.getLocalPort();
@@ -72,7 +91,6 @@ public abstract class BaseChunkServer {
         }
     }
 
-    /** Starts the heartbeat threads (minor: 15s, major: 60s). */
     protected void startHeartbeatThreads() {
         Thread minorHeartbeat =
                 new Thread(
@@ -111,33 +129,28 @@ public abstract class BaseChunkServer {
         majorHeartbeat.start();
     }
 
-    /** Sends a heartbeat message to the controller. */
     protected void sendHeartbeatToController(HeartbeatMessage heartbeat) throws IOException {
         try (Socket socket = new Socket(controllerHost, controllerPort);
                 TCPConnection connection = new TCPConnection(socket)) {
 
             connection.sendMessage(heartbeat);
-            connection.receiveMessage(); // Wait for ack
+            connection.receiveMessage();
         } catch (Exception e) {
             System.err.println("Error sending heartbeat: " + e.getMessage());
         }
     }
 
-    /** Returns free space available for storage. */
     protected long getFreeSpace() throws IOException {
-        long totalSpace = 1024L * 1024L * 1024L; // 1GB
+        long totalSpace = 1024L * 1024L * 1024L;
         long usedSpace = 0;
 
-        // Subclasses can override to calculate actual usage
         usedSpace = calculateUsedSpace();
 
         return totalSpace - usedSpace;
     }
 
-    /** Calculates used space. Subclasses implement based on their storage structure. */
     protected abstract long calculateUsedSpace();
 
-    /** Normalizes a filename by removing leading slashes. */
     protected String normalizeFilename(String filename) {
         if (filename.startsWith("/")) {
             return filename.substring(1);
@@ -145,7 +158,6 @@ public abstract class BaseChunkServer {
         return filename;
     }
 
-    /** Gets the storage path for a chunk/fragment. */
     protected Path getStoragePath(String... components) {
         return Paths.get(storageRoot, components);
     }

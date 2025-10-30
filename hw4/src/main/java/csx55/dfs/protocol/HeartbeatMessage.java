@@ -1,4 +1,3 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.protocol;
 
 import java.util.*;
@@ -7,11 +6,11 @@ public class HeartbeatMessage extends Message {
 
     private static final long serialVersionUID = 1L;
 
-    private final MessageType type; // MAJOR_HEARTBEAT or MINOR_HEARTBEAT
-    private final String chunkServerId; // "ip:port"
+    private final MessageType type;
+    private final String chunkServerId;
     private final int totalChunks;
-    private final long freeSpace; // bytes
-    private final List<ChunkInfo> chunks; // Chunk metadata
+    private final long freeSpace;
+    private final List<ChunkInfo> chunks;
 
     public HeartbeatMessage(
             MessageType type,
@@ -57,8 +56,7 @@ public class HeartbeatMessage extends Message {
         public long timestamp;
         public int dataSize;
 
-        // For erasure coding mode
-        public Integer fragmentNumber; // null for replication mode
+        public Integer fragmentNumber;
 
         public ChunkInfo(
                 String filename,

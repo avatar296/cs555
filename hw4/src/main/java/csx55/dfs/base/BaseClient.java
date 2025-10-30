@@ -1,18 +1,15 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.base;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.file.Files;
 import java.util.*;
 
 import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
+import csx55.dfs.util.DFSConfig;
 import csx55.dfs.util.PathUtil;
 
-/**
- * Abstract base class for Client implementations. Provides common functionality for both erasure
- * coding and replication modes.
- */
 public abstract class BaseClient {
 
     protected final String controllerHost;
@@ -23,16 +20,12 @@ public abstract class BaseClient {
         this.controllerPort = controllerPort;
     }
 
-    /** Returns the client type for logging purposes. */
     protected abstract String getClientType();
 
-    /** Uploads a file to the distributed file system. */
     protected abstract void uploadFile(String sourcePath, String destPath) throws Exception;
 
-    /** Downloads a file from the distributed file system. */
     protected abstract void downloadFile(String sourcePath, String destPath) throws Exception;
 
-    /** Starts the interactive client shell. */
     public void start() {
         System.out.println(
                 getClientType()
@@ -91,7 +84,6 @@ public abstract class BaseClient {
         }
     }
 
-    /** Gets the number of chunks for a file from the controller. */
     protected int getFileChunkCount(String filename) throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(controllerHost, controllerPort);
                 TCPConnection connection = new TCPConnection(socket)) {
@@ -104,7 +96,6 @@ public abstract class BaseClient {
         }
     }
 
-    /** Gets chunk servers for writing from the controller. */
     protected List<String> getChunkServersForWrite(String filename, int chunkNumber, int count)
             throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(controllerHost, controllerPort);
@@ -118,12 +109,10 @@ public abstract class BaseClient {
         }
     }
 
-    /** Normalizes a path for the distributed file system. */
     protected String normalizePath(String path) {
         return PathUtil.normalize(path);
     }
 
-    /** Validates that a source file exists. */
     protected void validateSourceFile(String sourcePath) throws FileNotFoundException {
         File sourceFile = new File(sourcePath);
         if (!sourceFile.exists()) {
@@ -131,7 +120,21 @@ public abstract class BaseClient {
         }
     }
 
-    /** Sends a message to the controller and returns the response. */
+    protected List<byte[]> readFileInChunks(String sourcePath) throws IOException {
+        File sourceFile = new File(sourcePath);
+        byte[] fileData = Files.readAllBytes(sourceFile.toPath());
+        int numChunks = (int) Math.ceil((double) fileData.length / DFSConfig.CHUNK_SIZE);
+
+        List<byte[]> chunks = new ArrayList<>();
+        for (int i = 0; i < numChunks; i++) {
+            int offset = i * DFSConfig.CHUNK_SIZE;
+            int length = Math.min(DFSConfig.CHUNK_SIZE, fileData.length - offset);
+            chunks.add(Arrays.copyOfRange(fileData, offset, offset + length));
+        }
+
+        return chunks;
+    }
+
     protected Message sendToController(Message request) throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(controllerHost, controllerPort);
                 TCPConnection connection = new TCPConnection(socket)) {
@@ -141,7 +144,6 @@ public abstract class BaseClient {
         }
     }
 
-    /** Sends a message to a chunk server and returns the response. */
     protected Message sendToChunkServer(String serverAddress, Message request)
             throws IOException, ClassNotFoundException {
         TCPConnection.Address addr = TCPConnection.Address.parse(serverAddress);
@@ -151,6 +153,23 @@ public abstract class BaseClient {
 
             connection.sendMessage(request);
             return connection.receiveMessage();
+        }
+    }
+
+    protected void validateChunkDataResponse(ChunkDataResponse response) throws IOException {
+        if (!response.isSuccess()) {
+            throw new IOException("Chunk operation failed: " + response.getErrorMessage());
+        }
+    }
+
+    protected void requireResponseType(Message response, MessageType expectedType)
+            throws IOException {
+        if (response.getType() != expectedType) {
+            throw new IOException(
+                    "Unexpected response type: expected "
+                            + expectedType
+                            + ", got "
+                            + response.getType());
         }
     }
 }

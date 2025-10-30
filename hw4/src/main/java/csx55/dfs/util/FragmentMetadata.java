@@ -1,4 +1,3 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.util;
 
 import java.io.Serializable;
@@ -25,7 +24,6 @@ public class FragmentMetadata implements Serializable {
         this.dataSize = dataSize;
     }
 
-    // Getters
     public String getFilename() {
         return filename;
     }

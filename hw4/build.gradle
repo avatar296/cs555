@@ -17,7 +17,6 @@ repositories {
 }
 
 dependencies {
-    // Reed-Solomon erasure coding library
     implementation files('reed-solomon-erasure-coding.jar')
 }
 
@@ -29,7 +28,6 @@ sourceSets {
     }
 }
 
-// Define tasks for running different components
 task runReplicationController(type: JavaExec) {
     group = 'application'
     description = 'Run the Replication Controller'
@@ -96,7 +94,6 @@ task runErasureClient(type: JavaExec) {
     }
 }
 
-// Jar configuration to create executable jars
 jar {
     manifest {
         attributes(
@@ -113,30 +110,21 @@ compileJava {
     options.encoding = 'UTF-8'
 }
 
-// Spotless configuration for code formatting
+
 spotless {
     java {
         target 'src/**/*.java'
 
-        // Use Google Java Format
         googleJavaFormat('1.17.0').aosp().reflowLongStrings()
 
-        // Remove unused imports
         removeUnusedImports()
 
-        // Format imports
         importOrder('java', 'javax', 'org', 'com', 'csx55', '')
 
-        // Trim trailing whitespace
         trimTrailingWhitespace()
 
-        // End files with newline
         endWithNewline()
 
-        // Custom rules
         indentWithSpaces(4)
-
-        // License header (optional)
-        licenseHeader '/* CS555 Distributed Systems - HW4 */'
     }
 }

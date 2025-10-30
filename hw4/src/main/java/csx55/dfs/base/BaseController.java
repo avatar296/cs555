@@ -1,4 +1,3 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.base;
 
 import java.io.IOException;
@@ -11,10 +10,6 @@ import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
 import csx55.dfs.util.ServerInfo;
 
-/**
- * Abstract base class for Controller implementations. Provides common functionality for both
- * erasure coding and replication modes.
- */
 public abstract class BaseController {
 
     protected final int port;
@@ -29,33 +24,34 @@ public abstract class BaseController {
         this.lastHeartbeat = new ConcurrentHashMap<>();
     }
 
-    /** Returns the type of controller for logging purposes. */
     protected abstract String getControllerType();
 
-    /** Returns the replication factor (9 for erasure, 3 for replication). */
     protected abstract int getReplicationFactor();
 
-    /**
-     * Updates location tracking from heartbeat messages. Erasure: updates fragment map Replication:
-     * updates chunk list
-     */
     protected abstract void updateLocationsFromHeartbeat(
             String serverId, List<HeartbeatMessage.ChunkInfo> chunks, MessageType type);
 
-    /**
-     * Initiates recovery for a failed server. Erasure: reconstructs missing fragments Replication:
-     * replicates chunks to new servers
-     */
-    protected abstract void initiateRecovery(String failedServerId);
+    protected void initiateRecovery(String failedServerId) {
+        System.out.println("Initiating recovery for failed server: " + failedServerId);
 
-    /** Returns all location keys (chunk/fragment keys) for file info queries. */
+        List<String> affectedChunks = findAffectedChunks(failedServerId);
+
+        System.out.println("Found " + affectedChunks.size() + " chunks affected by failure");
+
+        for (String chunkKey : affectedChunks) {
+            recoverChunk(chunkKey, failedServerId);
+        }
+    }
+
+    protected abstract List<String> findAffectedChunks(String failedServerId);
+
+    protected abstract void recoverChunk(String chunkKey, String failedServerId);
+
     protected abstract Set<String> getLocationKeys();
 
-    /** Handles additional message types specific to the controller mode. */
     protected abstract void handleAdditionalMessages(Message message, TCPConnection connection)
             throws Exception;
 
-    /** Starts the controller server. */
     public void start() throws IOException {
         serverSocket = new ServerSocket(port);
         System.out.println(getControllerType() + " started on port " + port);
@@ -74,7 +70,6 @@ public abstract class BaseController {
         }
     }
 
-    /** Handles incoming connections and dispatches messages. */
     private void handleConnection(Socket socket) {
         try (TCPConnection connection = new TCPConnection(socket)) {
             Message message = connection.receiveMessage();
@@ -94,7 +89,6 @@ public abstract class BaseController {
                     break;
 
                 default:
-                    // Let subclass handle additional message types
                     handleAdditionalMessages(message, connection);
                     break;
             }
@@ -104,7 +98,6 @@ public abstract class BaseController {
         }
     }
 
-    /** Processes heartbeat messages from chunk servers. */
     protected void processHeartbeat(HeartbeatMessage heartbeat, TCPConnection connection)
             throws IOException {
         String serverId = heartbeat.getChunkServerId();
@@ -120,14 +113,12 @@ public abstract class BaseController {
         serverInfo.count = heartbeat.getTotalChunks();
         lastHeartbeat.put(serverId, System.currentTimeMillis());
 
-        // Delegate location updates to subclass
         updateLocationsFromHeartbeat(serverId, heartbeat.getChunks(), heartbeat.getType());
 
         HeartbeatResponse response = new HeartbeatResponse();
         connection.sendMessage(response);
     }
 
-    /** Processes requests for chunk servers to write to. */
     protected void processChunkServersRequest(ChunkServersRequest request, TCPConnection connection)
             throws IOException {
         List<String> servers =
@@ -136,7 +127,6 @@ public abstract class BaseController {
         connection.sendMessage(response);
     }
 
-    /** Processes requests for file metadata (number of chunks). */
     protected void processFileInfoRequest(FileInfoRequest request, TCPConnection connection)
             throws IOException {
         String filename = request.getFilename();
@@ -154,7 +144,6 @@ public abstract class BaseController {
         connection.sendMessage(response);
     }
 
-    /** Selects chunk servers for writing based on free space. */
     protected List<String> selectChunkServersForWrite(String filename, int chunkNumber) {
         List<ServerInfo> availableServers = new ArrayList<>(chunkServers.values());
 
@@ -185,7 +174,6 @@ public abstract class BaseController {
         return selected;
     }
 
-    /** Selects a new server for recovery, excluding existing servers. */
     protected String selectNewServerForRecovery(Collection<String> existingServers) {
         List<ServerInfo> availableServers = new ArrayList<>(chunkServers.values());
 
@@ -200,7 +188,6 @@ public abstract class BaseController {
         return availableServers.get(0).serverId;
     }
 
-    /** Starts the failure detection thread. */
     private void startFailureDetectionThread() {
         Thread failureDetector =
                 new Thread(
@@ -218,7 +205,6 @@ public abstract class BaseController {
         failureDetector.start();
     }
 
-    /** Detects failed servers and initiates recovery. */
     private void detectFailures() {
         long currentTime = System.currentTimeMillis();
         long failureThreshold = 180000;

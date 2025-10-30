@@ -1,4 +1,3 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.erasure;
 
 import java.io.*;
@@ -28,27 +27,20 @@ public class Client extends BaseClient {
         validateSourceFile(sourcePath);
         destPath = normalizePath(destPath);
 
-        File sourceFile = new File(sourcePath);
-
-        byte[] fileData = Files.readAllBytes(sourceFile.toPath());
-        int numChunks = (int) Math.ceil((double) fileData.length / DFSConfig.CHUNK_SIZE);
+        List<byte[]> chunks = readFileInChunks(sourcePath);
+        long fileSize = new File(sourcePath).length();
 
         System.out.println("Uploading file with erasure coding: " + sourcePath + " -> " + destPath);
-        System.out.println("File size: " + fileData.length + " bytes, Chunks: " + numChunks);
+        System.out.println("File size: " + fileSize + " bytes, Chunks: " + chunks.size());
 
         List<String> allFragmentServers = new ArrayList<>();
 
-        // Upload each chunk
-        for (int i = 0; i < numChunks; i++) {
+        for (int i = 0; i < chunks.size(); i++) {
             int chunkNumber = i + 1;
-            int offset = i * DFSConfig.CHUNK_SIZE;
-            int length = Math.min(DFSConfig.CHUNK_SIZE, fileData.length - offset);
-            byte[] chunkData = Arrays.copyOfRange(fileData, offset, offset + length);
+            byte[] chunkData = chunks.get(i);
 
-            // Erasure code the chunk into 9 fragments
             byte[][] fragments = encodeChunk(chunkData);
 
-            // Get 9 chunk servers from controller (one for each fragment)
             List<String> fragmentServers =
                     getChunkServersForWrite(destPath, chunkNumber, DFSConfig.TOTAL_SHARDS);
 
@@ -57,7 +49,6 @@ public class Client extends BaseClient {
                         "Controller did not return " + DFSConfig.TOTAL_SHARDS + " chunk servers");
             }
 
-            // Send each fragment to its assigned server
             for (int j = 0; j < DFSConfig.TOTAL_SHARDS; j++) {
                 sendFragment(destPath, chunkNumber, j, fragments[j], fragmentServers.get(j));
             }
@@ -65,7 +56,6 @@ public class Client extends BaseClient {
             allFragmentServers.addAll(fragmentServers);
         }
 
-        // Print all fragment server locations
         for (String server : allFragmentServers) {
             System.out.println(server);
         }
@@ -89,15 +79,12 @@ public class Client extends BaseClient {
         ByteArrayOutputStream fileOutput = new ByteArrayOutputStream();
         List<String> fragmentServersUsed = new ArrayList<>();
 
-        // Download and reconstruct each chunk
         for (int i = 0; i < numChunks; i++) {
             int chunkNumber = i + 1;
 
-            // Get available fragment locations (list of 9, index = fragment number)
             List<String> fragmentLocations =
                     getChunkServersForWrite(sourcePath, chunkNumber, DFSConfig.TOTAL_SHARDS);
 
-            // Count non-null fragments
             int availableFragments = 0;
             for (String server : fragmentLocations) {
                 if (server != null) {
@@ -116,12 +103,10 @@ public class Client extends BaseClient {
                                 + ")");
             }
 
-            // Retrieve fragments and reconstruct chunk
             byte[][] fragments = new byte[DFSConfig.TOTAL_SHARDS][];
             boolean[] fragmentsPresent = new boolean[DFSConfig.TOTAL_SHARDS];
             int fragmentSize = 0;
 
-            // Try to get at least DFSConfig.DATA_SHARDS fragments
             int retrieved = 0;
             for (int j = 0; j < DFSConfig.TOTAL_SHARDS && j < fragmentLocations.size(); j++) {
                 String server = fragmentLocations.get(j);
@@ -142,7 +127,6 @@ public class Client extends BaseClient {
 
                 } catch (Exception e) {
                     fragmentsPresent[j] = false;
-                    // Continue trying other fragments
                 }
             }
 
@@ -156,25 +140,20 @@ public class Client extends BaseClient {
                                 + chunkNumber);
             }
 
-            // Ensure all fragments have same size for Reed-Solomon
             for (int j = 0; j < DFSConfig.TOTAL_SHARDS; j++) {
                 if (!fragmentsPresent[j]) {
-                    fragments[j] = new byte[fragmentSize]; // Empty placeholder
+                    fragments[j] = new byte[fragmentSize];
                 }
             }
 
-            // Reconstruct chunk using Reed-Solomon
-            // For simplicity, use DFSConfig.CHUNK_SIZE (last chunk may have padding)
             byte[] chunkData = decodeFragments(fragments, fragmentsPresent, DFSConfig.CHUNK_SIZE);
             fileOutput.write(chunkData);
         }
 
-        // Print fragment servers used
         for (String server : fragmentServersUsed) {
             System.out.println(server);
         }
 
-        // Write file
         Files.write(Paths.get(destPath), fileOutput.toByteArray());
 
         System.out.println("Download completed successfully");

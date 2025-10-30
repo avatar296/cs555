@@ -1,4 +1,3 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.replication;
 
 import java.io.*;
@@ -13,14 +12,15 @@ import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
 import csx55.dfs.util.ChunkMetadata;
 import csx55.dfs.util.DFSConfig;
+import csx55.dfs.util.NetworkUtils;
 
 public class ChunkServer extends BaseChunkServer {
 
     private final Map<String, ChunkMetadata> chunks;
     private final Set<String> newChunks;
 
-    private static final int SLICE_SIZE = 8 * 1024; // 8KB
-    private static final int SLICES_PER_CHUNK = DFSConfig.CHUNK_SIZE / SLICE_SIZE; // 8 slices
+    private static final int SLICE_SIZE = 8 * 1024;
+    private static final int SLICES_PER_CHUNK = DFSConfig.CHUNK_SIZE / SLICE_SIZE;
 
     public ChunkServer(String controllerHost, int controllerPort) {
         super(controllerHost, controllerPort);
@@ -96,21 +96,14 @@ public class ChunkServer extends BaseChunkServer {
             String filename, int chunkNumber, byte[] data, List<String> nextServers)
             throws Exception {
         String nextServerAddr = nextServers.get(0);
-        TCPConnection.Address addr = TCPConnection.Address.parse(nextServerAddr);
 
         List<String> remainingServers = new ArrayList<>(nextServers.subList(1, nextServers.size()));
         StoreChunkRequest forwardRequest =
                 new StoreChunkRequest(filename, chunkNumber, data, remainingServers);
 
-        try (Socket socket = new Socket(addr.host, addr.port);
-                TCPConnection connection = new TCPConnection(socket)) {
-
-            connection.sendMessage(forwardRequest);
-
-            Message response = connection.receiveMessage();
-            if (response.getType() != MessageType.STORE_CHUNK_RESPONSE) {
-                System.err.println("Unexpected response from next server: " + response.getType());
-            }
+        Message response = NetworkUtils.sendRequestToServer(nextServerAddr, forwardRequest);
+        if (response.getType() != MessageType.STORE_CHUNK_RESPONSE) {
+            System.err.println("Unexpected response from next server: " + response.getType());
         }
 
         System.out.println("Forwarded chunk " + chunkNumber + " to " + nextServerAddr);
@@ -141,16 +134,9 @@ public class ChunkServer extends BaseChunkServer {
         try {
             byte[] chunkData = readChunk(filename, chunkNumber);
 
-            TCPConnection.Address addr = TCPConnection.Address.parse(targetServer);
-            try (Socket targetSocket = new Socket(addr.host, addr.port);
-                    TCPConnection targetConnection = new TCPConnection(targetSocket)) {
-
-                StoreChunkRequest storeRequest =
-                        new StoreChunkRequest(filename, chunkNumber, chunkData, new ArrayList<>());
-                targetConnection.sendMessage(storeRequest);
-
-                targetConnection.receiveMessage();
-            }
+            StoreChunkRequest storeRequest =
+                    new StoreChunkRequest(filename, chunkNumber, chunkData, new ArrayList<>());
+            NetworkUtils.sendRequestToServer(targetServer, storeRequest);
 
             ReplicateChunkResponse response = new ReplicateChunkResponse(true);
             connection.sendMessage(response);
@@ -254,7 +240,7 @@ public class ChunkServer extends BaseChunkServer {
     }
 
     @Override
-    protected void sendMajorHeartbeat() throws IOException {
+    protected List<HeartbeatMessage.ChunkInfo> buildMajorHeartbeatChunks() {
         List<HeartbeatMessage.ChunkInfo> chunkList = new ArrayList<>();
         for (ChunkMetadata metadata : chunks.values()) {
             chunkList.add(
@@ -266,22 +252,12 @@ public class ChunkServer extends BaseChunkServer {
                             metadata.getTimestamp(),
                             metadata.getDataSize()));
         }
-
-        HeartbeatMessage heartbeat =
-                new HeartbeatMessage(
-                        MessageType.MAJOR_HEARTBEAT,
-                        serverId,
-                        chunks.size(),
-                        getFreeSpace(),
-                        chunkList);
-
-        sendHeartbeatToController(heartbeat);
-
         newChunks.clear();
+        return chunkList;
     }
 
     @Override
-    protected void sendMinorHeartbeat() throws IOException {
+    protected List<HeartbeatMessage.ChunkInfo> buildMinorHeartbeatChunks() {
         List<HeartbeatMessage.ChunkInfo> chunkList = new ArrayList<>();
         for (String chunkKey : newChunks) {
             ChunkMetadata metadata = chunks.get(chunkKey);
@@ -296,16 +272,7 @@ public class ChunkServer extends BaseChunkServer {
                                 metadata.getDataSize()));
             }
         }
-
-        HeartbeatMessage heartbeat =
-                new HeartbeatMessage(
-                        MessageType.MINOR_HEARTBEAT,
-                        serverId,
-                        chunks.size(),
-                        getFreeSpace(),
-                        chunkList);
-
-        sendHeartbeatToController(heartbeat);
+        return chunkList;
     }
 
     private Path getChunkPath(String filename, int chunkNumber) {

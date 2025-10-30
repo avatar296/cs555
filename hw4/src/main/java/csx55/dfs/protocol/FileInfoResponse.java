@@ -1,4 +1,3 @@
-/* CS555 Distributed Systems - HW4 */
 package csx55.dfs.protocol;
 
 public class FileInfoResponse extends Message {
