@@ -36,48 +36,31 @@ local.properties
 # Claude Code
 .claude/
 
-# IDE - NetBeans
 nbproject/private/
 build/
 nbbuild/
 dist/
 nbdist/
 .nb-gradle/
-
-# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
 
-# Thumbnails
 Thumbs.db
 
-# Logs
 *.log
 logs/
-
-# Temporary files
 *.tmp
 *.bak
 *.swp
 *~
-
-# Chunk server storage (test data)
 /tmp/chunk-server/
-
-# Test files
 *.test
 test-data/
-
-# Distribution
 *.tar
 *.zip
 !gradle-wrapper.jar
-
-# Package Files
 *.nar
-
-# Virtual machine crash logs
 hs_err_pid*
 replay_pid*

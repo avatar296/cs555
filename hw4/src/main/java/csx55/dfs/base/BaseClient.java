@@ -96,6 +96,19 @@ public abstract class BaseClient {
         }
     }
 
+    protected FileInfoResponse getFileInfo(String filename)
+            throws IOException, ClassNotFoundException {
+        try (Socket socket = new Socket(controllerHost, controllerPort);
+                TCPConnection connection = new TCPConnection(socket)) {
+
+            FileInfoRequest request = new FileInfoRequest(filename);
+            connection.sendMessage(request);
+
+            Message response = connection.receiveMessage();
+            return (FileInfoResponse) response;
+        }
+    }
+
     protected List<String> getChunkServersForWrite(String filename, int chunkNumber, int count)
             throws IOException, ClassNotFoundException {
         try (Socket socket = new Socket(controllerHost, controllerPort);
@@ -170,6 +183,27 @@ public abstract class BaseClient {
                             + expectedType
                             + ", got "
                             + response.getType());
+        }
+    }
+
+    protected void registerFileMetadata(String filename, long fileSize)
+            throws IOException, ClassNotFoundException {
+        RegisterFileMetadataRequest request = new RegisterFileMetadataRequest(filename, fileSize);
+        Message response = sendToController(request);
+        requireResponseType(response, MessageType.REGISTER_FILE_METADATA_RESPONSE);
+    }
+
+    protected List<String> getFragmentLocationsForRead(String filename, int chunkNumber)
+            throws IOException, ClassNotFoundException {
+        try (Socket socket = new Socket(controllerHost, controllerPort);
+                TCPConnection connection = new TCPConnection(socket)) {
+
+            ChunkServerForReadRequest request =
+                    new ChunkServerForReadRequest(filename, chunkNumber);
+            connection.sendMessage(request);
+
+            Message response = connection.receiveMessage();
+            return ((ChunkServersResponse) response).getChunkServers();
         }
     }
 }

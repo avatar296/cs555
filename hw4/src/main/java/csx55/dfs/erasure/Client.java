@@ -60,6 +60,8 @@ public class Client extends BaseClient {
             System.out.println(server);
         }
 
+        registerFileMetadata(destPath, fileSize);
+
         System.out.println("Upload completed successfully");
     }
 
@@ -70,7 +72,9 @@ public class Client extends BaseClient {
         System.out.println(
                 "Downloading file with erasure coding: " + sourcePath + " -> " + destPath);
 
-        int numChunks = getFileChunkCount(sourcePath);
+        FileInfoResponse fileInfo = getFileInfo(sourcePath);
+        int numChunks = fileInfo.getNumChunks();
+        long fileSize = fileInfo.getFileSize();
 
         if (numChunks == 0) {
             throw new FileNotFoundException("File not found: " + sourcePath);
@@ -81,9 +85,10 @@ public class Client extends BaseClient {
 
         for (int i = 0; i < numChunks; i++) {
             int chunkNumber = i + 1;
+            long remainingBytes = fileSize - (i * DFSConfig.CHUNK_SIZE);
+            int actualChunkSize = (int) Math.min(DFSConfig.CHUNK_SIZE, remainingBytes);
 
-            List<String> fragmentLocations =
-                    getChunkServersForWrite(sourcePath, chunkNumber, DFSConfig.TOTAL_SHARDS);
+            List<String> fragmentLocations = getFragmentLocationsForRead(sourcePath, chunkNumber);
 
             int availableFragments = 0;
             for (String server : fragmentLocations) {
@@ -146,7 +151,7 @@ public class Client extends BaseClient {
                 }
             }
 
-            byte[] chunkData = decodeFragments(fragments, fragmentsPresent, DFSConfig.CHUNK_SIZE);
+            byte[] chunkData = decodeFragments(fragments, fragmentsPresent, actualChunkSize);
             fileOutput.write(chunkData);
         }
 

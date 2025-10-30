@@ -5,9 +5,11 @@ public class FileInfoResponse extends Message {
     private static final long serialVersionUID = 1L;
 
     private final int numChunks;
+    private final long fileSize;
 
-    public FileInfoResponse(int numChunks) {
+    public FileInfoResponse(int numChunks, long fileSize) {
         this.numChunks = numChunks;
+        this.fileSize = fileSize;
     }
 
     @Override
@@ -17,5 +19,9 @@ public class FileInfoResponse extends Message {
 
     public int getNumChunks() {
         return numChunks;
+    }
+
+    public long getFileSize() {
+        return fileSize;
     }
 }

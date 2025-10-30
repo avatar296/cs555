@@ -77,6 +77,8 @@ public abstract class BaseChunkServer {
         System.out.println("Storage directory: " + storageRoot);
         System.out.println("Connected to Controller: " + controllerHost + ":" + controllerPort);
 
+        sendMajorHeartbeat();
+
         startHeartbeatThreads();
 
         while (running) {

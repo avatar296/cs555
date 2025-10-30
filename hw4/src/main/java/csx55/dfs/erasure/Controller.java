@@ -50,8 +50,19 @@ public class Controller extends BaseController {
     @Override
     protected void handleAdditionalMessages(Message message, TCPConnection connection)
             throws Exception {
+        if (message.getType() == MessageType.REQUEST_CHUNK_SERVER_FOR_READ) {
+            processFragmentLocationsForRead((ChunkServerForReadRequest) message, connection);
+        } else {
+            System.err.println("Unknown message type: " + message.getType());
+        }
+    }
 
-        System.err.println("Unknown message type: " + message.getType());
+    private void processFragmentLocationsForRead(
+            ChunkServerForReadRequest request, TCPConnection connection) throws IOException {
+        List<String> fragmentLocations =
+                getFragmentLocationsForRead(request.getFilename(), request.getChunkNumber());
+        ChunkServersResponse response = new ChunkServersResponse(fragmentLocations);
+        connection.sendMessage(response);
     }
 
     public List<String> getFragmentLocationsForRead(String filename, int chunkNumber) {

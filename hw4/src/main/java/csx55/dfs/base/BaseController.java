@@ -16,12 +16,14 @@ public abstract class BaseController {
     protected ServerSocket serverSocket;
     protected final Map<String, ServerInfo> chunkServers;
     protected final Map<String, Long> lastHeartbeat;
+    protected final Map<String, Long> fileSizes;
     protected volatile boolean running = true;
 
     public BaseController(int port) {
         this.port = port;
         this.chunkServers = new ConcurrentHashMap<>();
         this.lastHeartbeat = new ConcurrentHashMap<>();
+        this.fileSizes = new ConcurrentHashMap<>();
     }
 
     protected abstract String getControllerType();
@@ -88,6 +90,10 @@ public abstract class BaseController {
                     processFileInfoRequest((FileInfoRequest) message, connection);
                     break;
 
+                case REGISTER_FILE_METADATA_REQUEST:
+                    processRegisterFileMetadata((RegisterFileMetadataRequest) message, connection);
+                    break;
+
                 default:
                     handleAdditionalMessages(message, connection);
                     break;
@@ -140,7 +146,19 @@ public abstract class BaseController {
             }
         }
 
-        FileInfoResponse response = new FileInfoResponse(maxChunk);
+        long fileSize = fileSizes.getOrDefault(filename, 0L);
+        FileInfoResponse response = new FileInfoResponse(maxChunk, fileSize);
+        connection.sendMessage(response);
+    }
+
+    protected void processRegisterFileMetadata(
+            RegisterFileMetadataRequest request, TCPConnection connection) throws IOException {
+        String filename = request.getFilename();
+        long fileSize = request.getFileSize();
+
+        fileSizes.put(filename, fileSize);
+
+        RegisterFileMetadataResponse response = new RegisterFileMetadataResponse(true);
         connection.sendMessage(response);
     }
 
