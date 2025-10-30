@@ -265,20 +265,132 @@ public class Controller {
      */
     private void detectFailures() {
         long currentTime = System.currentTimeMillis();
-        long failureThreshold = 180000; // 3 minutes
+        long failureThreshold = 180000; // 3 minutes (180 seconds)
 
-        // TODO: Implement failure detection
-        // - Check last heartbeat times
-        // - Mark failed servers
-        // - Initiate chunk replication recovery
+        List<String> failedServers = new ArrayList<>();
+
+        // Check each server's last heartbeat time
+        for (Map.Entry<String, Long> entry : lastHeartbeat.entrySet()) {
+            String serverId = entry.getKey();
+            long lastTime = entry.getValue();
+
+            if (currentTime - lastTime > failureThreshold) {
+                failedServers.add(serverId);
+            }
+        }
+
+        // Initiate recovery for each failed server
+        for (String failedServerId : failedServers) {
+            System.err.println("FAILURE DETECTED: " + failedServerId);
+            initiateRecovery(failedServerId);
+
+            // Remove failed server from tracking
+            chunkServers.remove(failedServerId);
+            lastHeartbeat.remove(failedServerId);
+        }
     }
 
     /** Initiate recovery for chunks that lost replicas due to server failure */
     private void initiateRecovery(String failedServerId) {
-        // TODO: Implement recovery logic
-        // - Find chunks that were on failed server
-        // - Find servers with valid replicas
-        // - Instruct servers to replicate chunks to new locations
+        System.out.println("Initiating recovery for failed server: " + failedServerId);
+
+        // Find all chunks that were on the failed server
+        List<String> affectedChunks = new ArrayList<>();
+
+        for (Map.Entry<String, List<String>> entry : chunkLocations.entrySet()) {
+            String chunkKey = entry.getKey();
+            List<String> servers = entry.getValue();
+
+            if (servers.contains(failedServerId)) {
+                affectedChunks.add(chunkKey);
+            }
+        }
+
+        System.out.println("Found " + affectedChunks.size() + " chunks affected by failure");
+
+        // For each affected chunk, re-replicate it
+        for (String chunkKey : affectedChunks) {
+            String[] parts = chunkKey.split(":");
+            String filename = parts[0];
+            int chunkNumber = Integer.parseInt(parts[1]);
+
+            List<String> remainingServers = chunkLocations.get(chunkKey);
+            remainingServers.remove(failedServerId); // Remove failed server
+
+            if (remainingServers.isEmpty()) {
+                System.err.println("ERROR: No remaining replicas for " + chunkKey);
+                continue;
+            }
+
+            // Select a new server for replication (not in remaining servers, not failed)
+            String newServer = selectNewServerForReplication(remainingServers);
+
+            if (newServer == null) {
+                System.err.println("ERROR: Cannot find new server for " + chunkKey);
+                continue;
+            }
+
+            // Pick one of the remaining servers as the source
+            String sourceServer = remainingServers.get(0);
+
+            // Send replication request to source server
+            try {
+                TCPConnection.Address addr = TCPConnection.Address.parse(sourceServer);
+                try (Socket socket = new Socket(addr.host, addr.port);
+                        TCPConnection connection = new TCPConnection(socket)) {
+
+                    ReplicateChunkRequest request =
+                            new ReplicateChunkRequest(filename, chunkNumber, newServer);
+                    connection.sendMessage(request);
+
+                    Message response = connection.receiveMessage();
+                    ReplicateChunkResponse replicateResponse = (ReplicateChunkResponse) response;
+
+                    if (replicateResponse.isSuccess()) {
+                        // Update chunk locations
+                        remainingServers.add(newServer);
+                        System.out.println(
+                                "Successfully replicated "
+                                        + chunkKey
+                                        + " from "
+                                        + sourceServer
+                                        + " to "
+                                        + newServer);
+                    } else {
+                        System.err.println(
+                                "Failed to replicate "
+                                        + chunkKey
+                                        + ": "
+                                        + replicateResponse.getErrorMessage());
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error replicating " + chunkKey + ": " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Select a new server for replication that doesn't already have the chunk
+     *
+     * @param existingServers Servers that already have this chunk
+     * @return Server ID for new replica, or null if none available
+     */
+    private String selectNewServerForReplication(List<String> existingServers) {
+        // Get all available servers sorted by free space
+        List<ChunkServerInfo> availableServers = new ArrayList<>(chunkServers.values());
+
+        // Remove servers that already have this chunk
+        availableServers.removeIf(server -> existingServers.contains(server.serverId));
+
+        if (availableServers.isEmpty()) {
+            return null;
+        }
+
+        // Sort by free space (descending)
+        availableServers.sort((a, b) -> Long.compare(b.freeSpace, a.freeSpace));
+
+        return availableServers.get(0).serverId;
     }
 
     /** Inner class to track chunk server information */

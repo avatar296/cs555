@@ -99,6 +99,10 @@ public class ChunkServer {
                     handleReadChunkRequest((ReadChunkRequest) message, connection);
                     break;
 
+                case REPLICATE_CHUNK_REQUEST:
+                    handleReplicateChunkRequest((ReplicateChunkRequest) message, connection);
+                    break;
+
                 default:
                     System.err.println("Unknown message type: " + message.getType());
                     break;
@@ -173,6 +177,57 @@ public class ChunkServer {
             ChunkDataResponse response =
                     new ChunkDataResponse(filename, chunkNumber, e.getMessage());
             connection.sendMessage(response);
+        }
+    }
+
+    /**
+     * Handle replication request from Controller during failure recovery
+     *
+     * @param request The replication request
+     * @param connection Connection to Controller
+     */
+    private void handleReplicateChunkRequest(
+            ReplicateChunkRequest request, TCPConnection connection) throws Exception {
+        String filename = request.getFilename();
+        int chunkNumber = request.getChunkNumber();
+        String targetServer = request.getTargetServer();
+
+        try {
+            // Read chunk from local storage
+            byte[] chunkData = readChunk(filename, chunkNumber);
+
+            // Connect to target server and send chunk
+            TCPConnection.Address addr = TCPConnection.Address.parse(targetServer);
+            try (Socket targetSocket = new Socket(addr.host, addr.port);
+                    TCPConnection targetConnection = new TCPConnection(targetSocket)) {
+
+                // Send chunk to target with empty nextServers (no further forwarding)
+                StoreChunkRequest storeRequest =
+                        new StoreChunkRequest(filename, chunkNumber, chunkData, new ArrayList<>());
+                targetConnection.sendMessage(storeRequest);
+
+                // Wait for acknowledgment
+                targetConnection.receiveMessage();
+            }
+
+            // Send success response to Controller
+            ReplicateChunkResponse response = new ReplicateChunkResponse(true);
+            connection.sendMessage(response);
+
+            System.out.println(
+                    "Replicated " + filename + "_chunk" + chunkNumber + " to " + targetServer);
+
+        } catch (Exception e) {
+            // Send failure response to Controller
+            ReplicateChunkResponse response = new ReplicateChunkResponse(false, e.getMessage());
+            connection.sendMessage(response);
+            System.err.println(
+                    "Failed to replicate "
+                            + filename
+                            + "_chunk"
+                            + chunkNumber
+                            + ": "
+                            + e.getMessage());
         }
     }
 

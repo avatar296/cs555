@@ -39,6 +39,7 @@ public enum MessageType {
 
     // Recovery coordination (Controller → ChunkServer)
     REPLICATE_CHUNK_REQUEST,
+    REPLICATE_CHUNK_RESPONSE,
     RECONSTRUCT_FRAGMENT_REQUEST,
 
     // General responses

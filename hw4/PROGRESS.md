@@ -1,9 +1,9 @@
 # Implementation Progress - CS555 HW4
 
-**Last Updated**: 2025-10-28 (Session 3)
-**Status**: Corruption Detection Complete and Tested ✅
-**Points Earned**: 3/10
-**Next Step**: Implement auto-repair (Phase 4)
+**Last Updated**: 2025-10-29 (Session 4)
+**Status**: Auto-Repair Complete and Tested ✅
+**Points Earned**: 5/10
+**Next Step**: Implement failure recovery (Phase 5)
 
 ---
 
@@ -17,15 +17,15 @@
 | Utilities | ✅ Complete | 100% |
 | Controller (Replication) | ✅ Complete | 100% |
 | ChunkServer (Replication) | ✅ Complete | 100% |
-| Client (Replication) | ✅ Upload/Download/Corruption | 80% |
+| Client (Replication) | ✅ Upload/Download/Corruption/Auto-Repair | 90% |
 | **Phase 1: Upload** | **✅ TESTED** | **100%** |
 | **Phase 2: Download** | **✅ TESTED** | **100%** |
 | **Phase 3: Corruption Detection** | **✅ TESTED** | **100%** |
-| Phase 4: Auto-Repair | ⏳ Pending | 0% |
+| **Phase 4: Auto-Repair** | **✅ TESTED** | **100%** |
 | Phase 5: Failure Recovery | ⏳ Pending | 0% |
 | Phase 6: Erasure Coding | ⏳ Pending | 0% |
 
-**Current Deliverable**: Auto-Repair (Worth 2 points)
+**Current Deliverable**: Failure Recovery (Worth 2 points)
 
 ---
 
@@ -60,6 +60,33 @@
 - Storage directory collision: All ChunkServers were using same `/tmp/chunk-server/` directory
 - String matching typo: Error message contains "corruption" not "corrupted"
 - Exception handling: Changed catch from `IOException` to `Exception` for proper catching
+
+---
+
+## 🎉 Session 4 Accomplishments
+
+### ✅ Phase 4: Auto-Repair Complete (2 points earned)
+- Implemented retry loop in Client.downloadFile() with up to 3 attempts
+- Added automatic corruption recovery - retries with different replicas
+- Corruption messages now tracked in list (not thrown immediately)
+- Download succeeds if at least 1 valid replica exists among the 3
+- Successfully tested with corrupted replica (auto-recovery worked perfectly)
+- Output verified: corruption reported but download completes successfully
+
+**Key Implementation Details**:
+- Retry loop: attempts 0, 1, 2 (max 3 attempts for 3 replicas)
+- On corruption: track message, request different server, retry
+- On non-corruption error (server failure): don't retry, fail immediately
+- Downloads complete successfully even when hitting corrupted replicas
+- File integrity verified: downloaded file identical to original
+
+**Test Results**:
+- Uploaded file to 3 servers (ports 57267, 57283, 57292)
+- Corrupted one replica (port 57267, slice 1)
+- Downloaded 5 times with random server selection
+- When corrupted server hit: error printed, automatically retried with valid replica
+- Final output: `REMLP03210.local:57267 1 1 is corrupted` followed by successful server
+- All downloads completed successfully with correct file content
 
 ---
 
@@ -356,10 +383,10 @@ hw4/
 | 1 | Upload with 3x replication | 1 | ✅ EARNED |
 | 2 | Download | 1 | ✅ EARNED |
 | 3 | Detect corruption | 1 | ✅ EARNED |
-| 4 | Auto-repair corruption | 2 | ⏳ TODO |
+| 4 | Auto-repair corruption | 2 | ✅ EARNED |
 | 5 | Failure recovery | 2 | ⏳ TODO |
 | 6 | Erasure coding | 3 | ⏳ TODO |
-| **TOTAL** | | **10** | **3/10** |
+| **TOTAL** | | **10** | **5/10** |
 
 ---
 
@@ -376,20 +403,21 @@ hw4/
 
 ---
 
-### Phase 4: Auto-Repair (2 points) - Est. 1-2 hours
+### ✅ Phase 4: Auto-Repair (2 points) - COMPLETE
 
-**What Needs Implementation**:
-- Client retry logic when corruption detected
-- Request alternate replica from Controller
-- Read from valid replica
-- Complete download successfully
+**What Was Implemented**:
+- ✅ Client retry logic with up to 3 attempts (one per replica)
+- ✅ Automatic alternate replica selection from Controller
+- ✅ Read from valid replica after corruption detected
+- ✅ Download completes successfully despite corruption
+- ✅ Corruption messages tracked and printed at end
 
-**Flow**:
+**Flow (Implemented)**:
 1. Client reads chunk from Server A
-2. Corruption detected
-3. Client requests different server from Controller
+2. Corruption detected → add to corrupted list
+3. Client requests different server from Controller (retry attempt 1)
 4. Client reads from Server B (valid copy)
-5. Download succeeds
+5. Download succeeds with correct file content
 
 ---
 
