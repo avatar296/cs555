@@ -5,9 +5,18 @@
 
 echo "Creating CS555 HW4 submission tar file..."
 
-# Clean build artifacts
-echo "Cleaning build artifacts..."
-./gradlew clean
+# Apply code formatting
+echo "Applying code formatting..."
+./gradlew spotlessApply
+
+# Clean build and verify
+echo "Building and verifying code..."
+./gradlew clean build
+
+if [ $? -ne 0 ]; then
+    echo "ERROR: Build failed. Fix errors before submitting."
+    exit 1
+fi
 
 # Create the tar file
 echo "Creating tar file..."
