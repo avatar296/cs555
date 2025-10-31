@@ -15,7 +15,9 @@ echo "Cleaning up DFS..."
 pkill -f "csx55.dfs" 2>/dev/null || true
 
 # Remove chunk server storage (all instances)
-rm -rf /tmp/chunk-server-*
+rm -rf /tmp/chunk-server-*  # Local mode (unique directories)
+rm -rf /tmp/chunk_server     # Grader mode (shared directory)
+rm -f /tmp/.*_chunk*.meta    # Metadata files in root (if any)
 
 # Remove test files
 rm -f /tmp/test*.txt

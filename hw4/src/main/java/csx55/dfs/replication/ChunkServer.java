@@ -161,13 +161,17 @@ public class ChunkServer extends BaseChunkServer {
         byte[][] checksums = computeSliceChecksums(data);
 
         Path chunkPath = getChunkPath(filename, chunkNumber);
+        Path metadataPath = getMetadataPath(filename, chunkNumber);
         Files.createDirectories(chunkPath.getParent());
 
         try (FileOutputStream fos = new FileOutputStream(chunkPath.toFile())) {
+            fos.write(data);
+        }
+
+        try (FileOutputStream fos = new FileOutputStream(metadataPath.toFile())) {
             for (byte[] checksum : checksums) {
                 fos.write(checksum);
             }
-            fos.write(data);
         }
 
         ChunkMetadata metadata = new ChunkMetadata(filename, chunkNumber, data.length);
@@ -179,24 +183,28 @@ public class ChunkServer extends BaseChunkServer {
 
     public byte[] readChunk(String filename, int chunkNumber) throws Exception {
         Path chunkPath = getChunkPath(filename, chunkNumber);
+        Path metadataPath = getMetadataPath(filename, chunkNumber);
 
         if (!Files.exists(chunkPath)) {
             throw new FileNotFoundException(
                     "Chunk not found: " + filename + "_chunk" + chunkNumber);
         }
 
-        try (FileInputStream fis = new FileInputStream(chunkPath.toFile())) {
-            byte[][] storedChecksums = new byte[SLICES_PER_CHUNK][20];
+        byte[][] storedChecksums = new byte[SLICES_PER_CHUNK][20];
+        try (FileInputStream fis = new FileInputStream(metadataPath.toFile())) {
             for (int i = 0; i < SLICES_PER_CHUNK; i++) {
                 fis.read(storedChecksums[i]);
             }
-
-            byte[] data = fis.readAllBytes();
-
-            verifyChunkIntegrity(data, storedChecksums, filename, chunkNumber);
-
-            return data;
         }
+
+        byte[] data;
+        try (FileInputStream fis = new FileInputStream(chunkPath.toFile())) {
+            data = fis.readAllBytes();
+        }
+
+        verifyChunkIntegrity(data, storedChecksums, filename, chunkNumber);
+
+        return data;
     }
 
     private byte[][] computeSliceChecksums(byte[] data) throws Exception {
@@ -278,6 +286,11 @@ public class ChunkServer extends BaseChunkServer {
     private Path getChunkPath(String filename, int chunkNumber) {
         filename = normalizeFilename(filename);
         return getStoragePath(filename + "_chunk" + chunkNumber);
+    }
+
+    private Path getMetadataPath(String filename, int chunkNumber) {
+        filename = normalizeFilename(filename);
+        return getStoragePath("." + filename + "_chunk" + chunkNumber + ".meta");
     }
 
     private String getChunkKey(String filename, int chunkNumber) {

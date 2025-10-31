@@ -18,5 +18,5 @@ echo "Starting ChunkServer"
 echo "Controller: $HOST:$PORT"
 echo "=========================================="
 
-# Start the chunk server
-./gradlew runReplicationChunkServer -PappArgs="$HOST $PORT" --console=plain
+# Start the chunk server in local mode (unique directories per server)
+./gradlew runReplicationChunkServer -PappArgs="$HOST $PORT" -Ddfs.local.mode=true --console=plain

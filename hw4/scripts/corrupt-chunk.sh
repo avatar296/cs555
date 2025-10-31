@@ -6,7 +6,7 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR/.."
 
-CHUNK_DIR_PATTERN="/tmp/chunk-server-*"
+CHUNK_DIR_PATTERN="/tmp/chunk-server-* /tmp/chunk_server"
 TEST_FILE="/tmp/test.txt"
 
 # Colors for output
@@ -33,7 +33,7 @@ fi
 echo ""
 
 # Step 2: Check if chunk directories exist
-CHUNK_DIRS=$(find /tmp -maxdepth 1 -type d -name "chunk-server-*" 2>/dev/null)
+CHUNK_DIRS=$(find /tmp -maxdepth 1 -type d \( -name "chunk-server-*" -o -name "chunk_server" \) 2>/dev/null)
 
 if [ -z "$CHUNK_DIRS" ]; then
     echo -e "${RED}✗ No ChunkServer directories found!${NC}"
@@ -50,8 +50,9 @@ if [ $# -eq 0 ]; then
     echo -e "${YELLOW}Usage: $0 <dfs-filename>${NC}"
     echo ""
     echo "Available files:"
-    find /tmp/chunk-server-* -type f -name "*_chunk*" 2>/dev/null | \
+    find /tmp/chunk-server-* /tmp/chunk_server -type f -name "*_chunk*" 2>/dev/null | \
         sed 's|/tmp/chunk-server-[0-9]*/||' | \
+        sed 's|/tmp/chunk_server/||' | \
         sed 's/_chunk.*//' | \
         sort -u | \
         sed 's|^|  /|'
@@ -64,14 +65,15 @@ SEARCH_PATH="${DFS_FILE#/}"
 
 # Find all replicas of this chunk
 echo -e "${BLUE}Searching for replicas of: $DFS_FILE${NC}"
-CHUNK_FILES=$(find /tmp/chunk-server-* -type f -path "*/${SEARCH_PATH}_chunk*" 2>/dev/null)
+CHUNK_FILES=$(find /tmp/chunk-server-* /tmp/chunk_server -type f -path "*/${SEARCH_PATH}_chunk*" 2>/dev/null)
 
 if [ -z "$CHUNK_FILES" ]; then
     echo -e "${RED}✗ No chunks found for: $DFS_FILE${NC}"
     echo ""
     echo "Available files:"
-    find /tmp/chunk-server-* -type f -name "*_chunk*" 2>/dev/null | \
+    find /tmp/chunk-server-* /tmp/chunk_server -type f -name "*_chunk*" 2>/dev/null | \
         sed 's|/tmp/chunk-server-[0-9]*/||' | \
+        sed 's|/tmp/chunk_server/||' | \
         sed 's/_chunk.*//' | \
         sort -u | \
         sed 's|^|  /|'
@@ -85,9 +87,12 @@ echo ""
 
 # Step 4: Corrupt first replica only (for testing corruption detection)
 CHUNK_FILE=$(echo "$CHUNK_FILES" | head -1)
-PORT=$(echo "$CHUNK_FILE" | sed 's|/tmp/chunk-server-||' | sed 's|/.*||')
-
-echo -e "${YELLOW}Corrupting first replica only (port $PORT):${NC}"
+if [[ "$CHUNK_FILE" == *"/chunk-server-"* ]]; then
+    PORT=$(echo "$CHUNK_FILE" | sed 's|/tmp/chunk-server-||' | sed 's|/.*||')
+    echo -e "${YELLOW}Corrupting first replica only (port $PORT):${NC}"
+else
+    echo -e "${YELLOW}Corrupting first replica only:${NC}"
+fi
 echo "  $CHUNK_FILE"
 echo ""
 
@@ -115,14 +120,24 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Chunk corrupted successfully${NC}"
     echo ""
     echo -e "${BLUE}Replica Status:${NC}"
-    echo "  Port $PORT: CORRUPTED (slice 1)"
+    if [[ "$CHUNK_FILE" == *"/chunk-server-"* ]]; then
+        echo "  Port $PORT: CORRUPTED (slice 1)"
+    else
+        echo "  Replica 1: CORRUPTED (slice 1)"
+    fi
 
     # Show other replicas
     OTHER_REPLICAS=$(echo "$CHUNK_FILES" | tail -n +2)
     if [ ! -z "$OTHER_REPLICAS" ]; then
+        COUNT=2
         echo "$OTHER_REPLICAS" | while read replica; do
-            other_port=$(echo "$replica" | sed 's|/tmp/chunk-server-||' | sed 's|/.*||')
-            echo "  Port $other_port: OK (valid copy)"
+            if [[ "$replica" == *"/chunk-server-"* ]]; then
+                other_port=$(echo "$replica" | sed 's|/tmp/chunk-server-||' | sed 's|/.*||')
+                echo "  Port $other_port: OK (valid copy)"
+            else
+                echo "  Replica $COUNT: OK (valid copy)"
+                COUNT=$((COUNT + 1))
+            fi
         done
     fi
 
@@ -139,7 +154,11 @@ if [ $? -eq 0 ]; then
     echo "3. Expected behavior:"
     echo "   - ${GREEN}33% chance${NC}: Download succeeds from valid replica"
     echo "   - ${RED}33% chance${NC}: Corruption detected:"
-    echo "     ${YELLOW}REMLP03210.local:$PORT 1 1 is corrupted${NC}"
+    if [[ "$CHUNK_FILE" == *"/chunk-server-"* ]]; then
+        echo "     ${YELLOW}<ip>:$PORT 1 1 is corrupted${NC}"
+    else
+        echo "     ${YELLOW}<ip>:<port> 1 1 is corrupted${NC}"
+    fi
     echo ""
     echo "4. Keep downloading until you hit the corrupted replica!"
     echo ""

@@ -67,11 +67,15 @@ public abstract class BaseChunkServer {
         serverSocket = new ServerSocket(0);
         int port = serverSocket.getLocalPort();
 
-        storageRoot = "/tmp/chunk-server-" + port;
+        if (System.getProperty("dfs.local.mode") != null) {
+            storageRoot = "/tmp/chunk-server-" + port;
+        } else {
+            storageRoot = "/tmp/chunk_server";
+        }
         Files.createDirectories(Paths.get(storageRoot));
 
-        String hostname = java.net.InetAddress.getLocalHost().getHostName();
-        serverId = hostname + ":" + port;
+        String ipAddress = java.net.InetAddress.getLocalHost().getHostAddress();
+        serverId = ipAddress + ":" + port;
 
         System.out.println(getServerType() + " started: " + serverId);
         System.out.println("Storage directory: " + storageRoot);
