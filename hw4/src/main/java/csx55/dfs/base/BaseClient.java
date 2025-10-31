@@ -27,12 +27,7 @@ public abstract class BaseClient {
     protected abstract void downloadFile(String sourcePath, String destPath) throws Exception;
 
     public void start() {
-        System.out.println(
-                getClientType()
-                        + " connected to Controller: "
-                        + controllerHost
-                        + ":"
-                        + controllerPort);
+        System.out.println(getClientType() + " connected to Controller");
         System.out.println("Commands:");
         System.out.println("  upload <source> <destination>");
         System.out.println("  download <source> <destination>");

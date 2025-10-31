@@ -2,13 +2,13 @@ package csx55.dfs.replication;
 
 import java.io.*;
 import java.net.Socket;
-import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 
 import csx55.dfs.base.BaseClient;
 import csx55.dfs.protocol.*;
 import csx55.dfs.transport.TCPConnection;
+import csx55.dfs.util.IOUtils;
 
 public class Client extends BaseClient {
 
@@ -149,7 +149,7 @@ public class Client extends BaseClient {
             System.out.println(server);
         }
 
-        Files.write(Paths.get(destPath), fileOutput.toByteArray());
+        IOUtils.writeWithDirectoryCreation(Paths.get(destPath), fileOutput.toByteArray());
 
         System.out.println("Download completed successfully");
     }
