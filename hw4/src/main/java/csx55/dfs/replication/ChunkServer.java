@@ -98,7 +98,8 @@ public class ChunkServer extends BaseChunkServer {
         String nextServerAddr = nextServers.get(0);
 
         List<String> remainingServers = new ArrayList<>(nextServers.subList(1, nextServers.size()));
-        StoreChunkRequest forwardRequest = new StoreChunkRequest(filename, chunkNumber, data, remainingServers);
+        StoreChunkRequest forwardRequest =
+                new StoreChunkRequest(filename, chunkNumber, data, remainingServers);
 
         Message response = NetworkUtils.sendRequestToServer(nextServerAddr, forwardRequest);
         if (response.getType() != MessageType.STORE_CHUNK_RESPONSE) {
@@ -118,7 +119,8 @@ public class ChunkServer extends BaseChunkServer {
             ChunkDataResponse response = new ChunkDataResponse(filename, chunkNumber, data);
             connection.sendMessage(response);
         } catch (Exception e) {
-            ChunkDataResponse response = new ChunkDataResponse(filename, chunkNumber, e.getMessage());
+            ChunkDataResponse response =
+                    new ChunkDataResponse(filename, chunkNumber, e.getMessage());
             connection.sendMessage(response);
         }
     }
@@ -132,7 +134,8 @@ public class ChunkServer extends BaseChunkServer {
         try {
             byte[] chunkData = readChunk(filename, chunkNumber);
 
-            StoreChunkRequest storeRequest = new StoreChunkRequest(filename, chunkNumber, chunkData, new ArrayList<>());
+            StoreChunkRequest storeRequest =
+                    new StoreChunkRequest(filename, chunkNumber, chunkData, new ArrayList<>());
             NetworkUtils.sendRequestToServer(targetServer, storeRequest);
 
             ReplicateChunkResponse response = new ReplicateChunkResponse(true);
