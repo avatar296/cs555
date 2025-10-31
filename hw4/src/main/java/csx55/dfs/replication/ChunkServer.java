@@ -98,8 +98,7 @@ public class ChunkServer extends BaseChunkServer {
         String nextServerAddr = nextServers.get(0);
 
         List<String> remainingServers = new ArrayList<>(nextServers.subList(1, nextServers.size()));
-        StoreChunkRequest forwardRequest =
-                new StoreChunkRequest(filename, chunkNumber, data, remainingServers);
+        StoreChunkRequest forwardRequest = new StoreChunkRequest(filename, chunkNumber, data, remainingServers);
 
         Message response = NetworkUtils.sendRequestToServer(nextServerAddr, forwardRequest);
         if (response.getType() != MessageType.STORE_CHUNK_RESPONSE) {
@@ -119,8 +118,7 @@ public class ChunkServer extends BaseChunkServer {
             ChunkDataResponse response = new ChunkDataResponse(filename, chunkNumber, data);
             connection.sendMessage(response);
         } catch (Exception e) {
-            ChunkDataResponse response =
-                    new ChunkDataResponse(filename, chunkNumber, e.getMessage());
+            ChunkDataResponse response = new ChunkDataResponse(filename, chunkNumber, e.getMessage());
             connection.sendMessage(response);
         }
     }
@@ -134,8 +132,7 @@ public class ChunkServer extends BaseChunkServer {
         try {
             byte[] chunkData = readChunk(filename, chunkNumber);
 
-            StoreChunkRequest storeRequest =
-                    new StoreChunkRequest(filename, chunkNumber, chunkData, new ArrayList<>());
+            StoreChunkRequest storeRequest = new StoreChunkRequest(filename, chunkNumber, chunkData, new ArrayList<>());
             NetworkUtils.sendRequestToServer(targetServer, storeRequest);
 
             ReplicateChunkResponse response = new ReplicateChunkResponse(true);
@@ -290,7 +287,18 @@ public class ChunkServer extends BaseChunkServer {
 
     private Path getMetadataPath(String filename, int chunkNumber) {
         filename = normalizeFilename(filename);
-        return getStoragePath("." + filename + "_chunk" + chunkNumber + ".meta");
+
+        int lastSlash = filename.lastIndexOf('/');
+        String directory = "";
+        String basename = filename;
+
+        if (lastSlash >= 0) {
+            directory = filename.substring(0, lastSlash + 1);
+            basename = filename.substring(lastSlash + 1);
+        }
+
+        String metaFilename = directory + "." + basename + "_chunk" + chunkNumber + ".meta";
+        return getStoragePath(metaFilename);
     }
 
     private String getChunkKey(String filename, int chunkNumber) {
