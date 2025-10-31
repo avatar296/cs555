@@ -128,3 +128,28 @@ spotless {
         indentWithSpaces(4)
     }
 }
+
+task createTar(type: Tar) {
+    archiveBaseName.set('Christopher_Cowart_HW4')
+    archiveVersion.set('')
+    archiveExtension.set('tar')
+
+    from('.') {
+        include 'build.gradle'
+        include 'README.txt'
+        include 'src/main/java/**/*.java'
+        include 'reed-solomon-erasure-coding.jar'
+
+        exclude '**/._*'
+        exclude '**/.DS_Store'
+        exclude 'src/test/**'
+        exclude '**/test/**'
+        exclude '**/*Test.java'
+        exclude '**/*Tests.java'
+        exclude 'build/**'
+        exclude '.gradle/**'
+        exclude '.git/**'
+        exclude '.idea/**'
+        exclude '*.iml'
+    }
+}
