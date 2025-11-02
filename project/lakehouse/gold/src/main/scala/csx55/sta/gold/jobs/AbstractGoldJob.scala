@@ -111,7 +111,7 @@ abstract class AbstractGoldJob(
           inputStream.close()
         } catch {
           case e: Exception =>
-            logger.warn("Failed to close input stream for {}: {}", resourcePath, e.getMessage)
+            logger.warn(s"Failed to close input stream for $resourcePath: ${e.getMessage}")
         }
       }
     }

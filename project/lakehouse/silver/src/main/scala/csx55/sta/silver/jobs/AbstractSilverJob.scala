@@ -87,8 +87,7 @@ abstract class AbstractSilverJob(
     } catch {
       case e: Exception =>
         // Expected: monitoring table may not exist yet, but job should continue
-        logger.warn("Monitoring table {} does not exist. Metrics will not be recorded: {}",
-          MONITORING_TABLE, e.getMessage)
+        logger.warn(s"Monitoring table $MONITORING_TABLE does not exist. Metrics will not be recorded: ${e.getMessage}")
     }
   }
 
@@ -160,7 +159,7 @@ abstract class AbstractSilverJob(
           inputStream.close()
         } catch {
           case e: Exception =>
-            logger.warn("Failed to close input stream for {}: {}", resourcePath, e.getMessage)
+            logger.warn(s"Failed to close input stream for $resourcePath: ${e.getMessage}")
         }
       }
     }

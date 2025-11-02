@@ -74,7 +74,7 @@ class QualityMetricsRecorder(
     } catch {
       case e: Exception =>
         // Expected: monitoring table may not exist yet
-        logger.debug("Monitoring table {} does not exist: {}", monitoringTable, e.getMessage)
+        logger.debug(s"Monitoring table $monitoringTable does not exist: ${e.getMessage}")
         false
     }
   }

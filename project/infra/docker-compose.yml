@@ -202,8 +202,8 @@ services:
       - minio
       - postgres-iceberg
     environment:
-      - SPARK_WORKER_CORES=2
-      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=4
+      - SPARK_WORKER_MEMORY=8g
       - SPARK_NO_DAEMONIZE=true
       - SPARK_WORKER_OPTS=-Dspark.shuffle.service.enabled=true -Dspark.shuffle.service.port=7337
       # MinIO S3 Configuration
@@ -214,6 +214,13 @@ services:
       - spark-logs:/opt/spark/logs
     deploy:
       replicas: 2
+      resources:
+        limits:
+          memory: 10G
+          cpus: 4
+        reservations:
+          memory: 8G
+          cpus: 3
 
   # =========================================================================
   # BRONZE
@@ -316,11 +323,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 2G
-        reservations:
           cpus: '0.5'
-          memory: 1G
+          memory: 768M
+        reservations:
+          cpus: '0.25'
+          memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
       interval: 30s
@@ -594,11 +601,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 4G
-        reservations:
           cpus: '0.5'
-          memory: 1G
+          memory: 768M
+        reservations:
+          cpus: '0.25'
+          memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
       interval: 30s
@@ -904,11 +911,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.5'
-          memory: 5G
+          cpus: '0.5'
+          memory: 768M
         reservations:
-          cpus: '1.5'
-          memory: 3G
+          cpus: '0.25'
+          memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
       interval: 30s
