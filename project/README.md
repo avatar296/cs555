@@ -58,59 +58,21 @@ project/
 ### Prerequisites
 
 - Docker & Docker Compose
-- Java 17
-- Gradle 8.x (or use `./gradlew`)
+- 16GB+ RAM recommended
 
-### 1. Build All Modules
+### 1. Pull Pre-built Images
 
 ```bash
-./gradlew clean :lakehouse:schema-management:jar \
-                :lakehouse:bronze:jar \
-                :lakehouse:silver:jar \
-                :lakehouse:gold:jar \
-                :producer:jar
+cd infra
+docker compose pull
 ```
+
+This will pull all pre-built images from Docker Hub (`cowartc3/sta-*`).
 
 ### 2. Start Infrastructure
 
 ```bash
-cd infra
-docker-compose up -d postgres-iceberg minio kafka schema-registry
-```
-
-Wait for services to initialize (~30 seconds), then:
-
-```bash
-docker-compose up -d minio-setup spark-master spark-worker
-```
-
-### 3. Initialize Lakehouse Tables
-
-```bash
-docker-compose up bronze-table-setup
-docker-compose up silver-table-setup
-docker-compose up gold-table-setup
-```
-
-### 4. Start Data Producer
-
-```bash
-docker-compose up -d producer
-```
-
-### 5. Start Streaming Jobs
-
-```bash
-docker-compose up -d bronze-trips-consumer bronze-weather-consumer bronze-events-consumer
-docker-compose up -d silver-trips-consumer silver-weather-consumer silver-events-consumer
-docker-compose up -d gold-trip-metrics
-```
-
-### 6. Load Dimension Tables (Optional)
-
-```bash
-docker-compose run --rm gold-time-dim-loader
-docker-compose run --rm gold-location-dim-loader
+docker compose up
 ```
 
 ## Service Endpoints
@@ -123,27 +85,23 @@ docker-compose run --rm gold-location-dim-loader
 | Kafka UI | http://localhost:8088 | - |
 | Schema Registry | http://localhost:8081 | - |
 
-## Project Commands
-
-### Build Commands
+### Gradle Build Commands
 
 ```bash
+# Build all modules
 ./gradlew clean build
+
+# Build individual JARs
+./gradlew :lakehouse:schema-management:jar
 ./gradlew :lakehouse:bronze:jar
 ./gradlew :lakehouse:silver:jar
 ./gradlew :lakehouse:gold:jar
-./gradlew spotlessCheck
-./gradlew spotlessApply
+./gradlew :producer:jar
+
+# Code formatting
+./gradlew spotlessCheck    # Check formatting
+./gradlew spotlessApply    # Auto-fix formatting
+
+# View all available tasks
+./gradlew tasks
 ```
-
-## Configuration
-
-All configuration is environment-based via Docker Compose. Key settings:
-
-- **Kafka Bootstrap Servers**: `kafka:9092`
-- **Schema Registry URL**: `http://schema-registry:8081`
-- **Iceberg Catalog**: JDBC (PostgreSQL)
-- **Warehouse Path**: `s3a://lakehouse/warehouse`
-- **Checkpoint Location**: `/tmp/checkpoint/<layer>/<job>`
-- **Trigger Interval**: 10 seconds (configurable)
-

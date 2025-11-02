@@ -17,12 +17,18 @@ class TripsCleanedJob(config: StreamConfig)
       .isComplete("timestamp")
       .isComplete("pickup_location_id")
       .isComplete("dropoff_location_id")
+      .isComplete("fare_amount")
+      .isComplete("passenger_count")
       .hasMin("trip_distance", _ >= 0.1)
       .hasMax("trip_distance", _ <= 200.0)
       .hasMin("fare_amount", _ >= 2.50)
       .hasMax("fare_amount", _ <= 1000.0)
       .hasMin("passenger_count", _ >= 1.0)
       .hasMax("passenger_count", _ <= 6.0)
+      .hasMin("pickup_location_id", _ >= 1.0)
+      .hasMax("pickup_location_id", _ <= 263.0)
+      .hasMin("dropoff_location_id", _ >= 1.0)
+      .hasMax("dropoff_location_id", _ <= 263.0)
   }
   override protected def getBusinessRuleReplacements(): Map[String, Any] = {
     Map(
