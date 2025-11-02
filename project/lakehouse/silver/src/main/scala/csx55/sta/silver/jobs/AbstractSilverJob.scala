@@ -85,7 +85,10 @@ abstract class AbstractSilverJob(
     try {
       spark.table(MONITORING_TABLE)
     } catch {
-      case _: Exception =>
+      case e: Exception =>
+        // Expected: monitoring table may not exist yet, but job should continue
+        logger.warn("Monitoring table {} does not exist. Metrics will not be recorded: {}",
+          MONITORING_TABLE, e.getMessage)
     }
   }
 
@@ -98,6 +101,7 @@ abstract class AbstractSilverJob(
 
     val bronzeStream = spark.readStream
       .format("iceberg")
+      .option("streaming-max-rows-per-micro-batch", "2500")
       .table(streamConfig.sourceTable)
 
     val tempViewName = getTempViewName()
@@ -131,16 +135,15 @@ abstract class AbstractSilverJob(
   }
 
   protected def loadSqlFromResources(resourcePath: String): String = {
+    var inputStream: java.io.InputStream = null
     try {
-      val inputStream = getClass.getClassLoader.getResourceAsStream(resourcePath)
+      inputStream = getClass.getClassLoader.getResourceAsStream(resourcePath)
 
       if (inputStream == null) {
         throw new RuntimeException(s"SQL file not found in resources: $resourcePath")
       }
 
       val sql = Source.fromInputStream(inputStream, "UTF-8").mkString
-
-      inputStream.close()
 
       if (sql.trim.isEmpty) {
         throw new RuntimeException(s"SQL file is empty: $resourcePath")
@@ -151,6 +154,15 @@ abstract class AbstractSilverJob(
     } catch {
       case e: Exception =>
         throw new RuntimeException(s"Failed to load SQL file: $resourcePath", e)
+    } finally {
+      if (inputStream != null) {
+        try {
+          inputStream.close()
+        } catch {
+          case e: Exception =>
+            logger.warn("Failed to close input stream for {}: {}", resourcePath, e.getMessage)
+        }
+      }
     }
   }
 }

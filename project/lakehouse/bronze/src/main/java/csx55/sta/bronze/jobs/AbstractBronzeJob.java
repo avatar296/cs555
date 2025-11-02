@@ -49,7 +49,8 @@ public abstract class AbstractBronzeJob extends BaseStreamingJob {
         .option("kafka.bootstrap.servers", config.getKafkaBootstrapServers())
         .option("subscribe", streamConfig.topic)
         .option("startingOffsets", config.getStartingOffsets())
-        .option("failOnDataLoss", String.valueOf(config.getFailOnDataLoss()))
+        .option("failOnDataLoss", config.getFailOnDataLoss())
+        .option("maxOffsetsPerTrigger", "2500")
         .load();
   }
 

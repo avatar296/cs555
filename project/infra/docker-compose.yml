@@ -15,7 +15,7 @@ services:
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
-      - KAFKA_CFG_NUM_PARTITIONS=12
+      - KAFKA_CFG_NUM_PARTITIONS=4
       - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
       - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
@@ -275,16 +275,15 @@ services:
       --deploy-mode client
       --conf spark.driver.memory=512m
       --conf spark.executor.memory=512m
-      --conf spark.executor.cores=1
+      --conf spark.executor.cores=2
       --conf spark.dynamicAllocation.enabled=true
       --conf spark.dynamicAllocation.shuffleTracking.enabled=true
-      --conf spark.dynamicAllocation.minExecutors=0
+      --conf spark.dynamicAllocation.minExecutors=1
       --conf spark.dynamicAllocation.maxExecutors=2
       --conf spark.dynamicAllocation.initialExecutors=1
       --conf spark.dynamicAllocation.executorIdleTimeout=60s
       --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
       --conf spark.shuffle.service.enabled=true
-      --conf spark.streaming.kafka.maxRatePerPartition=1000
       --conf spark.sql.streaming.minBatchesToRetain=10
       --conf spark.driver.extraJavaOptions=-Dlog4j.configurationFile=file:/opt/spark/work-dir/conf/log4j2.properties
       --conf spark.executor.extraJavaOptions=-Dlog4j.configurationFile=file:/opt/spark/work-dir/conf/log4j2.properties
@@ -561,8 +560,8 @@ services:
       --master spark://spark-master:7077
       --deploy-mode client
       --conf spark.driver.memory=2g
-      --conf spark.executor.memory=2g
-      --conf spark.executor.cores=1
+      --conf spark.executor.memory=3g
+      --conf spark.executor.cores=2
       --conf spark.dynamicAllocation.enabled=true
       --conf spark.dynamicAllocation.shuffleTracking.enabled=true
       --conf spark.dynamicAllocation.minExecutors=1
@@ -571,7 +570,6 @@ services:
       --conf spark.dynamicAllocation.executorIdleTimeout=60s
       --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
       --conf spark.shuffle.service.enabled=true
-      --conf spark.streaming.kafka.maxRatePerPartition=1000
       --conf spark.sql.streaming.minBatchesToRetain=10
       --conf spark.driver.extraJavaOptions=-Dlog4j.configurationFile=file:/opt/spark/work-dir/conf/log4j2.properties
       --conf spark.executor.extraJavaOptions=-Dlog4j.configurationFile=file:/opt/spark/work-dir/conf/log4j2.properties
@@ -597,7 +595,7 @@ services:
       resources:
         limits:
           cpus: '1.0'
-          memory: 3G
+          memory: 4G
         reservations:
           cpus: '0.5'
           memory: 1G
@@ -870,18 +868,17 @@ services:
       --class csx55.sta.gold.GoldLayerApp
       --master spark://spark-master:7077
       --deploy-mode client
-      --conf spark.driver.memory=512m
-      --conf spark.executor.memory=512m
-      --conf spark.executor.cores=1
+      --conf spark.driver.memory=1g
+      --conf spark.executor.memory=3g
+      --conf spark.executor.cores=2
       --conf spark.dynamicAllocation.enabled=true
       --conf spark.dynamicAllocation.shuffleTracking.enabled=true
-      --conf spark.dynamicAllocation.minExecutors=0
-      --conf spark.dynamicAllocation.maxExecutors=1
+      --conf spark.dynamicAllocation.minExecutors=1
+      --conf spark.dynamicAllocation.maxExecutors=2
       --conf spark.dynamicAllocation.initialExecutors=1
       --conf spark.dynamicAllocation.executorIdleTimeout=60s
       --conf spark.dynamicAllocation.schedulerBacklogTimeout=5s
       --conf spark.shuffle.service.enabled=true
-      --conf spark.streaming.kafka.maxRatePerPartition=1000
       --conf spark.sql.streaming.minBatchesToRetain=10
       --conf spark.driver.extraJavaOptions=-Dlog4j.configurationFile=file:/opt/spark/work-dir/conf/log4j2.properties
       --conf spark.executor.extraJavaOptions=-Dlog4j.configurationFile=file:/opt/spark/work-dir/conf/log4j2.properties
@@ -907,11 +904,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1G
+          cpus: '2.5'
+          memory: 5G
         reservations:
-          cpus: '0.5'
-          memory: 1G
+          cpus: '1.5'
+          memory: 3G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4040/api/v1/applications"]
       interval: 30s

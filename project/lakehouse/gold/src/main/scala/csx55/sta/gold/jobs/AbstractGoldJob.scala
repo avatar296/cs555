@@ -22,13 +22,15 @@ abstract class AbstractGoldJob(
   override protected def readStream(): Dataset[Row] = {
     spark.readStream
       .format("iceberg")
+      .option("streaming-max-rows-per-micro-batch", "30000")
+      .option("streaming-max-files-per-micro-batch", "10")
       .table(streamConfig.sourceTable)
   }
 
   override protected def transform(input: Dataset[Row]): Dataset[Row] = {
     val sqlTemplate = loadSqlFromResources(getSqlFilePath())
 
-    val watermarkedInput = input.withWatermark("timestamp", "5 minutes")
+    val watermarkedInput = input.withWatermark("timestamp", "2 minutes")
 
     val tempViewName = getTempViewName()
     watermarkedInput.createOrReplaceTempView(tempViewName)
@@ -41,7 +43,7 @@ abstract class AbstractGoldJob(
       .format("iceberg")
       .outputMode("append")
       .option("checkpointLocation", streamConfig.checkpointPath)
-      .trigger(Trigger.ProcessingTime("30 seconds"))
+      .trigger(Trigger.ProcessingTime("60 seconds"))
       .toTable(streamConfig.targetTable)
   }
 
@@ -84,16 +86,15 @@ abstract class AbstractGoldJob(
   }
 
   protected def loadSqlFromResources(resourcePath: String): String = {
+    var inputStream: java.io.InputStream = null
     try {
-      val inputStream = getClass.getClassLoader.getResourceAsStream(resourcePath)
+      inputStream = getClass.getClassLoader.getResourceAsStream(resourcePath)
 
       if (inputStream == null) {
         throw new RuntimeException(s"SQL file not found in resources: $resourcePath")
       }
 
       val sql = Source.fromInputStream(inputStream, "UTF-8").mkString
-
-      inputStream.close()
 
       if (sql.trim.isEmpty) {
         throw new RuntimeException(s"SQL file is empty: $resourcePath")
@@ -104,6 +105,15 @@ abstract class AbstractGoldJob(
     } catch {
       case e: Exception =>
         throw new RuntimeException(s"Failed to load SQL file: $resourcePath", e)
+    } finally {
+      if (inputStream != null) {
+        try {
+          inputStream.close()
+        } catch {
+          case e: Exception =>
+            logger.warn("Failed to close input stream for {}: {}", resourcePath, e.getMessage)
+        }
+      }
     }
   }
 }

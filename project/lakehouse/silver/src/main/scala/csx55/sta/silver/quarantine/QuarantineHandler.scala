@@ -63,7 +63,10 @@ class QuarantineHandler(spark: SparkSession) {
       spark.table(quarantineTable)
       true
     } catch {
-      case _: Exception => false
+      case e: Exception =>
+        // Expected: quarantine table may not exist yet
+        logger.debug("Quarantine table {} does not exist: {}", quarantineTable, e.getMessage)
+        false
     }
   }
 

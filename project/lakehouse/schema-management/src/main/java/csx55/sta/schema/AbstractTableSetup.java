@@ -68,7 +68,10 @@ public abstract class AbstractTableSetup {
   protected void ensureNamespaceExists(String namespace) {
     try {
       spark.sql("CREATE NAMESPACE IF NOT EXISTS " + namespace);
+      logger.info("Ensured namespace exists: {}", namespace);
     } catch (Exception e) {
+      // Expected: namespace may already exist, but log for visibility
+      logger.warn("Failed to ensure namespace {} exists: {}", namespace, e.getMessage());
     }
   }
 

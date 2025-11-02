@@ -72,7 +72,9 @@ class DeequValidator(check: Check) extends DataQualityValidator {
       val checkResultsMap = result.checkResults.asInstanceOf[java.util.Map[Check, CheckResult]]
       checkResultsMap.asScala.values.count(_.status == CheckStatus.Success).toLong
     } catch {
-      case _: Exception => 0L
+      case e: Exception =>
+        logger.warn("Failed to count passed checks, returning 0: {}", e.getMessage)
+        0L
     }
   }
 
@@ -83,7 +85,9 @@ class DeequValidator(check: Check) extends DataQualityValidator {
       val checkResultsMap = result.checkResults.asInstanceOf[java.util.Map[Check, CheckResult]]
       checkResultsMap.asScala.values.count(_.status != CheckStatus.Success).toLong
     } catch {
-      case _: Exception => 0L
+      case e: Exception =>
+        logger.warn("Failed to count failed checks, returning 0: {}", e.getMessage)
+        0L
     }
   }
 }

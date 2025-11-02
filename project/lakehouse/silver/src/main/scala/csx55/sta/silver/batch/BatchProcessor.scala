@@ -17,19 +17,21 @@ class BatchProcessor(
   private val logger = LoggerFactory.getLogger(getClass)
 
   def process(batch: Dataset[Row], batchId: Long): Unit = {
-    if (batch.isEmpty) {
-      return
-    }
-
-    val recordCount = batch.count()
+    val cachedBatch = batch.cache()
 
     try {
-      val result = validator.validate(batch)
+      if (cachedBatch.isEmpty) {
+        return
+      }
+
+      val recordCount = cachedBatch.count()
+
+      val result = validator.validate(cachedBatch)
 
       if (result.passed) {
-        handleSuccessfulBatch(batch, batchId, result)
+        handleSuccessfulBatch(cachedBatch, batchId, result, recordCount)
       } else {
-        handleFailedBatch(batch, batchId, result)
+        handleFailedBatch(cachedBatch, batchId, result, recordCount)
         logger.error("Batch {}: {} records failed validation and quarantined", batchId, recordCount)
       }
 
@@ -37,13 +39,16 @@ class BatchProcessor(
       case e: Exception =>
         logger.error("Failed to process batch {}", batchId, e)
         throw new RuntimeException(s"Batch processing failed for batch $batchId", e)
+    } finally {
+      cachedBatch.unpersist()
     }
   }
 
   private def handleSuccessfulBatch(
     batch: Dataset[Row],
     batchId: Long,
-    result: csx55.sta.silver.validation.ValidationResult
+    result: csx55.sta.silver.validation.ValidationResult,
+    recordCount: Long
   ): Unit = {
     batch.write
       .format("iceberg")
@@ -54,7 +59,7 @@ class BatchProcessor(
       batchId = batchId,
       tableName = targetTable,
       jobName = jobName,
-      recordCount = batch.count(),
+      recordCount = recordCount,
       result = result,
       quarantined = false
     )
@@ -63,7 +68,8 @@ class BatchProcessor(
   private def handleFailedBatch(
     batch: Dataset[Row],
     batchId: Long,
-    result: csx55.sta.silver.validation.ValidationResult
+    result: csx55.sta.silver.validation.ValidationResult,
+    recordCount: Long
   ): Unit = {
     logger.error("Failure details: {}", result.getFailuresOrElse("Unknown"))
 
@@ -79,7 +85,7 @@ class BatchProcessor(
       batchId = batchId,
       tableName = targetTable,
       jobName = jobName,
-      recordCount = batch.count(),
+      recordCount = recordCount,
       result = result,
       quarantined = true
     )
