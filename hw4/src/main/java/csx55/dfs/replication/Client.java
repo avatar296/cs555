@@ -121,6 +121,10 @@ public class Client extends BaseClient {
                         corruptedChunks.add(corruptionMsg);
 
                         if (attempt == 2) {
+                            // Print all corruption messages before failing
+                            for (String corruption : corruptedChunks) {
+                                System.out.println(corruption);
+                            }
                             throw new IOException("All replicas failed for chunk " + chunkNumber);
                         }
 

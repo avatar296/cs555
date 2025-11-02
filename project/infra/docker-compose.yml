@@ -68,6 +68,7 @@ services:
   # =========================================================================
 
   producer:
+    image: cowartc3/sta-producer:latest
     build:
       context: ..
       dockerfile: producer/Dockerfile
@@ -160,8 +161,8 @@ services:
   # =========================================================================
 
   spark-master:
+    image: cowartc3/sta-spark:latest
     build: ./spark
-    image: project-spark:3.5.0
     container_name: spark-master
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     depends_on:
@@ -190,16 +191,11 @@ services:
       - "8081:8080"  # Spark Master Web UI
       - "7077:7077"  # Spark Master Port
     volumes:
-      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
-      - ../lakehouse/silver/build/libs:/opt/spark/work-dir/jars/silver
-      - ../lakehouse/gold/build/libs:/opt/spark/work-dir/jars/gold
-      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
-      - spark-state:/tmp/state-store
 
   spark-worker:
+    image: cowartc3/sta-spark:latest
     build: ./spark
-    image: project-spark:3.5.0
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     depends_on:
       - spark-master
@@ -209,28 +205,25 @@ services:
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_MEMORY=2g
       - SPARK_NO_DAEMONIZE=true
-      # Enable External Shuffle Service (required for dynamic allocation)
       - SPARK_WORKER_OPTS=-Dspark.shuffle.service.enabled=true -Dspark.shuffle.service.port=7337
       # MinIO S3 Configuration
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
-      - ../lakehouse/silver/build/libs:/opt/spark/work-dir/jars/silver
-      - ../lakehouse/gold/build/libs:/opt/spark/work-dir/jars/gold
-      - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
-      - spark-state:/tmp/state-store
     deploy:
-      replicas: 2  # 2 workers = 4 cores, 4GB total (right-sized for 512MB executors)
+      replicas: 2
 
   # =========================================================================
   # BRONZE
   # =========================================================================
 
   bronze-table-setup:
-    image: project-spark:3.5.0
+    image: cowartc3/sta-schema-management:latest
+    build:
+      context: ..
+      dockerfile: lakehouse/schema-management/Dockerfile
     container_name: bronze-table-setup
     command: >
       /opt/spark/bin/spark-submit
@@ -243,7 +236,7 @@ services:
       --conf spark.hadoop.fs.s3a.secret.key=admin123
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
       --conf spark.hadoop.fs.s3a.path.style.access=true
-      /opt/spark/work-dir/jars/schema/schema-management.jar
+      /opt/spark/work-dir/jars/schema-management.jar
       bronze
     depends_on:
       spark-master:
@@ -261,7 +254,6 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ../lakehouse/schema-management/build/libs:/opt/spark/work-dir/jars/schema
       - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
     restart: on-failure
     deploy:
@@ -271,7 +263,10 @@ services:
           memory: 2G
 
   bronze-trips-consumer:
-    image: project-spark:3.5.0
+    image: cowartc3/sta-bronze:latest
+    build:
+      context: ..
+      dockerfile: lakehouse/bronze/Dockerfile
     container_name: bronze-trips-consumer
     command: >
       /opt/spark/bin/spark-submit
@@ -297,7 +292,7 @@ services:
       --conf spark.hadoop.fs.s3a.secret.key=admin123
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
       --conf spark.hadoop.fs.s3a.path.style.access=true
-      /opt/spark/work-dir/jars/bronze/bronze.jar
+      /opt/spark/work-dir/jars/bronze.jar
     depends_on:
       bronze-table-setup:
         condition: service_completed_successfully
@@ -312,12 +307,10 @@ services:
       postgres-iceberg:
         condition: service_healthy
     environment:
-      # MinIO S3 Configuration (for checkpoints)
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
       - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
@@ -339,7 +332,10 @@ services:
     restart: unless-stopped
 
   # bronze-weather-consumer:
-  #   image: project-spark:3.5.0
+  #   image: cowartc3/sta-bronze:latest
+  #   build:
+  #     context: ..
+  #     dockerfile: lakehouse/bronze/Dockerfile
   #   container_name: bronze-weather-consumer
   #   command: >
   #     /opt/spark/bin/spark-submit
@@ -365,7 +361,7 @@ services:
   #     --conf spark.hadoop.fs.s3a.secret.key=admin123
   #     --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
   #     --conf spark.hadoop.fs.s3a.path.style.access=true
-  #     /opt/spark/work-dir/jars/bronze/bronze.jar
+  #     /opt/spark/work-dir/jars/bronze.jar
   #   depends_on:
   #     bronze-table-setup:
   #       condition: service_completed_successfully
@@ -385,7 +381,6 @@ services:
   #     - AWS_SECRET_ACCESS_KEY=admin123
   #     - AWS_REGION=us-east-1
   #   volumes:
-  #     - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
   #     - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
   #     - spark-logs:/opt/spark/logs
   #     - spark-state:/tmp/state-store
@@ -407,7 +402,10 @@ services:
   #   restart: unless-stopped
 
   # bronze-events-consumer:
-  #   image: project-spark:3.5.0
+  #   image: cowartc3/sta-bronze:latest
+  #   build:
+  #     context: ..
+  #     dockerfile: lakehouse/bronze/Dockerfile
   #   container_name: bronze-events-consumer
   #   command: >
   #     /opt/spark/bin/spark-submit
@@ -433,7 +431,7 @@ services:
   #     --conf spark.hadoop.fs.s3a.secret.key=admin123
   #     --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
   #     --conf spark.hadoop.fs.s3a.path.style.access=true
-  #     /opt/spark/work-dir/jars/bronze/bronze.jar
+  #     /opt/spark/work-dir/jars/bronze.jar
   #   depends_on:
   #     bronze-table-setup:
   #       condition: service_completed_successfully
@@ -453,7 +451,6 @@ services:
   #     - AWS_SECRET_ACCESS_KEY=admin123
   #     - AWS_REGION=us-east-1
   #   volumes:
-  #     - ../lakehouse/bronze/build/libs:/opt/spark/work-dir/jars/bronze
   #     - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
   #     - spark-logs:/opt/spark/logs
   #     - spark-state:/tmp/state-store
@@ -479,7 +476,7 @@ services:
   # =========================================================================
 
   monitoring-table-setup:
-    image: project-spark:3.5.0
+    image: cowartc3/sta-schema-management:latest
     container_name: monitoring-table-setup
     command: >
       /opt/spark/bin/spark-submit
@@ -492,7 +489,7 @@ services:
       --conf spark.hadoop.fs.s3a.secret.key=admin123
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
       --conf spark.hadoop.fs.s3a.path.style.access=true
-      /opt/spark/work-dir/jars/schema/schema-management.jar
+      /opt/spark/work-dir/jars/schema-management.jar
       monitoring
     depends_on:
       spark-master:
@@ -506,7 +503,6 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ../lakehouse/schema-management/build/libs:/opt/spark/work-dir/jars/schema
       - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
     restart: on-failure
     deploy:
@@ -516,7 +512,7 @@ services:
           memory: 2G
 
   silver-table-setup:
-    image: project-spark:3.5.0
+    image: cowartc3/sta-schema-management:latest
     container_name: silver-table-setup
     command: >
       /opt/spark/bin/spark-submit
@@ -529,7 +525,7 @@ services:
       --conf spark.hadoop.fs.s3a.secret.key=admin123
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
       --conf spark.hadoop.fs.s3a.path.style.access=true
-      /opt/spark/work-dir/jars/schema/schema-management.jar
+      /opt/spark/work-dir/jars/schema-management.jar
       silver
     depends_on:
       monitoring-table-setup:
@@ -545,7 +541,6 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ../lakehouse/schema-management/build/libs:/opt/spark/work-dir/jars/schema
       - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
     restart: on-failure
     deploy:
@@ -555,7 +550,10 @@ services:
           memory: 2G
 
   silver-trips-consumer:
-    image: project-spark:3.5.0
+    image: cowartc3/sta-silver:latest
+    build:
+      context: ..
+      dockerfile: lakehouse/silver/Dockerfile
     container_name: silver-trips-consumer
     command: >
       /opt/spark/bin/spark-submit
@@ -581,7 +579,7 @@ services:
       --conf spark.hadoop.fs.s3a.secret.key=admin123
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
       --conf spark.hadoop.fs.s3a.path.style.access=true
-      /opt/spark/work-dir/jars/silver/silver.jar
+      /opt/spark/work-dir/jars/silver.jar
     depends_on:
       silver-table-setup:
         condition: service_completed_successfully
@@ -592,7 +590,6 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ../lakehouse/silver/build/libs:/opt/spark/work-dir/jars/silver
       - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
@@ -614,7 +611,10 @@ services:
     restart: unless-stopped
 
   # silver-weather-consumer:
-  #   image: project-spark:3.5.0
+  #   image: cowartc3/sta-silver:latest
+  #   build:
+  #     context: ..
+  #     dockerfile: lakehouse/silver/Dockerfile
   #   container_name: silver-weather-consumer
   #   command: >
   #     /opt/spark/bin/spark-submit
@@ -640,7 +640,7 @@ services:
   #     --conf spark.hadoop.fs.s3a.secret.key=admin123
   #     --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
   #     --conf spark.hadoop.fs.s3a.path.style.access=true
-  #     /opt/spark/work-dir/jars/silver/silver.jar
+  #     /opt/spark/work-dir/jars/silver.jar
   #   depends_on:
   #     bronze-weather-consumer:
   #       condition: service_started
@@ -651,7 +651,6 @@ services:
   #     - AWS_SECRET_ACCESS_KEY=admin123
   #     - AWS_REGION=us-east-1
   #   volumes:
-  #     - ../lakehouse/silver/build/libs:/opt/spark/work-dir/jars/silver
   #     - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
   #     - spark-logs:/opt/spark/logs
   #     - spark-state:/tmp/state-store
@@ -673,7 +672,10 @@ services:
   #   restart: unless-stopped
 
   # silver-events-consumer:
-  #   image: project-spark:3.5.0
+  #   image: cowartc3/sta-silver:latest
+  #   build:
+  #     context: ..
+  #     dockerfile: lakehouse/silver/Dockerfile
   #   container_name: silver-events-consumer
   #   command: >
   #     /opt/spark/bin/spark-submit
@@ -699,7 +701,7 @@ services:
   #     --conf spark.hadoop.fs.s3a.secret.key=admin123
   #     --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
   #     --conf spark.hadoop.fs.s3a.path.style.access=true
-  #     /opt/spark/work-dir/jars/silver/silver.jar
+  #     /opt/spark/work-dir/jars/silver.jar
   #   depends_on:
   #     silver-table-setup:
   #       condition: service_completed_successfully
@@ -710,7 +712,6 @@ services:
   #     - AWS_SECRET_ACCESS_KEY=admin123
   #     - AWS_REGION=us-east-1
   #   volumes:
-  #     - ../lakehouse/silver/build/libs:/opt/spark/work-dir/jars/silver
   #     - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
   #     - spark-logs:/opt/spark/logs
   #     - spark-state:/tmp/state-store
@@ -736,7 +737,7 @@ services:
   # =========================================================================
 
   gold-table-setup:
-    image: project-spark:3.5.0
+    image: cowartc3/sta-schema-management:latest
     container_name: gold-table-setup
     command: >
       /opt/spark/bin/spark-submit
@@ -749,7 +750,7 @@ services:
       --conf spark.hadoop.fs.s3a.secret.key=admin123
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
       --conf spark.hadoop.fs.s3a.path.style.access=true
-      /opt/spark/work-dir/jars/schema-management/schema-management.jar
+      /opt/spark/work-dir/jars/schema-management.jar
       gold
     depends_on:
       postgres-iceberg:
@@ -763,11 +764,13 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ../lakehouse/schema-management/build/libs:/opt/spark/work-dir/jars/schema-management
       - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
 
   # gold-time-dim-loader:
-  #   image: project-spark:3.5.0
+  #   image: cowartc3/sta-gold:latest
+  #   build:
+  #     context: ..
+  #     dockerfile: lakehouse/gold/Dockerfile
   #   container_name: gold-time-dim-loader
   #   command: >
   #     /opt/spark/bin/spark-submit
@@ -780,7 +783,7 @@ services:
   #     --conf spark.hadoop.fs.s3a.secret.key=admin123
   #     --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
   #     --conf spark.hadoop.fs.s3a.path.style.access=true
-  #     /opt/spark/work-dir/jars/gold/gold-layer.jar
+  #     /opt/spark/work-dir/jars/gold-layer.jar
   #     load-time-dim
   #   depends_on:
   #     gold-table-setup:
@@ -790,11 +793,13 @@ services:
   #     - AWS_SECRET_ACCESS_KEY=admin123
   #     - AWS_REGION=us-east-1
   #   volumes:
-  #     - ../lakehouse/gold/build/libs:/opt/spark/work-dir/jars/gold
   #     - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
 
   # gold-location-dim-loader:
-  #   image: project-spark:3.5.0
+  #   image: cowartc3/sta-gold:latest
+  #   build:
+  #     context: ..
+  #     dockerfile: lakehouse/gold/Dockerfile
   #   container_name: gold-location-dim-loader
   #   command: >
   #     /opt/spark/bin/spark-submit
@@ -807,7 +812,7 @@ services:
   #     --conf spark.hadoop.fs.s3a.secret.key=admin123
   #     --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
   #     --conf spark.hadoop.fs.s3a.path.style.access=true
-  #     /opt/spark/work-dir/jars/gold/gold-layer.jar
+  #     /opt/spark/work-dir/jars/gold-layer.jar
   #     load-location-dim
   #   depends_on:
   #     gold-table-setup:
@@ -819,11 +824,13 @@ services:
   #     - AWS_SECRET_ACCESS_KEY=admin123
   #     - AWS_REGION=us-east-1
   #   volumes:
-  #     - ../lakehouse/gold/build/libs:/opt/spark/work-dir/jars/gold
   #     - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
 
   # gold-trip-metrics:
-  #   image: project-spark:3.5.0
+  #   image: cowartc3/sta-gold:latest
+  #   build:
+  #     context: ..
+  #     dockerfile: lakehouse/gold/Dockerfile
   #   container_name: gold-trip-metrics
   #   command: >
   #     /opt/spark/bin/spark-submit
@@ -849,11 +856,14 @@ services:
   #     --conf spark.hadoop.fs.s3a.secret.key=admin123
   #     --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
   #     --conf spark.hadoop.fs.s3a.path.style.access=true
-  #     /opt/spark/work-dir/jars/gold/gold-layer.jar
+  #     /opt/spark/work-dir/jars/gold-layer.jar
   #     trip-metrics-live
 
   pipeline-latency-metrics:
-    image: project-spark:3.5.0
+    image: cowartc3/sta-gold:latest
+    build:
+      context: ..
+      dockerfile: lakehouse/gold/Dockerfile
     container_name: pipeline-latency-metrics
     command: >
       /opt/spark/bin/spark-submit
@@ -879,7 +889,7 @@ services:
       --conf spark.hadoop.fs.s3a.secret.key=admin123
       --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
       --conf spark.hadoop.fs.s3a.path.style.access=true
-      /opt/spark/work-dir/jars/gold/gold-layer.jar
+      /opt/spark/work-dir/jars/gold-layer.jar
       pipeline-latency
     depends_on:
       monitoring-table-setup:
@@ -891,7 +901,6 @@ services:
       - AWS_SECRET_ACCESS_KEY=admin123
       - AWS_REGION=us-east-1
     volumes:
-      - ../lakehouse/gold/build/libs:/opt/spark/work-dir/jars/gold
       - ../lakehouse/streaming/src/main/resources:/opt/spark/work-dir/conf
       - spark-logs:/opt/spark/logs
       - spark-state:/tmp/state-store
