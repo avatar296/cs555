@@ -82,14 +82,44 @@ public class Controller extends BaseController {
         if (servers == null || servers.isEmpty()) {
             return null;
         }
+
+        // Filter out dead servers
+        List<String> aliveServers = new ArrayList<>();
+        for (String serverId : servers) {
+            if (chunkServers.containsKey(serverId)) {
+                aliveServers.add(serverId);
+            }
+        }
+
+        if (aliveServers.isEmpty()) {
+            return null;
+        }
+
         Random random = new Random();
-        return servers.get(random.nextInt(servers.size()));
+        return aliveServers.get(random.nextInt(aliveServers.size()));
     }
 
     private void processChunkServerForReadRequest(
             ChunkServerForReadRequest request, TCPConnection connection) throws IOException {
-        String server = getChunkServerForRead(request.getFilename(), request.getChunkNumber());
-        ChunkServerForReadResponse response = new ChunkServerForReadResponse(server);
+        // Return ALL replicas instead of just one random replica
+        String key = request.getFilename() + ":" + request.getChunkNumber();
+        List<String> servers = chunkLocations.get(key);
+
+        if (servers == null || servers.isEmpty()) {
+            ChunkServersResponse response = new ChunkServersResponse(new ArrayList<>());
+            connection.sendMessage(response);
+            return;
+        }
+
+        // Filter out dead servers
+        List<String> aliveServers = new ArrayList<>();
+        for (String serverId : servers) {
+            if (chunkServers.containsKey(serverId)) {
+                aliveServers.add(serverId);
+            }
+        }
+
+        ChunkServersResponse response = new ChunkServersResponse(aliveServers);
         connection.sendMessage(response);
     }
 

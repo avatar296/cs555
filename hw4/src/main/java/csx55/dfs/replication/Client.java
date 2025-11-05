@@ -78,13 +78,18 @@ public class Client extends BaseClient {
             boolean chunkSucceeded = false;
             byte[] chunkData = null;
 
-            for (int attempt = 0; attempt < 3; attempt++) {
+            // Get ALL replicas for this chunk upfront
+            List<String> replicaServers = getFragmentLocationsForRead(sourcePath, chunkNumber);
 
-                String chunkServer = getChunkServerForRead(sourcePath, chunkNumber);
+            if (replicaServers == null || replicaServers.isEmpty()) {
+                failedServers.add("Failed to locate chunk " + chunkNumber);
+                throw new IOException("Cannot locate chunk " + chunkNumber);
+            }
 
+            // Try each replica in sequence until one succeeds
+            for (String chunkServer : replicaServers) {
                 if (chunkServer == null) {
-                    failedServers.add("Failed to locate chunk " + chunkNumber);
-                    throw new IOException("Cannot locate chunk " + chunkNumber);
+                    continue;
                 }
 
                 try {
@@ -119,24 +124,25 @@ public class Client extends BaseClient {
                                         + sliceNumber
                                         + " is corrupted";
                         corruptedChunks.add(corruptionMsg);
-
-                        if (attempt == 2) {
-                            // Print all corruption messages before failing
-                            for (String corruption : corruptedChunks) {
-                                System.out.println(corruption);
-                            }
-                            throw new IOException("All replicas failed for chunk " + chunkNumber);
-                        }
+                        // Continue to try next replica
 
                     } else {
 
                         failedServers.add(chunkServer + " has failed");
-                        throw e;
+                        // Continue to try next replica
                     }
                 }
             }
 
-            if (chunkSucceeded && chunkData != null) {
+            // If no replica succeeded, throw exception with corruption details
+            if (!chunkSucceeded) {
+                for (String corruption : corruptedChunks) {
+                    System.out.println(corruption);
+                }
+                throw new IOException("All replicas failed for chunk " + chunkNumber);
+            }
+
+            if (chunkData != null) {
                 fileOutput.write(chunkData);
             }
         }
