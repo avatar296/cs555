@@ -1,0 +1,52 @@
+graph TB
+    %% Layer 1 - Front-End SOA Services
+    subgraph FE["Front-End SOA Services"]
+        direction LR
+        A1[Sales]
+        A2[Dealer Relations]
+        A3[Credit]
+        A4[Funding]
+    end
+
+    %% Layer 2 - Back-End Services
+    subgraph BE["Back-End Loan Origination Services"]
+        direction LR
+        C1[Legal-Contracts]
+        C2[Dispositions]
+        C3[Loan Processing]
+        C4[Document Management]
+    end
+
+    FE --> BE
+
+    %% Layer 3 - Service Bus / Event Streaming
+    D1[Apache Kafka<br/>Service Bus & Event Streaming<br/>Topics: loan-events, contract-events, disposition-events]
+
+    BE <--> D1
+
+    %% Layer 4 - Medallion Architecture
+    E1[BRONZE Layer<br/>Raw Data Ingestion<br/>Parquet Storage]
+    E2[SILVER Layer<br/>Cleaned & Validated<br/>Apache Spark Processing]
+    E3[GOLD Layer<br/>Analytics-Ready<br/>Business Insights]
+
+    D1 --> E1
+    E1 --> E2
+    E2 --> E3
+
+    %% Styling
+    classDef frontend fill:#3b82f6,stroke:#1e40af,stroke-width:2px,color:#fff
+    classDef backend fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
+    classDef kafka fill:#f59e0b,stroke:#d97706,stroke-width:3px,color:#fff
+    classDef bronze fill:#cd7f32,stroke:#8b5a00,stroke-width:2px,color:#fff
+    classDef silver fill:#c0c0c0,stroke:#808080,stroke-width:2px,color:#000
+    classDef gold fill:#ffd700,stroke:#b8860b,stroke-width:2px,color:#000
+
+    class A1,A2,A3,A4 frontend
+    class C1,C2,C3,C4 backend
+    class D1 kafka
+    class E1 bronze
+    class E2 silver
+    class E3 gold
+
+    style FE fill:#eff6ff,stroke:#3b82f6,stroke-width:3px
+    style BE fill:#f0fdf4,stroke:#10b981,stroke-width:3px
