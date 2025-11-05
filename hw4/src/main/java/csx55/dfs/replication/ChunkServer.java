@@ -193,7 +193,14 @@ public class ChunkServer extends BaseChunkServer {
         byte[][] storedChecksums = new byte[SLICES_PER_CHUNK][20];
         try (FileInputStream fis = new FileInputStream(metadataPath.toFile())) {
             for (int i = 0; i < SLICES_PER_CHUNK; i++) {
-                fis.read(storedChecksums[i]);
+                int bytesRead = fis.read(storedChecksums[i]);
+                if (bytesRead != 20) {
+                    throw new IOException(
+                            "Corrupted or incomplete metadata file for "
+                                    + filename
+                                    + "_chunk"
+                                    + chunkNumber);
+                }
             }
         }
 
